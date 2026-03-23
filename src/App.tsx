@@ -1,17 +1,16 @@
-import * as React from "react";
-import { ChakraProvider, ColorModeScript, useToast } from "@chakra-ui/react";
+import { ChakraProvider, useToast } from '@chakra-ui/react';
+import * as React from 'react';
 
-import SidebarWithHeader from "./Components/Sidebar";
-import SimulatorView from "./Components/pages/Simulator View/SimulatorView";
-import InstructionSetPage from "./Components/pages/InstructionSet/InstructionSet";
-import Logger from "./Service/Logger";
-import ExamplePage from "./Components/pages/Exemples/ExamplePage";
-import CreditsPage from "./Components/pages/Credits";
-import theme from "./Components/utils/theme";
+import SidebarWithHeader from './Components/Sidebar';
+import CreditsPage from './Components/pages/Credits';
+import ExamplePage from './Components/pages/Exemples/ExamplePage';
+import InstructionSetPage from './Components/pages/InstructionSet/InstructionSet';
+import SimulatorView from './Components/pages/Simulator View/SimulatorView';
+import theme from './Components/utils/theme';
+import Logger from './Service/Logger';
+import { SimulatorProvider } from './hooks/simulator.hook';
 
-export function App()
-{
-
+export function App() {
   const toast = useToast();
   const log = Logger.instance;
 
@@ -19,7 +18,7 @@ export function App()
 
   // @doc : add to doc
   const handleKeyPress = React.useCallback((event: KeyboardEvent) => {
-    if(event.key == "F8") checkAppDebugs();
+    if (event.key == 'F8') checkAppDebugs();
   }, []);
 
   React.useEffect(() => {
@@ -32,28 +31,24 @@ export function App()
     };
   }, [handleKeyPress]);
 
-  function checkAppErrors()
-  {
-    if(log.appErrors.length > 0)
-    {
+  function checkAppErrors() {
+    if (log.appErrors.length > 0) {
       toast({
-        title: "App Error",
+        title: 'App Error',
         description: log.popAppError(),
-        status: "error",
+        status: 'error',
         duration: 5000,
         isClosable: true,
       });
     }
   }
 
-  function checkAppDebugs()
-  {
-    if(log.appInternalMessages.length > 0)
-    {
+  function checkAppDebugs() {
+    if (log.appInternalMessages.length > 0) {
       toast({
-        title: "App Debug",
+        title: 'App Debug',
         description: log.popAppInternalMessage(),
-        status: "warning",
+        status: 'warning',
         duration: 5000,
         isClosable: true,
       });
@@ -61,18 +56,25 @@ export function App()
   }
 
   React.useEffect(() => {
-    if(interval == null) setIntervalID(setInterval(() => {
-      checkAppErrors();
-      //checkAppDebugs();
-    }, 1000));
+    if (interval == null)
+      setIntervalID(
+        setInterval(() => {
+          checkAppErrors();
+          //checkAppDebugs();
+        }, 1000),
+      );
   }, []);
 
-  return (<ChakraProvider theme={theme}>
-    <SidebarWithHeader>
-      <SimulatorView />
-      <InstructionSetPage />
-      <ExamplePage/>
-      <CreditsPage/>
-    </SidebarWithHeader>
-  </ChakraProvider>)
+  return (
+    <SimulatorProvider>
+      <ChakraProvider theme={theme}>
+        <SidebarWithHeader>
+          <SimulatorView />
+          <InstructionSetPage />
+          <ExamplePage />
+          <CreditsPage />
+        </SidebarWithHeader>
+      </ChakraProvider>
+    </SimulatorProvider>
+  );
 }
