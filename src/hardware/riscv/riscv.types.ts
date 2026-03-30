@@ -1,5 +1,5 @@
-import type { ICPU, IDecodedInstruction } from "../common/processor";
-import type { rv_codec, rv_opcode } from "./riscv.const";
+import type { ICPU, IDecodedInstruction } from '../common/processor';
+import type { rv_codec, rv_opcode } from './riscv.const';
 
 export interface IDecodedRVInstruction extends IDecodedInstruction {
   // Instruction bytecode
@@ -8,8 +8,11 @@ export interface IDecodedRVInstruction extends IDecodedInstruction {
   // Instruction codec
   codec: rv_codec;
 
-  // Instruction op
-  op: rv_opcode;
+  // Instruction in enum
+  _op: rv_opcode;
+
+  // Instruction opcode
+  opcode: number;
 
   // RV32I fields:
 

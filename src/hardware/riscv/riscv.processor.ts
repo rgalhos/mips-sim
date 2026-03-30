@@ -29,7 +29,10 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly instructions = rv_opcode;
   public readonly opcodeInfo = RV_OPCODE_DATA;
 
-  protected readonly DRAM_BASE_ADDRESS = 0x80000000n;
+  //protected readonly DRAM_BASE_ADDRESS = 0x80000000n;
+  protected readonly DRAM_BASE_ADDRESS = 4096n;
+
+  public readonly INSTRUCTION_LENGTH = 4;
 
   protected readonly cpu: IRVCPU = {
     register: {
@@ -70,8 +73,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   };
 
   public assemble(instruction: Partial<IDecodedRVInstruction>): bigint {
-    const op = instruction.op ?? rv_opcode.illegal;
-    if (op === rv_opcode.illegal) return 0n;
+    const op = instruction._op ?? rv_opcode.illegal;
+    if (!instruction || op === rv_opcode.illegal) return 0n;
 
     const rd = BigInt(instruction.rd ?? rv_reg.zero);
     const rs1 = BigInt(instruction.rs1 ?? rv_reg.zero);
@@ -269,7 +272,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     if (op === rv_opcode.illegal) {
       return {
         inst,
-        op: rv_opcode.illegal,
+        _op: rv_opcode.illegal,
+        opcode: 0,
         codec: rv_codec.illegal,
         rd: rv_reg.zero,
         rs1: rv_reg.zero,
@@ -282,7 +286,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     const codec = RV_OPCODE_DATA[op].codec;
     const dec: IDecodedRVInstruction = {
       inst,
-      op,
+      _op: rv_opcode.illegal,
+      opcode: 0,
       codec,
       rd: rv_reg.zero,
       rs1: rv_reg.zero,
@@ -331,7 +336,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   execute(d: IDecodedRVInstruction): void {
     console.log('WIMS: rv.execute: ' + this.stringifyInstruction(d));
 
-    switch (d.op) {
+    switch (d._op) {
       case rv_opcode.lui:
         this.registerWrite(d.rd, d.imm);
         break;
@@ -339,7 +344,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   }
 
   public stringifyInstruction(instruction: Partial<IDecodedRVInstruction>): string {
-    const opcode = instruction.op || rv_opcode.illegal;
+    const opcode = instruction._op || rv_opcode.illegal;
     const rd = rv_reg[instruction.rd || rv_reg.zero];
     const rs1 = rv_reg[instruction.rs1 || rv_reg.zero];
     const rs2 = rv_reg[instruction.rs2 || rv_reg.zero];
@@ -352,7 +357,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     for (const c of fmt) {
       if (c === 'O') {
-        str += opcode;
+        str += op_info.name;
       } else if (c === 'd') {
         str += rd;
       } else if (c === '1') {

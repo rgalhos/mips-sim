@@ -7,8 +7,11 @@ export interface IDecodedInstruction {
   // Instruction codec
   codec: unknown;
 
-  // Instruction op
-  op: unknown;
+  // Instruction opcode
+  opcode: number;
+
+  // From instruction enum
+  _op: unknown;
 }
 
 export type ICPU = Record<string, unknown> & {
@@ -37,6 +40,11 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
    * Architecture base address
    */
   protected readonly DRAM_BASE_ADDRESS: bigint = 0x00000000000n;
+
+  /**
+   * Architecture instruction length
+   */
+  public readonly INSTRUCTION_LENGTH: number = 4;
 
   /**
    * CPU

@@ -113,10 +113,10 @@ export function reg5(x: bigint): bigint {
   return x & 0x1fn;
 }
 
-export function encodeRType(op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint): bigint {
+export function encodeRType(_op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint): bigint {
   let f3 = 0n;
   let f7 = 0n;
-  switch (op) {
+  switch (_op) {
     case rv_opcode.add:
       f3 = 0n;
       f7 = 0n;
