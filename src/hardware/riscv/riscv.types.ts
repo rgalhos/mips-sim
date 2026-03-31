@@ -3,7 +3,7 @@ import type { rv_codec, rv_opcode } from './riscv.const';
 
 export interface IDecodedRVInstruction extends IDecodedInstruction {
   // Instruction bytecode
-  inst: bigint;
+  bytecode: bigint;
 
   // Instruction codec
   codec: rv_codec;

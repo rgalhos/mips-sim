@@ -1,5 +1,13 @@
 import type { IUserManual } from './manual';
-import type { IProcessor } from './processor';
+import type { IDecodedInstruction, IProcessor } from './processor';
+
+export interface IAssembledInstruction<TDecoded extends IDecodedInstruction = IDecodedInstruction> {
+  code: string;
+  lineNumber: string;
+  decoded: TDecoded;
+  address: bigint;
+  scope?: string;
+}
 
 export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor<any>> {
   static name = 'Uninitialized simulator';

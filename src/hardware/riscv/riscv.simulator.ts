@@ -1,5 +1,5 @@
 import { IUserManual } from '../common/manual';
-import { ISimulator } from '../common/simulator';
+import { IAssembledInstruction, ISimulator } from '../common/simulator';
 import { rv_codec, rv_opcode, RV_OPCODE_DATA, rv_opcode_pseudo, rv_reg } from './riscv.const';
 import { RVProcessor } from './riscv.processor';
 import { IDecodedRVInstruction } from './riscv.types';
@@ -25,10 +25,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     const tok2 = tokens[2];
     const tok3 = tokens[3];
 
-    console.log(tokens);
-
     const dec: IDecodedRVInstruction = {
-      inst: 0n,
+      bytecode: 0n,
       codec: rv_codec.illegal,
       _op: rv_opcode.illegal,
       opcode: 0,
@@ -45,6 +43,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     dec._op = rv_opcode[tokOp];
     dec.opcode = data.opcode;
     dec.codec = data.codec;
+    // @todo detect invalid revisters
     dec.rd = Number.isNaN(+tok1) ? (rv_reg[tok1 as keyof typeof rv_reg] ?? rv_reg.zero) : rv_reg.zero;
     dec.rs1 = Number.isNaN(+tok2) ? (rv_reg[tok2 as keyof typeof rv_reg] ?? rv_reg.zero) : rv_reg.zero;
     dec.rs2 = Number.isNaN(+tok3) ? (rv_reg[tok3 as keyof typeof rv_reg] ?? rv_reg.zero) : rv_reg.zero;
@@ -55,17 +54,17 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       dec.imm = Number.isNaN(+tok2) ? 0n : BigInt(tok2);
     }
 
-    dec.inst = this.processor.assemble(dec);
+    dec.bytecode = this.processor.toBytecode(dec);
 
     return dec;
   }
 
-  public assembleCode(code: string) {
+  public assembleCode(code: string): Array<IAssembledInstruction<IDecodedRVInstruction>> {
     //function assemble(code) {
     // Remove comments
     const labels: Record<string, bigint> = {};
-    /** @type {IAss[]} */
-    const lines = [];
+    const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
+    const errors = [];
 
     let currentLabel = '';
     let currentAddress = 0x0n;
@@ -92,7 +91,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         }
 
         if (labels[_label]) {
+          errors.push({ lineNumber: idx, line: codeSplit[idx], message: 'Label já declarada' });
           console.warn('Label já declarada');
+          continue;
         }
 
         labels[_label] = currentAddress;
@@ -105,6 +106,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         if (line.toLowerCase().startsWith('.org')) {
           const addr = line.split(/ +/)[1];
           if (Number.isNaN(addr)) {
+            errors.push({ lineNumber: idx, line: codeSplit[idx], message: 'Endereço de memória inválido' });
             console.error('Invalid address');
             continue;
           }
@@ -113,12 +115,16 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         }
       } else {
         line = line.replace(/,/g, ' ').replace(/\s+/g, ' ').toLowerCase();
+
         //console.log(line);
-        const decoded = this.assembleLine(line.split(' '));
+        const tokens = line.split(' ');
+        console.log(tokens);
+        const decoded = this.assembleLine(tokens);
         //console.log(ass, this.processor.stringifyInstruction(ass));
 
-        lines.push({
-          line,
+        assembledInstructions.push({
+          code: line,
+          lineNumber: idx,
           decoded,
           address: currentAddress,
           scope: currentLabel,
@@ -128,28 +134,42 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
     }
 
-    for (const inst of lines) {
+    for (const inst of assembledInstructions) {
+      let offset = '';
       if (inst.decoded.codec === rv_codec.b) {
-        let offset = inst.line.split(' ')?.[3];
-
-        if (!offset || !Number.isNaN(+offset)) {
-          continue;
-        } else if (offset[0] === '.') {
-          offset = inst.scope + offset;
-        }
-
-        const offsetAddr = labels[offset];
-        if (!offsetAddr) {
-          console.error('Inexistent label', offsetAddr);
-        }
-
-        inst.decoded.imm = offsetAddr;
+        offset = inst.code.split(' ')?.[3];
+      } else if ([rv_opcode.jal].includes(inst.decoded._op)) {
+        // instruções do tipo: jal x0, OFFSET (token[2])
+        offset = inst.code.split(' ')?.[2];
+      } else {
+        continue;
       }
+      console.log(inst, offset, '0x' + inst.decoded.bytecode.toString(16));
+
+      if (!offset || !Number.isNaN(+offset)) {
+        continue;
+      } else if (offset[0] === '.') {
+        offset = inst.scope + offset;
+      }
+
+      const offsetAddr = labels[offset];
+      if (!offsetAddr) {
+        errors.push({
+          lineNumber: inst.lineNumber,
+          line: codeSplit[Number(inst.lineNumber)],
+          message: 'Referência a uma label inexistente',
+        });
+
+        console.error('Inexistent label', offsetAddr);
+      }
+
+      inst.decoded.imm = offsetAddr;
+      inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
     }
 
-    console.log({ labels });
+    console.log(labels, errors);
 
-    return lines;
+    return assembledInstructions;
   }
 }
 

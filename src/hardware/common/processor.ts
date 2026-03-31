@@ -1,8 +1,10 @@
+import { IAssembledInstruction } from './simulator';
+
 type TAnyEnum = Record<string, any>;
 
 export interface IDecodedInstruction {
   // Instruction bytecode
-  inst: bigint;
+  bytecode: bigint;
 
   // Instruction codec
   codec: unknown;
@@ -34,7 +36,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   /**
    * Simulator memory
    */
-  protected readonly memory: bigint[] = [];
+  public memory: number[] = [];
 
   /**
    * Architecture base address
@@ -68,13 +70,13 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
    * Function that will be used by the assembler
    * It takes a decoded instruction object and returns the instruction in bytecode
    */
-  abstract assemble(instruction: Partial<TDecodedInstruction>): bigint;
+  abstract toBytecode(instruction: Partial<TDecodedInstruction>): bigint;
 
   /**
    * Function that will be used by the disassembler
    * It takes the instruction bytecode and returns a decoded instruction object
    */
-  abstract disassemble(instruction: bigint): TDecodedInstruction;
+  abstract fromBytecode(instruction: bigint): TDecodedInstruction;
 
   /**
    * Function that will execute the instruction
@@ -102,7 +104,8 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
     this.cpu.register[reg] = value;
   }
 
-  protected memoryWrite(address: number, value: bigint, bits: 8 | 16 | 32 = 8): void {
+  protected memoryWrite(address: number | bigint, value: bigint, bits: 8 | 16 | 32 = 8): void {
+    address = Number(address);
     switch (bits) {
       // case 64:
       //   this.memory[address + 7] = (value >> 56) & 0xff;
@@ -111,23 +114,24 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
       //   this.memory[address + 4] = (value >> 32) & 0xff;
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 32: {
-        this.memory[address + 3] = (value >> 24n) & 0xffn;
-        this.memory[address + 2] = (value >> 16n) & 0xffn;
+        this.memory[address + 3] = Number((value >> 24n) & 0xffn);
+        this.memory[address + 2] = Number((value >> 16n) & 0xffn);
       }
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 16: {
-        this.memory[address + 1] = (value >> 8n) & 0xffn;
+        this.memory[address + 1] = Number((value >> 8n) & 0xffn);
       } // eslint-disable-next-line no-fallthrough
       default: {
-        this.memory[address + 0] = value & 0xffn;
+        this.memory[address + 0] = Number(value & 0xffn);
       }
     }
   }
 
-  protected memoryRead(address: number, bits: 8 | 16 | 32 | 64 = 8): bigint {
+  protected memoryRead(address: number | bigint, bits: 8 | 16 | 32 | 64 = 8): bigint {
+    address = Number(address);
     // If address is empty we generate a random number (garbage) and save it to the address.
     const read = (addr: number) => {
-      let v = this.memory[address];
+      let v = BigInt(this.memory[addr]);
       if (typeof v === 'undefined') {
         v = BigInt((Math.random() * 32768) & 255);
         this.memoryWrite(addr, v);
@@ -147,10 +151,10 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
       // }
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 32: {
-        v |= ((read(address + 3) << 24n) & 0xffn) | ((read(address + 2) << 16n) & 0xffn);
+        v |= ((read(address + 3) & 0xffn) << 24n) | ((read(address + 2) & 0xffn) << 16n);
       } // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 16: {
-        v |= (read(address + 1) << 8n) & 0xffn;
+        v |= (read(address + 1) & 0xffn) << 8n;
       } // eslint-disable-next-line no-fallthrough
       default: {
         v |= read(address + 0) & 0xffn;
@@ -159,4 +163,6 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
     return v;
   }
+
+  public abstract loadProgram(program: Array<IAssembledInstruction>): void;
 }

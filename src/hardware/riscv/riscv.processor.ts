@@ -1,4 +1,5 @@
 import { IProcessor } from '../common/processor';
+import { IAssembledInstruction } from '../common/simulator';
 import { rv_codec, rv_opcode, RV_OPCODE_DATA, rv_reg } from './riscv.const';
 import { IDecodedRVInstruction, IRVCPU } from './riscv.types';
 import {
@@ -72,7 +73,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     pc: 0,
   };
 
-  public assemble(instruction: Partial<IDecodedRVInstruction>): bigint {
+  public toBytecode(instruction: Partial<IDecodedRVInstruction>): bigint {
     const op = instruction._op ?? rv_opcode.illegal;
     if (!instruction || op === rv_opcode.illegal) return 0n;
 
@@ -107,15 +108,15 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     }
   }
 
-  public disassemble(instruction: bigint): IDecodedRVInstruction {
-    const inst = u32(instruction);
+  public fromBytecode(instruction: bigint): IDecodedRVInstruction {
+    const bytecode = u32(instruction);
     let op: rv_opcode = rv_opcode.illegal;
 
-    switch (operand_opcode(inst)) {
+    switch (operand_opcode(bytecode)) {
       case 0b0110011: {
-        switch (operand_funct3(inst)) {
+        switch (operand_funct3(bytecode)) {
           case 0x0:
-            switch (operand_funct7(inst)) {
+            switch (operand_funct7(bytecode)) {
               case 0x00:
                 op = rv_opcode.add;
                 break;
@@ -137,7 +138,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
             op = rv_opcode.xor;
             break;
           case 0x5:
-            switch (operand_funct7(inst)) {
+            switch (operand_funct7(bytecode)) {
               case 0x00:
                 op = rv_opcode.srl;
                 break;
@@ -156,7 +157,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         break;
       }
       case 0b0010011: {
-        switch (operand_funct3(inst)) {
+        switch (operand_funct3(bytecode)) {
           case 0x0:
             op = rv_opcode.addi;
             break;
@@ -173,7 +174,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
             op = rv_opcode.xori;
             break;
           case 0x5:
-            switch (operand_funct7(inst)) {
+            switch (operand_funct7(bytecode)) {
               case 0x00:
                 op = rv_opcode.srli;
                 break;
@@ -192,7 +193,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         break;
       }
       case 0b0000011: {
-        switch (operand_funct3(inst)) {
+        switch (operand_funct3(bytecode)) {
           case 0x0:
             op = rv_opcode.lb;
             break;
@@ -212,7 +213,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         break;
       }
       case 0b0100011: {
-        switch (operand_funct3(inst)) {
+        switch (operand_funct3(bytecode)) {
           case 0x0:
             op = rv_opcode.sb;
             break;
@@ -226,7 +227,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         break;
       }
       case 0b1100011: {
-        switch (operand_funct3(inst)) {
+        switch (operand_funct3(bytecode)) {
           case 0x0:
             op = rv_opcode.beq;
             break;
@@ -261,8 +262,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         op = rv_opcode.auipc;
         break;
       case 0b1110011: {
-        if (operand_funct3(inst) !== 0) break;
-        const sysImm = Number((u32(inst) >> 20n) & 0xfffn);
+        if (operand_funct3(bytecode) !== 0) break;
+        const sysImm = Number((u32(bytecode) >> 20n) & 0xfffn);
         if (sysImm === 0) op = rv_opcode.ecall;
         else if (sysImm === 1) op = rv_opcode.ebreak;
         break;
@@ -271,7 +272,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     if (op === rv_opcode.illegal) {
       return {
-        inst,
+        bytecode,
         _op: rv_opcode.illegal,
         opcode: 0,
         codec: rv_codec.illegal,
@@ -285,7 +286,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     const codec = RV_OPCODE_DATA[op].codec;
     const dec: IDecodedRVInstruction = {
-      inst,
+      bytecode,
       _op: rv_opcode.illegal,
       opcode: 0,
       codec,
@@ -298,32 +299,32 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     switch (codec) {
       case rv_codec.r:
-        dec.rd = operand_rd(inst) as rv_reg;
-        dec.rs1 = operand_rs1(inst) as rv_reg;
-        dec.rs2 = operand_rs2(inst) as rv_reg;
+        dec.rd = operand_rd(bytecode) as rv_reg;
+        dec.rs1 = operand_rs1(bytecode) as rv_reg;
+        dec.rs2 = operand_rs2(bytecode) as rv_reg;
         break;
       case rv_codec.i:
-        dec.rd = operand_rd(inst) as rv_reg;
-        dec.rs1 = operand_rs1(inst) as rv_reg;
-        dec.imm = operand_iimm12(inst);
+        dec.rd = operand_rd(bytecode) as rv_reg;
+        dec.rs1 = operand_rs1(bytecode) as rv_reg;
+        dec.imm = operand_iimm12(bytecode);
         break;
       case rv_codec.s:
-        dec.rs1 = operand_rs1(inst) as rv_reg;
-        dec.rs2 = operand_rs2(inst) as rv_reg;
-        dec.imm = operand_simm12(inst);
+        dec.rs1 = operand_rs1(bytecode) as rv_reg;
+        dec.rs2 = operand_rs2(bytecode) as rv_reg;
+        dec.imm = operand_simm12(bytecode);
         break;
       case rv_codec.b:
-        dec.rs1 = operand_rs1(inst) as rv_reg;
-        dec.rs2 = operand_rs2(inst) as rv_reg;
-        dec.imm = operand_bimm(inst);
+        dec.rs1 = operand_rs1(bytecode) as rv_reg;
+        dec.rs2 = operand_rs2(bytecode) as rv_reg;
+        dec.imm = operand_bimm(bytecode);
         break;
       case rv_codec.u:
-        dec.rd = operand_rd(inst) as rv_reg;
-        dec.imm = operand_imm_u(inst);
+        dec.rd = operand_rd(bytecode) as rv_reg;
+        dec.imm = operand_imm_u(bytecode);
         break;
       case rv_codec.j:
-        dec.rd = operand_rd(inst) as rv_reg;
-        dec.imm = operand_imm_j(inst);
+        dec.rd = operand_rd(bytecode) as rv_reg;
+        dec.imm = operand_imm_j(bytecode);
         break;
       default:
         dec.imm = 0n;
@@ -333,7 +334,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     return dec;
   }
 
-  execute(d: IDecodedRVInstruction): void {
+  public execute(d: IDecodedRVInstruction): void {
     console.log('WIMS: rv.execute: ' + this.stringifyInstruction(d));
 
     switch (d._op) {
@@ -391,6 +392,19 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   protected registerWrite(reg: number, value: bigint) {
     if (reg !== rv_reg.zero) {
       return super.registerWrite(reg, value & 0xffffffffn);
+    }
+  }
+
+  public loadProgram(program: Array<IAssembledInstruction<IDecodedRVInstruction>>) {
+    this.memory = []; // force gc
+    this.memory = Array(32768).fill(0);
+
+    for (const v of program) {
+      // @todo aceitar bytes
+      this.memoryWrite(v.address, v.decoded.bytecode, 32);
+    }
+    for (const v of program) {
+      console.log('0x' + this.memoryRead(v.address, 32).toString(16));
     }
   }
 }

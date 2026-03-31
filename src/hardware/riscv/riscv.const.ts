@@ -126,20 +126,20 @@ export enum rv_opcode_pseudo {
   nop, // addi zero, zero, 0
   // li,
   // la,
-  mv, // addi, rd, rs1, 0
-  not, // xori, rd, rs1, -1
+  mv, // addi rd, rs1, 0
+  not, // xori rd, rs1, -1
   neg, // sub rd, zero, rs1
   seqz, // sltiu rd, rs1, 1
   snez, // sltu rd, zero, rs1
   sltz, // slt rd, rs1, zero
   sgtz, // slt rd, zero, rs1 
-  beqz, // beq, rs1, zero, offset
-  bnez, // bne, rs1, zero, offset
-  blez, // bge, zero, rs1, offset
-  bgez, // bge, rs1, zero, offset
-  bltz, // blt, zero, rs1, offset
-  bgtz, // blt, zero, rs1, offset
-  bgt, // blt, rs1, zero, offset
+  beqz, // beq rs1, zero, offset
+  bnez, // bne rs1, zero, offset
+  blez, // bge zero, rs1, offset
+  bgez, // bge rs1, zero, offset
+  bltz, // blt zero, rs1, offset
+  bgtz, // blt zero, rs1, offset
+  bgt, // blt rs1, zero, offset
   ret,
 }
 
