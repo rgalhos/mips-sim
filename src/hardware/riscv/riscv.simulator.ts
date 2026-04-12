@@ -1,8 +1,14 @@
+import { ETokenType, IToken, tokenize } from '../analyzer/tokenizer';
 import { IUserManual } from '../common/manual';
 import { IAssembledInstruction, ISimulator } from '../common/simulator';
 import { rv_codec, rv_opcode, RV_OPCODE_DATA, rv_opcode_pseudo, rv_reg } from './riscv.const';
 import { RVProcessor } from './riscv.processor';
 import { IDecodedRVInstruction } from './riscv.types';
+
+const throwUnexpectedToken = (tokens: IToken[]) => {
+  console.log('rv: unexpected token', tokens);
+  return new Error('rv: unexpected token');
+};
 
 export class RVSimulator extends ISimulator<RVProcessor> {
   static name = 'RISC-V (RV32I)';
@@ -19,11 +25,11 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   protected cpuWorkerLocation = new URL('./riscv.worker.ts', import.meta.url);
 
-  public assembleLine(tokens: string[]): IDecodedRVInstruction {
-    const tokOp = String(tokens[0]) as keyof typeof rv_opcode;
-    const tok1 = tokens[1];
-    const tok2 = tokens[2];
-    const tok3 = tokens[3];
+  public assembleLine(tokens: IToken[], constants: Record<string, IToken>) {
+    const tkFirst = tokens[0];
+    if (!tkFirst || tkFirst.type !== ETokenType.IDENTIFIER) {
+      throw throwUnexpectedToken(tokens);
+    }
 
     const dec: IDecodedRVInstruction = {
       bytecode: 0n,
@@ -37,21 +43,65 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       rs3: rv_reg.zero,
     };
 
-    const data = RV_OPCODE_DATA[rv_opcode[tokOp]];
+    const op = String(tkFirst.value) as keyof typeof rv_opcode;
+    const data = RV_OPCODE_DATA[rv_opcode[op]];
     if (!data || !data.opcode) return dec;
 
-    dec._op = rv_opcode[tokOp];
+    dec._op = rv_opcode[op];
     dec.opcode = data.opcode;
     dec.codec = data.codec;
-    // @todo detect invalid revisters
-    dec.rd = Number.isNaN(+tok1) ? (rv_reg[tok1 as keyof typeof rv_reg] ?? rv_reg.zero) : rv_reg.zero;
-    dec.rs1 = Number.isNaN(+tok2) ? (rv_reg[tok2 as keyof typeof rv_reg] ?? rv_reg.zero) : rv_reg.zero;
-    dec.rs2 = Number.isNaN(+tok3) ? (rv_reg[tok3 as keyof typeof rv_reg] ?? rv_reg.zero) : rv_reg.zero;
 
-    if (dec.codec === rv_codec.i) {
-      dec.imm = Number.isNaN(+tok3) ? 0n : BigInt(tok3);
-    } else if (dec.codec === rv_codec.u) {
-      dec.imm = Number.isNaN(+tok2) ? 0n : BigInt(tok2);
+    const tok1 = tokens[1];
+    const tok2 = tokens[2];
+    const tok3 = tokens[3];
+
+    const decodeConstOrFallback = (t: IToken) => {
+      if (!t) throw throwUnexpectedToken([t]);
+      else if (t.value !== ETokenType.IDENTIFIER) return t;
+      return constants[t.value] || t;
+    };
+
+    const ensureRegister = (t: IToken): number => {
+      const dec = decodeConstOrFallback(t);
+      const r = rv_reg[dec.value as keyof typeof rv_reg];
+      if (typeof r === 'undefined') throw throwUnexpectedToken([dec]);
+      return r;
+    };
+
+    const ensureNumber = (t: IToken): bigint => {
+      const dec = decodeConstOrFallback(t);
+      if (!dec || dec.type !== ETokenType.NUMBER) throwUnexpectedToken([dec]);
+      return BigInt(dec.value as number);
+    };
+
+    switch (dec.codec) {
+      case rv_codec.r:
+        dec.rd = ensureRegister(tok1);
+        dec.rs1 = ensureRegister(tok2);
+        dec.rs2 = ensureRegister(tok3);
+        break;
+      case rv_codec.i:
+        dec.rd = ensureRegister(tok1);
+        dec.rs1 = ensureRegister(tok2);
+        dec.imm = ensureNumber(tok3);
+        break;
+      case rv_codec.s:
+      case rv_codec.b:
+        dec.rs1 = ensureRegister(tok1);
+        dec.rs2 = ensureRegister(tok2);
+        if (tok3.type === ETokenType.NUMBER) {
+          // else: is a label. treat it later
+          dec.imm = ensureNumber(tok3);
+        }
+        break;
+      case rv_codec.u:
+      case rv_codec.j:
+        dec.rd = ensureRegister(tok1);
+        if (tok2.type === ETokenType.NUMBER) {
+          // else: is a label. treat it later
+          dec.imm = ensureNumber(tok2);
+        }
+        break;
     }
 
     dec.bytecode = this.processor.toBytecode(dec);
@@ -59,117 +109,157 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     return dec;
   }
 
-  public assembleCode(code: string): Array<IAssembledInstruction<IDecodedRVInstruction>> {
-    //function assemble(code) {
-    // Remove comments
+  public assembleCode(code: string) {
+    // label->address translation table
     const labels: Record<string, bigint> = {};
+    // constant->value translation table
+    const constants: Record<string, IToken> = {};
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
-    const errors = [];
 
+    this.processor.memory = Array(32768).fill(0);
+
+    let currentAddr = 0x0n;
     let currentLabel = '';
-    let currentAddress = 0x0n;
 
-    // Remove comments
-    code = code.replaceAll(/#.*$/gm, '');
     const codeSplit = code.split(/\n/g);
-
     for (const idx in codeSplit) {
-      let line = codeSplit[idx].replace(/([+-]?\d+)\((\$?[a-zA-Z0-9_]+)\)/g, '$2 $1').trim();
+      const line = codeSplit[idx];
+
+      console.log(tokenize(line));
 
       if (!line) {
         continue;
       }
 
-      if (line.includes(':')) {
-        let [_label, _ins] = line.split(':');
-        _label = _label.trim();
+      const tokens = tokenize(line);
 
-        if (_label[0] === '.') {
-          _label = currentLabel + _label;
-        } else {
-          currentLabel = _label;
-        }
-
-        if (labels[_label]) {
-          errors.push({ lineNumber: idx, line: codeSplit[idx], message: 'Label já declarada' });
-          console.warn('Label já declarada');
-          continue;
-        }
-
-        labels[_label] = currentAddress;
-
-        line = _ins.trim();
-        if (!line) continue;
+      if (tokens.length === 0) {
+        continue;
       }
 
-      if (line[0] === '.') {
-        if (line.toLowerCase().startsWith('.org')) {
-          const addr = line.split(/ +/)[1];
-          if (Number.isNaN(addr)) {
-            errors.push({ lineNumber: idx, line: codeSplit[idx], message: 'Endereço de memória inválido' });
-            console.error('Invalid address');
-            continue;
+      // special: handle labels first then shift so we can start processing instructions
+      if (tokens[0].type === ETokenType.LABEL) {
+        let sLabel = tokens[0].value;
+        tokens.shift();
+
+        if (sLabel[0] === '.') {
+          sLabel = currentLabel + sLabel;
+        }
+
+        if (!!labels[sLabel]) {
+          console.log('rv: label already declared: ' + sLabel);
+        }
+
+        labels[sLabel] = BigInt(currentAddr);
+      }
+
+      const tkIdentifier = tokens[0];
+      if (!tkIdentifier) {
+        continue;
+      } else if (tkIdentifier.type !== ETokenType.IDENTIFIER) {
+        console.log('rv: unexpected token');
+      }
+
+      // directive
+      if (tkIdentifier.type === ETokenType.IDENTIFIER && tkIdentifier.value[0] === '.') {
+        const directive = tkIdentifier.value.toLowerCase();
+
+        if (['.byte', '.half', '.word', '.dword', '.org'].includes(directive)) {
+          const tkValue = tokens[1];
+
+          if (!tkValue || tkValue.type !== ETokenType.NUMBER) {
+            throw throwUnexpectedToken(tokens);
           }
 
-          currentAddress = BigInt(addr);
-        }
-      } else {
-        line = line.replace(/,/g, ' ').replace(/\s+/g, ' ').toLowerCase();
+          const val = BigInt(tkValue.value);
 
-        //console.log(line);
-        const tokens = line.split(' ');
+          if (directive === '.byte') {
+            this.processor.memoryWrite(currentAddr, val, 8);
+            currentAddr += 1n;
+          } else if (directive === '.half') {
+            this.processor.memoryWrite(currentAddr, val, 16);
+            currentAddr += 2n;
+          } else if (directive === '.word') {
+            this.processor.memoryWrite(currentAddr, val, 32);
+            currentAddr += 4n;
+          } else if (directive === '.org') {
+            currentAddr = val;
+          }
+        } else if (directive === '.asciz') {
+          const tkValue = tokens[1];
+
+          if (!tkValue || tkValue.type !== ETokenType.STRING) {
+            throw throwUnexpectedToken(tokens);
+          }
+
+          for (const c of tkValue.value) {
+            this.processor.memoryWrite(currentAddr, BigInt(c.charCodeAt(0)), 8);
+            currentAddr += 1n;
+          }
+
+          this.processor.memoryWrite(currentAddr, 0n, 8);
+          currentAddr += 1n;
+        } else if (directive === '.equ') {
+          const tkName = tokens[1];
+          const tkVal = tokens[2];
+
+          if (!tkName || tkName.type !== ETokenType.IDENTIFIER || !tkVal) {
+            throw throwUnexpectedToken([tkName, tkVal]);
+          }
+
+          constants[tkName.value] = tkVal;
+        }
+      }
+      // identifier (instruction)
+      else if (tkIdentifier.type === ETokenType.IDENTIFIER) {
+        console.log(line);
         console.log(tokens);
-        const decoded = this.assembleLine(tokens);
-        //console.log(ass, this.processor.stringifyInstruction(ass));
+        const decoded = this.assembleLine(tokens, constants);
+        console.log(decoded);
 
         assembledInstructions.push({
           code: line,
           lineNumber: idx,
+          tokens,
           decoded,
-          address: currentAddress,
+          address: currentAddr,
           scope: currentLabel,
         });
 
-        currentAddress += 4n;
+        // instruction must be address 4-byte aligned
+        currentAddr = (currentAddr + 7n) & ~0x3n;
       }
     }
 
     for (const inst of assembledInstructions) {
-      let offset = '';
-      if (inst.decoded.codec === rv_codec.b) {
-        offset = inst.code.split(' ')?.[3];
-      } else if ([rv_opcode.jal].includes(inst.decoded._op)) {
-        // instruções do tipo: jal x0, OFFSET (token[2])
-        offset = inst.code.split(' ')?.[2];
-      } else {
-        continue;
+      if (
+        (inst.decoded.codec === rv_codec.u || inst.decoded.codec === rv_codec.j) &&
+        inst.tokens[2].type === ETokenType.IDENTIFIER
+      ) {
+        const labelName = inst.scope + inst.tokens[2].value;
+        const labelAddr = labels[labelName];
+        if (typeof labelAddr === 'undefined') {
+          console.error('rv: inexistent label: ', labelName);
+          continue;
+        }
+
+        inst.decoded.imm = labelAddr;
+        inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
+      } else if (
+        (inst.decoded.codec === rv_codec.s || inst.decoded.codec === rv_codec.b) &&
+        inst.tokens[3].type === ETokenType.IDENTIFIER
+      ) {
+        const labelName = inst.scope + inst.tokens[3].value;
+        const labelAddr = labels[labelName];
+        if (typeof labelAddr === 'undefined') {
+          console.error('rv: inexistent label: ', labelName);
+          continue;
+        }
+
+        inst.decoded.imm = labelAddr;
+        inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
       }
-      console.log(inst, offset, '0x' + inst.decoded.bytecode.toString(16));
-
-      if (!offset || !Number.isNaN(+offset)) {
-        continue;
-      } else if (offset[0] === '.') {
-        offset = inst.scope + offset;
-      }
-
-      const offsetAddr = labels[offset];
-      if (!offsetAddr) {
-        errors.push({
-          lineNumber: inst.lineNumber,
-          line: codeSplit[Number(inst.lineNumber)],
-          message: 'Referência a uma label inexistente',
-        });
-
-        console.error('Inexistent label', offsetAddr);
-      }
-
-      inst.decoded.imm = offsetAddr;
-      inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
     }
-
-    console.log(labels, errors);
-
-    return assembledInstructions;
   }
 }
 

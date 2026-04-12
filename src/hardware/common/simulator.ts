@@ -1,9 +1,11 @@
+import { IToken } from '../analyzer/tokenizer';
 import type { IUserManual } from './manual';
 import type { IDecodedInstruction, IProcessor } from './processor';
 
 export interface IAssembledInstruction<TDecoded extends IDecodedInstruction = IDecodedInstruction> {
   code: string;
   lineNumber: string;
+  tokens: IToken[];
   decoded: TDecoded;
   address: bigint;
   scope?: string;
@@ -49,6 +51,4 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
 
     return (this._cpuWorker = new Worker(this.cpuWorkerLocation, workerOptions));
   }
-
-  public abstract assembleLine(tokens: string[]): any;
 }

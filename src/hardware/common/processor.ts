@@ -104,7 +104,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
     this.cpu.register[reg] = value;
   }
 
-  protected memoryWrite(address: number | bigint, value: bigint, bits: 8 | 16 | 32 = 8): void {
+  public memoryWrite(address: number | bigint, value: bigint, bits: 8 | 16 | 32 = 8): void {
     address = Number(address);
     switch (bits) {
       // case 64:
@@ -127,7 +127,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
     }
   }
 
-  protected memoryRead(address: number | bigint, bits: 8 | 16 | 32 | 64 = 8): bigint {
+  public memoryRead(address: number | bigint, bits: 8 | 16 | 32 | 64 = 8): bigint {
     address = Number(address);
     // If address is empty we generate a random number (garbage) and save it to the address.
     const read = (addr: number) => {
