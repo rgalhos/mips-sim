@@ -1,7 +1,7 @@
 import { ETokenType, IToken, tokenize } from '../analyzer/tokenizer';
 import { IUserManual } from '../common/manual';
 import { IAssembledInstruction, ISimulator } from '../common/simulator';
-import { rv_codec, rv_opcode, RV_OPCODE_DATA, rv_opcode_pseudo, rv_reg } from './riscv.const';
+import { rv_codec, rv_directives, rv_opcode, RV_OPCODE_DATA, rv_opcode_pseudo, rv_reg } from './riscv.const';
 import { RVProcessor } from './riscv.processor';
 import { IDecodedRVInstruction } from './riscv.types';
 
@@ -15,7 +15,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   public static readonly manual: IUserManual;
 
-  public readonly instructionKeywords = Object.keys({ ...rv_opcode, ...rv_opcode_pseudo })
+  public readonly instructionKeywords = Object.keys({ ...rv_opcode, ...rv_opcode_pseudo, ...rv_directives })
     .filter((v) => Number.isNaN(+v))
     .slice(1) /* rv_opcode.illegal */;
 
@@ -125,13 +125,12 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     for (const idx in codeSplit) {
       const line = codeSplit[idx];
 
-      console.log(tokenize(line));
-
       if (!line) {
         continue;
       }
 
       const tokens = tokenize(line);
+      console.log(tokens)
 
       if (tokens.length === 0) {
         continue;
@@ -164,7 +163,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       if (tkIdentifier.type === ETokenType.IDENTIFIER && tkIdentifier.value[0] === '.') {
         const directive = tkIdentifier.value.toLowerCase();
 
-        if (['.byte', '.half', '.word', '.dword', '.org'].includes(directive)) {
+        if (['.byte', '.half', '.word', '.dword', '.org', '.space'].includes(directive)) {
           const tkValue = tokens[1];
 
           if (!tkValue || tkValue.type !== ETokenType.NUMBER) {
@@ -184,6 +183,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
             currentAddr += 4n;
           } else if (directive === '.org') {
             currentAddr = val;
+          } else if (directive === '.space') {
+            currentAddr += val;
           }
         } else if (directive === '.asciz') {
           const tkValue = tokens[1];
@@ -212,8 +213,10 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
       // identifier (instruction)
       else if (tkIdentifier.type === ETokenType.IDENTIFIER) {
+        // instruction must be address 4-byte aligned
+        currentAddr = (currentAddr + 3n) & ~0x3n;
+
         console.log(line);
-        console.log(tokens);
         const decoded = this.assembleLine(tokens, constants);
         console.log(decoded);
 
@@ -226,8 +229,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           scope: currentLabel,
         });
 
-        // instruction must be address 4-byte aligned
-        currentAddr = (currentAddr + 7n) & ~0x3n;
+        currentAddr += 4n;
       }
     }
 
@@ -259,6 +261,12 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         inst.decoded.imm = labelAddr;
         inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
       }
+    }
+
+    // write instructions to memory
+    for (const inst of assembledInstructions) {
+      console.log('writing at:', inst.address, 'val:', inst.decoded);
+      this.processor.memoryWrite(inst.address, inst.decoded.bytecode, 32);
     }
   }
 }

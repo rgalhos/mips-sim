@@ -37,7 +37,16 @@ export function tokenize(line: string) {
       let j = i + 1;
       let value = '';
       while (j < line.length && line[j] !== '"') {
-        value += line[j];
+        c = line[j];
+        if (c === '\\') {
+          c = line[++j];
+          if (c === 'n') {
+            c = '\n';
+          } else if (c === '0') {
+            c = '\0';
+          }
+        }
+        value += c;
         j++;
       }
       tokens.push({ type: ETokenType.STRING, value });

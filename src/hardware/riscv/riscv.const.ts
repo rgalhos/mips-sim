@@ -143,6 +143,15 @@ export enum rv_opcode_pseudo {
   ret,
 }
 
+export enum rv_directives {
+  '.org',
+  '.byte',
+  '.half',
+  '.word',
+  '.asciz',
+  '.space',
+}
+
 export const RV_CODEC_FORMAT = {
   [rv_codec.r]: 'O d,1,2',
   [rv_codec.i]: 'O d,1,i',
