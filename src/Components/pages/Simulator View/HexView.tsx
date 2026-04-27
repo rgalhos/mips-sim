@@ -1,9 +1,7 @@
 import { Button, Grid, GridItem, Icon, Text } from "@chakra-ui/react";
 import React from "react";
-import { useEffect } from "react";
 import { IoIosDownload } from "react-icons/io";
 import SharedData, { Instruction } from "../../../Service/SharedData";
-import SimulatorService from "../../../Service/SimulatorService";
 
 export function HexDisplay({n,i}:{n:number,i:Instruction}){
     return (<>
@@ -18,7 +16,6 @@ export function HexDisplay({n,i}:{n:number,i:Instruction}){
 }
 
 function HexView({program} : {program : Array<Instruction>}){
-    // const simservice = SimulatorService.getInstance();
     let shared  : SharedData = SharedData.instance;
 
     function downloadHex() 

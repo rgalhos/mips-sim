@@ -1,33 +1,16 @@
-import { ColorModeSwitcher } from "../../../ColorModeSwitcher";
-import { Logo } from "../../../Logo";
-import Editor from "@monaco-editor/react";
-import AssemblyEditor from "../../AssemblyEditor";
-import { ArrowForwardIcon } from "@chakra-ui/icons";
-import { HiPlay } from "react-icons/hi";
-import { BsTerminalFill } from "react-icons/bs";
-import { RiRewindFill, RiSettings2Fill } from "react-icons/ri";
-import { MdDelete } from "react-icons/md";
 import * as React from "react";
 import {
   Stack,
-  Button,
-  Icon,
   Tabs,
   TabList,
   Tab,
   TabPanels,
   TabPanel,
-  Textarea,
   useToast,
-  Slide,
-  Box,
-  IconButton,
-  Tooltip,
   Input,
 } from "@chakra-ui/react";
 import SimulatorService from "../../../Service/SimulatorService";
 import HardwareView from "./HardwareView";
-import SISMIPS from "../../../Hardware/SIS Mips/SIS";
 import Logger from "../../../Service/Logger";
 import SharedData, { Instruction } from "../../../Service/SharedData";
 import EditorView from "./Editor Tab/EditorTab";
@@ -35,8 +18,6 @@ import MonoMIPS from "../../../Hardware/Mono Mips/MonoMIPS";
 import WorkerService from "../../../Service/WorkerService";
 import { ScreenRenderer } from "./Editor Tab/Screen";
 import HexView from "./HexView";
-
-// const cpuWorker = new Worker(new URL('./MonoMIPSWorker.ts', import.meta.url));
 
 export default function SimulatorView() {
   // Handles the assembly code present in the editor
@@ -62,8 +43,6 @@ export default function SimulatorView() {
   let log: Logger = Logger.instance;
 
   const txtProgramtitle = React.useRef<HTMLInputElement>(null);
-
-  const hardwareRef = React.useRef();
 
   function handleKeyPress(e : KeyboardEvent) 
   {

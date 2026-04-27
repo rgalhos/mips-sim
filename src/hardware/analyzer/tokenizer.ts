@@ -3,8 +3,8 @@ export enum ETokenType {
   STRING,
   CHAR,
   NUMBER,
-  INVALID,
   LABEL,
+  INVALID,
   EOL,
 }
 
@@ -53,8 +53,9 @@ export function tokenize(line: string) {
       if (line[j] !== '"') {
         // end of line without "
         tokens.push({ type: ETokenType.INVALID, value });
+        break;
       }
-      i = j + 1;
+      i = j;
       continue;
     }
     // char
@@ -140,7 +141,6 @@ export function tokenize(line: string) {
       break;
     } else if (c === '(') {
       readingOffset = true;
-      console.log('sjiijsijsisjiijsiiiiiiiiiiiiiiiiiiiiiiiiiii');
       i++;
       continue;
     } else if (c === ')') {

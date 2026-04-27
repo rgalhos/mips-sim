@@ -2,9 +2,6 @@ import { Button, Card, CardBody, Grid, GridItem, Icon, IconButton, Text } from "
 import Editor from "@monaco-editor/react";
 import { HiPlay } from "react-icons/hi";
 import SharedData from "../../../Service/SharedData";
-import SimulatorService from "../../../Service/SimulatorService";
-import AssemblyEditor from "../../AssemblyEditor";
-import SidebarWithHeader from "../../Sidebar";
 
 
 const HiPlayIcon = () => (

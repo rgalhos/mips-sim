@@ -116,7 +116,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     const constants: Record<string, IToken> = {};
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
 
-    this.processor.memory = Array(32768).fill(0);
+    this.processor.memory = new Uint8Array(32768).fill(0);
 
     let currentAddr = 0x0n;
     let currentLabel = '';
@@ -130,7 +130,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
 
       const tokens = tokenize(line);
-      console.log(tokens)
+      console.log(tokens);
 
       if (tokens.length === 0) {
         continue;
@@ -230,6 +230,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         });
 
         currentAddr += 4n;
+      } else {
+        throw throwUnexpectedToken(tokens);
       }
     }
 

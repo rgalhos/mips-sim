@@ -3,7 +3,6 @@ import MonoMIPS from "../Hardware/Mono Mips/MonoMIPS";
 import SISMIPS from "../Hardware/SIS Mips/SIS";
 import { addr } from "../Hardware/TemplatePorcessor";
 import Logger from "./Logger";
-import { WorkCpuMessage } from "./MIPSWorker";
 import SharedData, { Instruction, IProcessor } from "./SharedData";
 
 export default class WorkerService {

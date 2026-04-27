@@ -6,26 +6,15 @@ import {
     ModalFooter,
     ModalHeader,
     ModalOverlay,
-    Slider,
     Stack,
     Text,
-    SliderMark,
-    SliderTrack,
-    SliderFilledTrack,
-    SliderThumb,
-    Select,
     Button,
     Flex,
-    Input,
     IconButton,
-    Icon,
   } from "@chakra-ui/react";
-  import SISMIPS from "../../../../Hardware/SIS Mips/SIS";
   import SharedData from "../../../../Service/SharedData";
   import React from "react";
-  import MonoMIPS from "../../../../Hardware/Mono Mips/MonoMIPS";
 import DeleteProgramAlert from "./DeleteProgramAlert";
-import { ReactIcon } from "@chakra-ui/icons";
 import { MdDelete } from "react-icons/md";
   
 export default function LoadProgramModal(props: {

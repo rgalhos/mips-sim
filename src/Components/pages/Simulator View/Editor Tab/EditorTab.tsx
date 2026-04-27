@@ -5,16 +5,8 @@ import {
   Icon,
   IconButton,
   Slide,
-  Slider,
-  SliderFilledTrack,
-  SliderMark,
-  SliderThumb,
-  SliderTrack,
   Stack,
-  Textarea,
-  Text,
   Tooltip,
-  Select,
   useToast,
 } from "@chakra-ui/react";
 import React from "react";
@@ -22,18 +14,14 @@ import { BsTerminalFill } from "react-icons/bs";
 import {IoMdSave} from "react-icons/io";
 import { HiPlay } from "react-icons/hi";
 import {CgScreen} from "react-icons/cg";
-import { MdDelete } from "react-icons/md";
 import { BsFileEarmarkCode } from "react-icons/bs";
 import { RiRewindFill, RiSettings2Fill } from "react-icons/ri";
-import SISMIPS from "../../../../Hardware/SIS Mips/SIS";
 import Logger from "../../../../Service/Logger";
 import SharedData from "../../../../Service/SharedData";
-import SimulatorService from "../../../../Service/SimulatorService";
 import AssemblyEditor from "../../../AssemblyEditor";
 import ConfigModal from "./ConfigModal";
 import ConsoleTerminal from "./ConsoleTerminal";
 import DebugTerminal from "./DebugTerminal";
-import MonoMIPS from "../../../../Hardware/Mono Mips/MonoMIPS";
 import { FaDownload, FaFolderOpen } from "react-icons/fa";
 import LoadProgramModal from "./LoadProgramModal";
 import WorkerService from "../../../../Service/WorkerService";
@@ -78,9 +66,6 @@ export default function EditorView(props: {
 
   //Logger instance
   let log: Logger = Logger.instance;
-
-  // SimulatorService instance that handles the assembly of the code
-  let simservice: SimulatorService = SimulatorService.getInstance();
 
   const toast = useToast();
 

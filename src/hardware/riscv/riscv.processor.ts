@@ -396,13 +396,14 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   }
 
   public loadProgram(program: Array<IAssembledInstruction<IDecodedRVInstruction>>) {
-    this.memory = []; // force gc
-    this.memory = Array(32768).fill(0);
+    this.memory = new Uint8Array(); // force gc
+    this.memory = new Uint8Array(32768); // @todo
 
     for (const v of program) {
       // @todo aceitar bytes
       this.memoryWrite(v.address, v.decoded.bytecode, 32);
     }
+
     for (const v of program) {
       console.log('0x' + this.memoryRead(v.address, 32).toString(16));
     }

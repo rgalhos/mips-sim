@@ -34,9 +34,19 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   abstract readonly instructions: TAnyEnum;
 
   /**
+   * Default memory size
+   */
+  public readonly defaultMemorySize = 32768;
+
+  /**
    * Simulator memory
    */
-  public memory: number[] = [];
+  public memory: Uint8Array = new Uint8Array(this.defaultMemorySize);
+
+  /**
+   * Memory size
+   */
+  private _memorySize = this.defaultMemorySize;
 
   /**
    * Architecture base address
