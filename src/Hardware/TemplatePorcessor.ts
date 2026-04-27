@@ -235,12 +235,13 @@ export default class TemplateProcessor implements IProcessor {
   }
 
   private getHumanInstruction(instruction: number): string {
-    return (
-      this.share.program.find(
-        (x) =>
-          x.machineCode == instruction
-      )?.humanCode ?? "Undefined"
-    );
+    return '';
+    //return (
+    //  this.share.program.find(
+    //    (x) =>
+    //      x.machineCode == instruction
+    //  )?.humanCode ?? "Undefined"
+    //);
   }
 
   /*

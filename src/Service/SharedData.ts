@@ -1,7 +1,4 @@
-import React from "react";
-// import BinaryNumber from "../Hardware/BinaryNumber";
-import MonoMIPS from "../Hardware/Mono Mips/MonoMIPS";
-import SISMIPS from "../Hardware/SIS Mips/SIS";
+import { IAssembledInstruction } from "../hardware/common/simulator";
 import { addr, INPUT_BUFFER_ADDR } from "../Hardware/TemplatePorcessor";
 import Logger from "./Logger";
 
@@ -64,7 +61,7 @@ export default class SharedData {
   // Title of the current program
   public programTitle : string = "Recent";
 
-  // public _startMemoryDefault : Array<addr> = [{address: INPUT_BUFFER_ADDR, value: 0}];
+  public _startMemoryDefault : Array<addr> = [{address: INPUT_BUFFER_ADDR, value: 0}];
 
   // the memory that the processor is initialized with
   public startMemory : Array<addr> = this.resetStartMemory();
@@ -82,15 +79,14 @@ export default class SharedData {
 
   // Pure text code
   private _code: string = "";
+
   // Current model for simulation
   private _currentProcessor: IProcessor | null = null;
 
   private _processorFrequency: number = 1000;
 
   //Stores the original program and the machine code
-  public program: Array<Instruction> = [];
-
-  public onProcessorChange: Function = (processor: IProcessor) => {};
+  public program: Array<IAssembledInstruction> = [];
 
   public refreshHardwareView : Function = (i : Instruction) => {};
 
@@ -293,9 +289,9 @@ export default class SharedData {
     return SharedData._instance;
   }
 
-  public _debugMemory(_program: Array<Instruction> = this.program){
+  public _debugMemory(_program: IAssembledInstruction[] = this.program){
     _program.forEach(x => {
-      console.log(`${x.humanCode} [${x.memAddress}]`)
+      console.log(`${x.code} [${x.address}]`)
     })
   }
 }

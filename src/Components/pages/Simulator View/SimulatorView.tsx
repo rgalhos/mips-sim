@@ -1,4 +1,3 @@
-import * as React from "react";
 import {
   Stack,
   Tabs,
@@ -9,29 +8,30 @@ import {
   useToast,
   Input,
 } from "@chakra-ui/react";
-import SimulatorService from "../../../Service/SimulatorService";
 import HardwareView from "./HardwareView";
 import Logger from "../../../Service/Logger";
 import SharedData, { Instruction } from "../../../Service/SharedData";
 import EditorView from "./Editor Tab/EditorTab";
-import MonoMIPS from "../../../Hardware/Mono Mips/MonoMIPS";
-import WorkerService from "../../../Service/WorkerService";
 import { ScreenRenderer } from "./Editor Tab/Screen";
 import HexView from "./HexView";
+import { useEffect, useRef, useState } from "react";
+import { useSimulator } from "../../../hooks/simulator.hook";
+import { IAssembledInstruction } from "../../../hardware/common/simulator";
 
 export default function SimulatorView() {
+  const { simulator } = useSimulator();
   // Handles the assembly code present in the editor
-  const [code, setCode] = React.useState<string>("");
-  const [program, setProgram] = React.useState<Array<Instruction>>();
-  const [currentInstruction, setCurrentInstruction] = React.useState<Instruction>();
+  const [code, setCode] = useState<string>("");
+  const [program, setProgram] = useState<null | Array<IAssembledInstruction>>(null);
+  const [currentInstruction, setCurrentInstruction] = useState<Instruction>();
 
   // Handles the title of the program
-  //const [programTitle, setProgramTitle] = React.useState<string>("Recent");
+  //const [programTitle, setProgramTitle] = useState<string>("Recent");
 
-  // const [assemblyCode, setAssemblyCode] = React.useState<string>("");
+  // const [assemblyCode, setAssemblyCode] = useState<string>("");
 
   // SimulatorService instance that handles the assembly of the code
-  let simservice: SimulatorService = SimulatorService.getInstance();
+  //let simservice: SimulatorService = SimulatorService.getInstance();
 
   // Notification toast
   const toast = useToast();
@@ -42,32 +42,25 @@ export default function SimulatorView() {
   // Logger instance
   let log: Logger = Logger.instance;
 
-  const txtProgramtitle = React.useRef<HTMLInputElement>(null);
+  const txtProgramtitle = useRef<HTMLInputElement>(null);
 
-  function handleKeyPress(e : KeyboardEvent) 
-  {
-    //if(e.repeat) return;
-    let ascii, key = e.key;
-    if(key.length == 1) {
-        ascii = key.charCodeAt(0);
-        if(ascii < 128 && e.ctrlKey) {
-             ascii = ascii & 0x1f;
-        }
-    }
-    if( typeof ascii == "number" && ascii < 128) {
-        share.ibuffer.push(ascii); //todo: change to shift register
-        // console.log(`ASCII code ${ascii} entered from keyboard`);
-    }
-    
+  function handleKeyPress(e: KeyboardEvent) {
+    simulator.handleKeyPress(e);
   }
 
-  React.useEffect(() => {
-    // TODO : check if it is necessary to remove the event
-    // document.removeEventListener("keydown", handleKeyPress, true)
-    document.addEventListener("keypress", handleKeyPress, true)
-  }, [])
+  useEffect(
+    () => {
+      // TODO : check if it is necessary to remove the event
+      // document.removeEventListener("keydown", handleKeyPress, true)
+      document.addEventListener('keypress', handleKeyPress, true);
 
-  React.useEffect(() => {
+      return () => document.removeEventListener('keypress', handleKeyPress, true);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  useEffect(() => {
     if (txtProgramtitle.current) txtProgramtitle.current.value = share.programTitle;
   }, [share.programTitle, program, currentInstruction])
 
@@ -80,7 +73,6 @@ export default function SimulatorView() {
   }
 
   function forceGetCode() {
-
     if (share.monacoEditor == null) {
       log.pushAppError("Monaco editor is null")
       return;
@@ -88,7 +80,7 @@ export default function SimulatorView() {
 
     console.log("monaco editor value ", share.monacoEditor.getValue());
     console.log("code ", code);
-    if (code == "" && share.monacoEditor != null) {
+    if (!code && share.monacoEditor != null) {
       let monacoCode = share.monacoEditor.getValue();
       setCode(monacoCode);
       share.code = monacoCode;
@@ -112,15 +104,31 @@ export default function SimulatorView() {
      forceGetCode();
  
      //resets the program
-     share.program = [];
- 
-     // Assembles the code
-     simservice.assembledCode = simservice.assemble(share.code);
-     // share._debugMemory();
- 
-     setProgram(simservice.program);
+     try {
+      const assembled = simulator.assembleCode(share.code);
 
-     if (log.getErrors().length == 0 && log.appErrors.length == 0) {
+      share.program = assembled;
+  
+      // Assembles the code
+      // simservice.assembledCode = simservice.assemble(share.code);
+      // share._debugMemory();
+  
+      setProgram(assembled);
+     } catch (e) {
+      share.program = [];
+      setProgram([]);
+
+      toast({
+        title: "Assemble failed",
+        description:
+          "Your code has not been assembled, please check the terminal for errors",
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+     }
+
+     if (log.getErrors().length === 0 && log.appErrors.length === 0) {
       toast({
         title: "Code assembled",
         description: "Your code has been assembled",
@@ -141,43 +149,50 @@ export default function SimulatorView() {
   }
 
   function runCode() {
+    if (!simulator.cpuWorkerRunning) {
+      simulator.createCpuWorker();
+    }
 
-    // first, we have to link our canvas with our ScreenRenderer
-    setScreenRendererCanva()
-    share.ibuffer = [0];
-    // share.resetStartMemory();
+    //simulator.cpuWorker?.postMessage
 
-    if (share.currentProcessor == null) share.currentProcessor = new MonoMIPS();
+    console.log("@todo runCode")
 
-    share.currentProcessor.halted = false;
-    WorkerService.instance.runCode(share.program, share.processorFrequency);
-
-    console.log(`Running at frequency ${share.processorFrequency}`)
+    //// first, we have to link our canvas with our ScreenRenderer
+    //setScreenRendererCanva()
+    //share.ibuffer = [0];
+    //// share.resetStartMemory();
+//
+    //if (share.currentProcessor == null) share.currentProcessor = new MonoMIPS();
+//
+    //share.currentProcessor.halted = false;
+    //WorkerService.instance.runCode(share.program, share.processorFrequency);
+//
+    //console.log(`Running at frequency ${share.processorFrequency}`)
 
     
   }
 
   function callExecuteStep()
   {
-
-    share.updateCode();
-    if(share.currentProcessor == null) share.currentProcessor = new MonoMIPS();
-
-    if(share.currentProcessor.halted){
-      share.currentProcessor.halted = false;
-      // console.log("processor was halted before")
-      simservice.assembledCode = simservice.assemble(share.code)
-      WorkerService.instance.stepCode();
-    }
-    else
-    {
-      // console.log("processor was not halted before")
-      WorkerService.instance.stepCode();
-    }
-
-    setProgram(simservice.program);
-
-    setCurrentInstruction(share.currentProcessor.currentInstruction);
+    console.log("@todo execute step")
+    //share.updateCode();
+    //if(share.currentProcessor == null) share.currentProcessor = new MonoMIPS();
+//
+    //if(share.currentProcessor.halted){
+    //  share.currentProcessor.halted = false;
+    //  // console.log("processor was halted before")
+    //  simservice.assembledCode = simservice.assemble(share.code)
+    //  WorkerService.instance.stepCode();
+    //}
+    //else
+    //{
+    //  // console.log("processor was not halted before")
+    //  WorkerService.instance.stepCode();
+    //}
+//
+    //setProgram(simservice.program);
+//
+    //setCurrentInstruction(share.currentProcessor.currentInstruction);
 
   }
 
@@ -185,6 +200,7 @@ export default function SimulatorView() {
   // View page that houses the assembly code editor, assembly hex, and hardware view
 
   return (
+    // @ts-ignore ijijjididejidjiedjide
     <Tabs variant="soft-rounded" style={{zIndex:50}}>
       <TabList style={{zIndex:50}}>
         <Tab style={{zIndex:50}}>Editor</Tab>

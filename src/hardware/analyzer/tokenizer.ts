@@ -55,7 +55,7 @@ export function tokenize(line: string) {
         tokens.push({ type: ETokenType.INVALID, value });
         break;
       }
-      i = j;
+      i = j + 1;
       continue;
     }
     // char
@@ -93,9 +93,18 @@ export function tokenize(line: string) {
       continue;
     }
     // number
-    else if (/[0-9]/.test(c)) {
+    // eslint-disable-next-line no-useless-escape
+    else if (/[0-9\-]/.test(c)) {
       let j = i + 1;
+      let isNegative = 1;
+
+      if (c === '-') {
+        isNegative = -1;
+        c = line[j++];
+      }
+
       let value = c;
+
       // hex
       if (c === '0' && /[xX]/.test(line[j])) {
         value += line[j++];
@@ -113,14 +122,17 @@ export function tokenize(line: string) {
         }
       }
       // decimal
-      else {
+      else if (/[0-9]/.test(c)) {
         while (j < line.length && /[0-9]/.test(line[j])) {
           value += line[j];
           j++;
         }
+      } else {
+        tokens.push({ type: ETokenType.INVALID, value });
+        break;
       }
 
-      const v = Number(value);
+      const v = Number(value) * isNegative;
       if (isNaN(v)) {
         // @todo tratar melhor aí em cima
         tokens.push({ type: ETokenType.INVALID, value: v });

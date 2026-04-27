@@ -48,7 +48,7 @@ self.onmessage = function (e: MessageEvent<WorkCpuMessage>) {
         console.log(`SETUP !`)
         console.log(e.data.startMem)
 
-        share.program = e.data.program;
+        //share.program = e.data.program;
 
         cpu.workerPostMessage = (channel:string, message: any) => {
             self.postMessage({command: channel, value: message});

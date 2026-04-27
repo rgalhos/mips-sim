@@ -1,6 +1,7 @@
 import { IToken } from '../analyzer/tokenizer';
 import type { IUserManual } from './manual';
 import type { IDecodedInstruction, IProcessor } from './processor';
+import { WorkerService } from './worker-service';
 
 export interface IAssembledInstruction<TDecoded extends IDecodedInstruction = IDecodedInstruction> {
   code: string;
@@ -28,27 +29,31 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
 
   protected abstract readonly cpuWorkerLocation: string | URL;
 
-  private _stepSpeed = 1000;
+  public readonly workerService = new WorkerService();
 
-  get stepSpeed() {
-    return this._stepSpeed;
-  }
-
-  public setStepSpeed(speed: number) {
-    return this._stepSpeed;
-  }
-
-  private _cpuWorker?: Worker;
+  private _cpuWorkerRunning = false;
 
   get cpuWorker() {
-    return this._cpuWorker;
+    return this.workerService.worker;
+  }
+
+  get cpuWorkerRunning() {
+    return this._cpuWorkerRunning;
   }
 
   public createCpuWorker(workerOptions?: WorkerOptions) {
-    if (!!this._cpuWorker) {
-      console.warn(`ISimulator: CPU worker creation requested but a worker already exists!`);
-    }
+    this.workerService.createCpuWorker(this.cpuWorkerLocation, workerOptions);
+  }
 
-    return (this._cpuWorker = new Worker(this.cpuWorkerLocation, workerOptions));
+  public handleKeyPress(event: KeyboardEvent) {
+    console.log('simulator: received unhandled key press event', { event });
+  }
+
+  public abstract assembleCode(code: string): Array<IAssembledInstruction>;
+
+  public linkToManual(instruction: string): string {
+    void instruction;
+
+    return '#';
   }
 }

@@ -18,7 +18,7 @@ export interface IDecodedInstruction {
 
 export type ICPU = Record<string, unknown> & {
   register: Record<number, bigint>;
-  pc: number;
+  pc: bigint;
 };
 
 export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction> {
@@ -49,9 +49,11 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   private _memorySize = this.defaultMemorySize;
 
   /**
-   * Architecture base address
+   * Architecture base addresses
    */
-  protected readonly DRAM_BASE_ADDRESS: bigint = 0x00000000000n;
+  public readonly DRAM_BASE_ADDRESS: bigint = 0x00000000000n;
+  public readonly PC_START: bigint = 0x1000n;
+  public readonly STACK_START: bigint = 0x7c00n;
 
   /**
    * Architecture instruction length
@@ -73,7 +75,17 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   }
 
   public setHalted(halted: boolean) {
-    this._halted = halted;
+    return (this._halted = halted);
+  }
+
+  private _frequency = 1000;
+
+  public get frequency() {
+    return this._frequency;
+  }
+
+  public setFrequency(freq: number) {
+    return (this._frequency = freq);
   }
 
   /**

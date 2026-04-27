@@ -31,9 +31,12 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly opcodeInfo = RV_OPCODE_DATA;
 
   //protected readonly DRAM_BASE_ADDRESS = 0x80000000n;
-  protected readonly DRAM_BASE_ADDRESS = 4096n;
+  public readonly PC_START = 0x1000n;
+  public readonly STACK_START = 0x7c00n;
 
   public readonly INSTRUCTION_LENGTH = 4;
+
+  public program: IAssembledInstruction[] = [];
 
   protected readonly cpu: IRVCPU = {
     register: {
@@ -70,7 +73,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       [rv_reg.t5]: 0n,
       [rv_reg.t6]: 0n,
     },
-    pc: 0,
+    pc: this.PC_START,
   };
 
   public toBytecode(instruction: Partial<IDecodedRVInstruction>): bigint {
@@ -344,6 +347,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     }
   }
 
+  public run() {}
+
   public stringifyInstruction(instruction: Partial<IDecodedRVInstruction>): string {
     const opcode = instruction._op || rv_opcode.illegal;
     const rd = rv_reg[instruction.rd || rv_reg.zero];
@@ -370,7 +375,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       } else if (c === 'i') {
         str += imm;
       } else if (c === 'x') {
-        str += '0x' + imm.toString(16);
+        str += '0x' + imm.toString(16).toUpperCase();
+      } else if (c === 'X') {
+        str += '0x' + imm.toString(16).toUpperCase().padStart(8, '0');
       } else if (c === 'j') {
         str += imm;
       } else {
@@ -397,7 +404,10 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
   public loadProgram(program: Array<IAssembledInstruction<IDecodedRVInstruction>>) {
     this.memory = new Uint8Array(); // force gc
-    this.memory = new Uint8Array(32768); // @todo
+    this.memory = new Uint8Array(this.defaultMemorySize); // @todo
+
+    this.cpu.pc = program[0]?.address || this.PC_START;
+    this.cpu.register[rv_reg.sp] = this.STACK_START;
 
     for (const v of program) {
       // @todo aceitar bytes

@@ -10,7 +10,6 @@ type Label = {
 
 export default class SimulatorService {
   public editorValue: string = "";
-  public assembledCode: string = "";
   private log: Logger = Logger.instance;
   private share: SharedData = SharedData.instance;
 
@@ -399,19 +398,19 @@ export default class SimulatorService {
 
     const pushInstruction = (instruction: string, i:number, humanCode:string="") => {
       // Saves the state so we can look up the instruction later in a readable format
-      this.share.program.push({
-        humanCode: humanCode == "" ? lines[i] : humanCode,
-        index: i,
-        machineCode: parseInt(instruction,2),
-        memAddress: this.currentAddr,
-      });
-
-      this.program.push({
-        humanCode: humanCode == "" ? lines[i] : humanCode,
-        index: i,
-        machineCode: parseInt(instruction,2),
-        memAddress: this.currentAddr,
-      });
+      //this.share.program.push({
+      //  humanCode: humanCode == "" ? lines[i] : humanCode,
+      //  index: i,
+      //  machineCode: parseInt(instruction,2),
+      //  memAddress: this.currentAddr,
+      //});
+//
+      //this.program.push({
+      //  humanCode: humanCode == "" ? lines[i] : humanCode,
+      //  index: i,
+      //  machineCode: parseInt(instruction,2),
+      //  memAddress: this.currentAddr,
+      //});
 
       this.currentAddr += 4; //increment PC by 4
       machineCode = "0x"+parseInt(instruction,2).toString(16);

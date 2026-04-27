@@ -23,7 +23,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   public readonly processor: RVProcessor = new RVProcessor();
 
-  protected cpuWorkerLocation = new URL('./riscv.worker.ts', import.meta.url);
+  public instructionCache: Record<number, IDecodedRVInstruction> = {};
+
+  protected readonly cpuWorkerLocation = new URL('./riscv.worker.js', import.meta.url);
 
   public assembleLine(tokens: IToken[], constants: Record<string, IToken>) {
     const tkFirst = tokens[0];
@@ -63,7 +65,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
     const ensureRegister = (t: IToken): number => {
       const dec = decodeConstOrFallback(t);
-      const r = rv_reg[dec.value as keyof typeof rv_reg];
+      const v = (dec.value as string).toLowerCase();
+      const r = rv_reg[v as keyof typeof rv_reg];
       if (typeof r === 'undefined') throw throwUnexpectedToken([dec]);
       return r;
     };
@@ -109,14 +112,22 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     return dec;
   }
 
-  public assembleCode(code: string) {
+  /**
+   * @todo Essa função deveria apenas fazer o assemble do código, mas na realidade ela
+   * reinicia a memória, faz o assembler, popula os dados na memória, gera as representações
+   * intermediárias e as salva no cache de instruções.
+   */
+  public assembleCode(code: string): Array<IAssembledInstruction<IDecodedRVInstruction>> {
     // label->address translation table
     const labels: Record<string, bigint> = {};
     // constant->value translation table
-    const constants: Record<string, IToken> = {};
+    const constants: Record<string, IToken> = {
+      PC_START: { type: ETokenType.NUMBER, value: Number(this.processor.PC_START) },
+      STACK_START: { type: ETokenType.NUMBER, value: Number(this.processor.STACK_START) },
+    };
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
 
-    this.processor.memory = new Uint8Array(32768).fill(0);
+    this.processor.memory = new Uint8Array(32768);
 
     let currentAddr = 0x0n;
     let currentLabel = '';
@@ -163,7 +174,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       if (tkIdentifier.type === ETokenType.IDENTIFIER && tkIdentifier.value[0] === '.') {
         const directive = tkIdentifier.value.toLowerCase();
 
-        if (['.byte', '.half', '.word', '.dword', '.org', '.space'].includes(directive)) {
+        if (['.byte', '.half', '.word', '.dword', '.space'].includes(directive)) {
           const tkValue = tokens[1];
 
           if (!tkValue || tkValue.type !== ETokenType.NUMBER) {
@@ -181,12 +192,23 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           } else if (directive === '.word') {
             this.processor.memoryWrite(currentAddr, val, 32);
             currentAddr += 4n;
-          } else if (directive === '.org') {
-            currentAddr = val;
           } else if (directive === '.space') {
             currentAddr += val;
           }
-        } else if (directive === '.asciz') {
+        } else if (directive === '.org') {
+          let tkValue = tokens[1];
+          if (tkValue && tkValue.type === ETokenType.IDENTIFIER) {
+            tkValue = constants[tkValue.value];
+          }
+
+          if (!tkValue || tkValue.type !== ETokenType.NUMBER) {
+            throw throwUnexpectedToken(tokens);
+          }
+
+          const val = BigInt(tkValue.value);
+
+          currentAddr = val;
+        } else if (directive === '.ascii' || directive === '.asciz' || directive === '.string') {
           const tkValue = tokens[1];
 
           if (!tkValue || tkValue.type !== ETokenType.STRING) {
@@ -198,8 +220,11 @@ export class RVSimulator extends ISimulator<RVProcessor> {
             currentAddr += 1n;
           }
 
-          this.processor.memoryWrite(currentAddr, 0n, 8);
-          currentAddr += 1n;
+          if (directive !== '.ascii') {
+            // .ascii is not zero-terminated
+            this.processor.memoryWrite(currentAddr, 0n, 8);
+            currentAddr += 1n;
+          }
         } else if (directive === '.equ') {
           const tkName = tokens[1];
           const tkVal = tokens[2];
@@ -213,7 +238,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
       // identifier (instruction)
       else if (tkIdentifier.type === ETokenType.IDENTIFIER) {
-        // instruction must be address 4-byte aligned
+        // instruction addresses must be 4-byte aligned
         currentAddr = (currentAddr + 3n) & ~0x3n;
 
         console.log(line);
@@ -269,7 +294,17 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     for (const inst of assembledInstructions) {
       console.log('writing at:', inst.address, 'val:', inst.decoded);
       this.processor.memoryWrite(inst.address, inst.decoded.bytecode, 32);
+
+      if (inst.decoded.codec !== rv_codec.illegal) {
+        this.instructionCache[Number(inst.decoded.bytecode)] = inst.decoded;
+      }
     }
+
+    return assembledInstructions;
+  }
+
+  public linkToManual(instruction: string) {
+    return 'https://msyksphinz-self.github.io/riscv-isadoc/html/rvi.html#' + instruction;
   }
 }
 

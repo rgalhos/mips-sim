@@ -148,17 +148,19 @@ export enum rv_directives {
   '.byte',
   '.half',
   '.word',
+  '.ascii',
   '.asciz',
+  '.string',
   '.space',
 }
 
 export const RV_CODEC_FORMAT = {
-  [rv_codec.r]: 'O d,1,2',
-  [rv_codec.i]: 'O d,1,i',
-  [rv_codec.s]: 'O i,1,2',
-  [rv_codec.b]: 'O 1,2,x',
-  [rv_codec.j]: 'O d,j',
-  [rv_codec.u]: 'O d,j',
+  [rv_codec.r]: 'O d, 1, 2',
+  [rv_codec.i]: 'O d, 1, i',
+  [rv_codec.s]: 'O i, 1, 2',
+  [rv_codec.b]: 'O 1, 2, X',
+  [rv_codec.j]: 'O d, X',
+  [rv_codec.u]: 'O d, j',
 } as const;
 
 // É imprescindível que os elementos de RV_OPCODE_DATA estejam na mesma ordem que os do enum rv_opcode

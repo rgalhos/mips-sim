@@ -6,8 +6,10 @@ import Logger from "../../../../Service/Logger";
 import SharedData from "../../../../Service/SharedData";
 import SimulatorService from "../../../../Service/SimulatorService";
 import WorkerService from "../../../../Service/WorkerService";
+import { useSimulator } from "../../../../hooks/simulator.hook";
 
 export default function MemoryTerminal() {
+  const {simulator} = useSimulator();
 
   const [cmd, setCmd] = useState("")
   const [txtArea, setTxtArea] = useState("")
