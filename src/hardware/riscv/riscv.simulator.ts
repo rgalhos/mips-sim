@@ -272,11 +272,11 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           continue;
         }
 
-        // rv32i: j-type é relativo ao PC, u-type (lui/auipc) é endereço absoluto
+        // rv32i: J-type é PC-rel.; U-type usa campo alto de 20 bits = endereço_do_rótulo >> 12.
         if (inst.decoded.codec === rv_codec.j) {
           inst.decoded.imm = labelAddr - inst.address;
         } else {
-          inst.decoded.imm = labelAddr;
+          inst.decoded.imm = (labelAddr >> 12n) & 0xfffffn;
         }
         inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
       } else if (
@@ -306,7 +306,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
   }
 
   public linkToManual(instruction: string) {
-    return 'https://msyksphinz-self.github.io/riscv-isadoc/html/rvi.html#' + instruction;
+    return `https://riscv.github.io/riscv-unified-db/manual/html/isa/isa_20240411/insts/${instruction.toLowerCase()}.html`;
   }
 }
 

@@ -1,40 +1,75 @@
-import { Input, Stack, Tab, TabList, TabPanel, TabPanels, Tabs, useToast } from '@chakra-ui/react';
+import { ArrowForwardIcon } from '@chakra-ui/icons';
+import {
+  Box,
+  Button,
+  Flex,
+  Icon,
+  IconButton,
+  Input,
+  Slide,
+  Stack,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Tooltip,
+  useColorModeValue,
+  useToast,
+} from '@chakra-ui/react';
 import { useEffect, useRef, useState } from 'react';
+import { BsFileEarmarkCode, BsTerminalFill } from 'react-icons/bs';
+import { CgScreen } from 'react-icons/cg';
+import { FaDownload, FaFolderOpen } from 'react-icons/fa';
+import { HiPlay } from 'react-icons/hi';
+import { IoMdSave } from 'react-icons/io';
+import { RiRewindFill, RiSettings2Fill } from 'react-icons/ri';
 import { IAssembledInstruction } from '../../../hardware/common/simulator';
 import { useSimulator } from '../../../hooks/simulator.hook';
 import Logger from '../../../Service/Logger';
 import SharedData, { Instruction } from '../../../Service/SharedData';
+import WorkerService from '../../../Service/WorkerService';
 import EditorView from './Editor Tab/EditorTab';
-import { ScreenRenderer } from './Editor Tab/Screen';
+import ConfigModal from './Editor Tab/ConfigModal';
+import ConsoleTerminal from './Editor Tab/ConsoleTerminal';
+import DebugTerminal from './Editor Tab/DebugTerminal';
+import LoadProgramModal from './Editor Tab/LoadProgramModal';
+import Screen, { ScreenRenderer } from './Editor Tab/Screen';
 import HardwareView from './HardwareView';
 import HexView from './HexView';
 import MemoryTerminal from './MemoryTerminal';
 
+function HiPlayIcon() {
+  return <Icon as={HiPlay} style={{ transform: 'scale(1.4)' }} />;
+}
+
+function TerminalFill() {
+  return <Icon as={BsTerminalFill} />;
+}
+
 export default function SimulatorView() {
   const { simulator } = useSimulator();
-  // Handles the assembly code present in the editor
   const [code, setCode] = useState<string>('');
   const [program, setProgram] = useState<null | Array<IAssembledInstruction>>(null);
-  const [currentInstruction, setCurrentInstruction] = useState<Instruction>();
+  const [currentInstruction] = useState<Instruction>();
 
-  // Handles the title of the program
-  //const [programTitle, setProgramTitle] = useState<string>("Recent");
-
-  // const [assemblyCode, setAssemblyCode] = useState<string>("");
-
-  // SimulatorService instance that handles the assembly of the code
-  //let simservice: SimulatorService = SimulatorService.getInstance();
-
-  // Notification toast
   const toast = useToast();
 
-  // Holds the shared state of the application
   let share: SharedData = SharedData.instance;
-
-  // Logger instance
   let log: Logger = Logger.instance;
 
   const txtProgramtitle = useRef<HTMLInputElement>(null);
+
+  const [consoleOpen, setConsoleOpen] = useState<boolean>(false);
+  const [consoleTxt, setConsoleTxt] = useState<string>('');
+  const [currentTerminal, setCurrentTerminal] = useState<number>(0);
+  const [debugTxt, setDebugTxt] = useState<string>('');
+  const [configModalOpen, setConfigModalOpen] = useState<boolean>(false);
+  const [loadProgramModalOpen, setLoadProgramModalOpen] = useState<boolean>(false);
+  const [screenModalOpen, setScreenModalOpen] = useState<boolean>(false);
+
+  const toolbarBg = useColorModeValue('gray.50', 'gray.900');
+  const toolbarBorder = useColorModeValue('gray.200', 'gray.700');
 
   function handleKeyPress(e: KeyboardEvent) {
     simulator.handleKeyPress(e);
@@ -42,10 +77,7 @@ export default function SimulatorView() {
 
   useEffect(
     () => {
-      // TODO : check if it is necessary to remove the event
-      // document.removeEventListener("keydown", handleKeyPress, true)
       document.addEventListener('keypress', handleKeyPress, true);
-
       return () => document.removeEventListener('keypress', handleKeyPress, true);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,7 +88,30 @@ export default function SimulatorView() {
     if (txtProgramtitle.current) txtProgramtitle.current.value = share.programTitle;
   }, [share.programTitle, program, currentInstruction]);
 
-  // Updates the assembly code when the code changes
+  useEffect(() => {
+    Logger.instance.onLogChange(() => {
+      setConsoleTxt(log.getConsole() + log.getErrors());
+      setDebugTxt(log.getDebug());
+
+      let debugTxtArea = document.getElementById('debugTxtArea');
+      if (debugTxtArea) debugTxtArea.scrollTop = debugTxtArea.scrollHeight;
+
+      let consoleTxtArea = document.getElementById('consoleTxtArea');
+      if (consoleTxtArea) consoleTxtArea.scrollTop = consoleTxtArea.scrollHeight;
+    });
+  }, [consoleOpen, debugTxt, log]);
+
+  function setScreenRendererCanva() {
+    try {
+      let canva = (document.getElementById('screenCanvas') as HTMLCanvasElement).getContext('2d');
+      ScreenRenderer.instance.draw = canva;
+    } catch {}
+  }
+
+  useEffect(() => {
+    setScreenRendererCanva();
+  }, [screenModalOpen]);
+
   function onEditorChange(value: string | undefined, event: any) {
     setCode(value!);
     share.code = value ?? code;
@@ -68,8 +123,6 @@ export default function SimulatorView() {
       return;
     }
 
-    //console.log('monaco editor value ', share.monacoEditor.getValue());
-    //console.log('code ', code);
     if (!code && share.monacoEditor != null) {
       let monacoCode = share.monacoEditor.getValue();
       setCode(monacoCode);
@@ -77,37 +130,20 @@ export default function SimulatorView() {
     }
   }
 
-  function setScreenRendererCanva() {
-    try {
-      let canva = (document.getElementById('screenCanvas') as HTMLCanvasElement).getContext('2d');
-      ScreenRenderer.instance.draw = canva;
-    } catch {}
-  }
-
   function assembleCode() {
-    // first, we have to link our canvas with our ScreenRenderer
     setScreenRendererCanva();
-
-    // if code state is empty, get code from monaco editor and update share.code
     forceGetCode();
-
     setProgram(null);
 
-    //resets the program
     try {
       if (!simulator.workerService.worker) {
         simulator.createCpuWorker();
       }
 
       const assembled = simulator.assembleCode(share.code);
-      //simulator.processor.loadProgram(assembled);
       simulator.syncWorker();
 
       share.program = assembled;
-
-      // Assembles the code
-      // simservice.assembledCode = simservice.assemble(share.code);
-      // share._debugMemory();
 
       setProgram(assembled);
 
@@ -157,26 +193,7 @@ export default function SimulatorView() {
     }
 
     simulator.workerService.runCode();
-
-    //simulator.workerService.loadProgram(program);
-    //simulator.syncWorker();
-    //simulator.workerService.runCode();
-
-    //simulator.cpuWorker?.postMessage
-
     console.log('@todo runCode');
-
-    //// first, we have to link our canvas with our ScreenRenderer
-    //setScreenRendererCanva()
-    //share.ibuffer = [0];
-    //// share.resetStartMemory();
-    //
-    //if (share.currentProcessor == null) share.currentProcessor = new MonoMIPS();
-    //
-    //share.currentProcessor.halted = false;
-    //WorkerService.instance.runCode(share.program, share.processorFrequency);
-    //
-    //console.log(`Running at frequency ${share.processorFrequency}`)
   }
 
   function callExecuteStep() {
@@ -187,28 +204,7 @@ export default function SimulatorView() {
     }
 
     simulator.workerService.stepCode();
-    //share.updateCode();
-    //if(share.currentProcessor == null) share.currentProcessor = new MonoMIPS();
-    //
-    //if(share.currentProcessor.halted){
-    //  share.currentProcessor.halted = false;
-    //  // console.log("processor was halted before")
-    //  simservice.assembledCode = simservice.assemble(share.code)
-    //  WorkerService.instance.stepCode();
-    //}
-    //else
-    //{
-    //  // console.log("processor was not halted before")
-    //  WorkerService.instance.stepCode();
-    //}
-    //
-    //setProgram(simservice.program);
-    //
-    //setCurrentInstruction(share.currentProcessor.currentInstruction);
   }
-
-  /* DESCRIPTION */
-  // View page that houses the assembly code editor, assembly hex, and hardware view
 
   return (
     <Tabs variant="soft-rounded" style={{ zIndex: 50 }}>
@@ -219,6 +215,293 @@ export default function SimulatorView() {
         <Tab style={{ zIndex: 50 }}>Memory</Tab>
       </TabList>
 
+      <Box
+        position="sticky"
+        top={0}
+        zIndex={49}
+        bg={toolbarBg}
+        borderBottomWidth="1px"
+        borderColor={toolbarBorder}
+        py={2}
+        px={2}
+      >
+        <Flex gap={2} flexWrap="wrap" align="center">
+          <Tooltip label="Assemble">
+            <IconButton
+              icon={<BsFileEarmarkCode style={{ transform: 'scale(1.4)' }} />}
+              colorScheme="linkedin"
+              variant="solid"
+              onClick={() => {
+                assembleCode();
+              }}
+              aria-label="Assemble program"
+              borderRadius={50}
+              size="sm"
+              zIndex={10}
+            >
+              Run
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Run">
+            <IconButton
+              icon={<HiPlayIcon />}
+              colorScheme="teal"
+              variant="solid"
+              onClick={() => runCode()}
+              aria-label="Run program"
+              borderRadius={50}
+              size="sm"
+              zIndex={10}
+            >
+              Run
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Run next instruction">
+            <IconButton
+              icon={<ArrowForwardIcon style={{ transform: 'scale(1.4)' }} />}
+              colorScheme="yellow"
+              aria-label="Run step"
+              variant="solid"
+              borderRadius={50}
+              size="sm"
+              onClick={() => callExecuteStep()}
+              zIndex={10}
+            >
+              Step
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Open terminal">
+            <IconButton
+              icon={<TerminalFill />}
+              color="white"
+              backgroundColor={SharedData.theme.editorBackground}
+              variant="solid"
+              aria-label="Open console"
+              borderRadius={50}
+              size="sm"
+              zIndex={10}
+              onClick={() => {
+                setConsoleOpen(!consoleOpen);
+              }}
+            >
+              Terminal
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Reset">
+            <IconButton
+              icon={<Icon as={RiRewindFill} />}
+              aria-label="Reset"
+              backgroundColor={SharedData.theme.editorBackground}
+              color="white"
+              borderRadius={50}
+              size="sm"
+              zIndex={10}
+              onClick={() => {
+                WorkerService.instance.resetCpu();
+                share.currentProcessor?.reset();
+                if (share.currentProcessor) {
+                  share.currentProcessor.halted = true;
+                  share.currentProcessor.frequency = 1000;
+                  share.processorFrequency = 1000;
+                }
+                clearInterval(share.interval ?? 0);
+              }}
+            >
+              Reset
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Screen">
+            <IconButton
+              icon={<CgScreen />}
+              aria-label={'Screen'}
+              backgroundColor={SharedData.theme.editorBackground}
+              color="white"
+              borderRadius={50}
+              size="sm"
+              zIndex={10}
+              onClick={() => {
+                setScreenModalOpen(!screenModalOpen);
+              }}
+            />
+          </Tooltip>
+          <Tooltip label="Configuration">
+            <IconButton
+              icon={<Icon as={RiSettings2Fill} style={{ transform: 'scale(1.2)' }} />}
+              zIndex={10}
+              aria-label="Configuration"
+              backgroundColor={SharedData.theme.editorBackground}
+              color="white"
+              borderRadius={50}
+              size="sm"
+              onClick={() => setConfigModalOpen(true)}
+            >
+              Configuration
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Save">
+            <IconButton
+              icon={<Icon as={IoMdSave} style={{ transform: 'scale(1.2)' }} />}
+              zIndex={10}
+              aria-label="Save"
+              backgroundColor={SharedData.theme.editorBackground}
+              color="white"
+              borderRadius={50}
+              size="sm"
+              onClick={() => {
+                share.saveProgram(share.programTitle.toLowerCase(), share.code);
+                toast({
+                  title: 'Code saved',
+                  description: 'Your code has been saved',
+                  status: 'success',
+                  duration: 3000,
+                  isClosable: true,
+                });
+              }}
+            >
+              Save
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Load">
+            <IconButton
+              icon={<Icon as={FaFolderOpen} style={{ transform: 'scale(1.2)' }} />}
+              zIndex={10}
+              aria-label="Load"
+              backgroundColor={SharedData.theme.editorBackground}
+              color="white"
+              borderRadius={50}
+              size="sm"
+              onClick={() => setLoadProgramModalOpen(true)}
+            >
+              Load
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Download Code">
+            <IconButton
+              icon={<Icon as={FaDownload} style={{ transform: 'scale(1.2)' }} />}
+              zIndex={10}
+              aria-label="Download Code"
+              backgroundColor={SharedData.theme.editorBackground}
+              color="white"
+              borderRadius={50}
+              size="sm"
+              onClick={() => {
+                function downloadFile() {
+                  const element = document.createElement('a');
+                  const file = new Blob([share.code], { type: 'text/plain' });
+                  element.href = URL.createObjectURL(file);
+                  element.download = share.programTitle + '.txt';
+                  document.body.appendChild(element);
+                  element.click();
+                }
+
+                try {
+                  downloadFile();
+                  toast({
+                    title: 'Code downloaded',
+                    description: 'Your code has been downloaded',
+                    status: 'success',
+                    duration: 3000,
+                    isClosable: true,
+                  });
+                } catch {
+                  toast({
+                    title: 'Something went wrong...',
+                    description: 'There was an error while trying to download the code',
+                    status: 'error',
+                    duration: 3000,
+                    isClosable: true,
+                  });
+                }
+              }}
+            >
+              Download
+            </IconButton>
+          </Tooltip>
+        </Flex>
+      </Box>
+
+      {screenModalOpen ? <Screen /> : <></>}
+
+      <Slide
+        direction="bottom"
+        in={consoleOpen}
+        style={{
+          zIndex: 48,
+        }}
+      >
+        <Box
+          p="40px"
+          color="white"
+          mt="4"
+          bg="#20212b"
+          rounded="md"
+          shadow="md"
+          style={{
+            position: 'relative',
+            right: '11px',
+            width: '102vw',
+            height: '250px',
+          }}
+        >
+          <Stack direction="row" spacing={4} zIndex={10}>
+            <Button
+              style={{
+                position: 'relative',
+                borderBottom: currentTerminal === 0 ? 'solid' : 'none',
+                backgroundColor: 'none',
+                background: 'none',
+                borderRadius: '0px',
+                top: -40,
+                right: 20,
+                zIndex: 10,
+              }}
+              onClick={() => setCurrentTerminal(0)}
+            >
+              Terminal
+            </Button>
+            <Button
+              style={{
+                position: 'relative',
+                borderBottom: currentTerminal === 1 ? 'solid' : 'none',
+                backgroundColor: 'none',
+                background: 'none',
+                borderRadius: '0px',
+                top: -40,
+                right: 20,
+                zIndex: 10,
+              }}
+              onClick={() => setCurrentTerminal(1)}
+            >
+              Debug
+            </Button>
+          </Stack>
+
+          {currentTerminal === 0 ? (
+            <ConsoleTerminal
+              value={consoleTxt}
+              onClear={() => {
+                setConsoleTxt('');
+                Logger.instance.clearConsole();
+              }}
+            />
+          ) : (
+            <></>
+          )}
+
+          {currentTerminal === 1 ? (
+            <DebugTerminal
+              value={debugTxt}
+              onClear={() => {
+                setDebugTxt('');
+                Logger.instance.clearDebug();
+              }}
+            />
+          ) : (
+            <></>
+          )}
+        </Box>
+      </Slide>
+
       <TabPanels>
         <TabPanel>
           <Stack>
@@ -228,38 +511,28 @@ export default function SimulatorView() {
               variant={'unstyled'}
               defaultValue={share.programTitle}
               onChange={(e) => {
-                // setProgramTitle(e.target.value);
                 share.programTitle = e.target.value;
               }}
             />
-            <EditorView
-              onEditorChange={onEditorChange}
-              assembleBtn={assembleCode}
-              runBtn={runCode}
-              callExecuteStep={callExecuteStep}
-            />
+            <EditorView onEditorChange={onEditorChange} />
           </Stack>
         </TabPanel>
 
         <TabPanel>
-          {/* <Textarea
-            style={{ height: "80vh" }}
-            value={
-              simservice.program.map(i => "0x"+i.machineCode.toString(16)).join(" ")  
-            }
-          /> */}
           <HexView program={program ?? []} />
         </TabPanel>
 
         <TabPanel>
           <HardwareView callExecutableStep={callExecuteStep} />
-          {/* stepFunc={callExecuteStep} currentI={share.currentProcessor?.currentInstruction ?? null} */}
         </TabPanel>
 
         <TabPanel>
           <MemoryTerminal />
         </TabPanel>
       </TabPanels>
+
+      {configModalOpen ? <ConfigModal isOpen={configModalOpen} close={() => setConfigModalOpen(false)} /> : <></>}
+      <LoadProgramModal isOpen={loadProgramModalOpen} close={() => setLoadProgramModalOpen(false)} />
     </Tabs>
   );
 }

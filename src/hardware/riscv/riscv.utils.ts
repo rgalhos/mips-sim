@@ -58,9 +58,9 @@ export function operand_bimm(inst: bigint): bigint {
   return imm | 0n;
 }
 
-/** U-type: imm[31:12] << 12 */
+/** U-type: imediato de 20 bits em [31:12] da instrução (igual à assembly: lui rd, k). */
 export function operand_imm_u(inst: bigint): bigint {
-  return u32(inst) & 0xfffff000n;
+  return (u32(inst) >> 12n) & 0xfffffn;
 }
 
 /** J-type offset, sign-extended */
@@ -259,7 +259,7 @@ export function encodeBType(op: rv_opcode, rs1: bigint, rs2: bigint, imm: bigint
 
 export function encodeUType(op: rv_opcode, rd: bigint, imm: bigint): bigint {
   const r = reg5(rd);
-  const hi = imm & 0xfffff000n;
+  const hi = u32((imm & 0xfffffn) << 12n);
   switch (op) {
     case rv_opcode.lui:
       return 0b0110111n | (r << 7n) | hi;

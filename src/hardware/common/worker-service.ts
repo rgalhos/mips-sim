@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { ICPU, IDecodedInstruction, IProcessor } from './processor';
 import { IAssembledInstruction } from './simulator';
 
@@ -86,7 +87,7 @@ export type WorkerMessageResponse =
       data: never;
     };
 
-export class WorkerService {
+export class WorkerService extends EventEmitter {
   private _worker: Worker | null = null;
 
   public get worker() {
@@ -109,6 +110,10 @@ export class WorkerService {
     return this._worker.postMessage(...args);
   }
 
+  private _onMessage = (event: MessageEvent<WorkerMessageResponse>) => {
+    this.emit(event.data.command, event.data);
+  };
+
   createCpuWorker(createWorker: () => Worker) {
     if (!!this._worker) {
       console.warn(`worker service: cpu worker creation requested but a worker already exists!`, {
@@ -124,6 +129,8 @@ export class WorkerService {
     w.onerror = (ev) => {
       console.error('cpu worker:', ev.message, ev.filename, ev.lineno, ev.colno);
     };
+
+    w.addEventListener('message', this._onMessage);
 
     return (this._worker = w);
   }
@@ -152,6 +159,10 @@ export class WorkerService {
     this._postMessage({ command: EWorkerCommand.SET_FREQUENCY, data: size } as WorkerMessage);
   }
 
+  requestCpuDump() {
+    this._postMessage({ command: EWorkerCommand.CPU_DUMP } as WorkerMessage);
+  }
+
   syncWorker(data: IProcessor<IDecodedInstruction>) {
     console.log('SYNC', data);
     this._postMessage({
@@ -167,38 +178,12 @@ export class WorkerService {
     this._postMessage({ command: EWorkerCommand.LOAD_PROGRAM, data: program } as WorkerMessage);
   }
 
-  requestCpuDump(timeoutMs = 3000): Promise<IWorkerCPUDump> {
-    const worker = this._worker;
-    if (!worker) {
-      return Promise.reject(new Error('Worker CPU não está ativo'));
-    }
-
-    return new Promise((resolve, reject) => {
-      const timer = window.setTimeout(() => {
-        worker.removeEventListener('message', onMessage);
-        reject(new Error(`CPU_DUMP: tempo esgotado (${timeoutMs} ms)`));
-      }, timeoutMs);
-
-      const onMessage = (ev: MessageEvent<WorkerMessageResponse>) => {
-        const msg = ev.data;
-        if (msg.command !== EWorkerCommand.CPU_DUMP) {
-          return;
-        }
-        window.clearTimeout(timer);
-        worker.removeEventListener('message', onMessage);
-        resolve(msg.data);
-      };
-
-      worker.addEventListener('message', onMessage);
-      this._postMessage({ command: EWorkerCommand.CPU_DUMP } as WorkerMessage);
-    });
-  }
-
   terminate() {
     if (!this._worker) {
       console.log('cpu worker: tried to terminate a non initialized worker');
     }
 
+    this._worker?.removeEventListener('message', this._onMessage);
     this._worker?.terminate();
     this._worker = null;
     this._workerRunning = false;

@@ -1,6 +1,6 @@
-import { Box, Button, Flex, Spinner, Text } from '@chakra-ui/react';
+import { Box, Flex, Text } from '@chakra-ui/react';
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { IWorkerCPUDump } from '../../../hardware/common/worker-service';
+import { EWorkerCommand, IWorkerCPUDump, WorkerMessageResponse } from '../../../hardware/common/worker-service';
 import { useSimulator } from '../../../hooks/simulator.hook';
 
 const monoStyles = {
@@ -188,26 +188,22 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
 function MemoryTerminal() {
   const { simulator } = useSimulator();
   const [dump, setDump] = useState<IWorkerCPUDump | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await simulator.workerService.requestCpuDump();
-      setDump(data);
-    } catch (e) {
-      setDump(null);
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [simulator]);
+  const onDump = useCallback((response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
+    setDump(response.data);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    const ws = simulator.workerService;
+    ws.on(EWorkerCommand.CPU_DUMP, onDump);
+    ws.requestCpuDump();
+
+    return () => {
+      ws.off(EWorkerCommand.CPU_DUMP, onDump);
+    };
+  }, [simulator.workerService, onDump]);
 
   const registerValues = useMemo(() => {
     if (!dump) return {};
@@ -258,19 +254,7 @@ function MemoryTerminal() {
           </Text>
           <Text fontWeight="bold">Current cycle: {Number(dump?.cycle) || 0}</Text>
         </Flex>
-        <Flex align="center" gap={3}>
-          {loading ? <Spinner size="sm" color="blue.300" thickness="3px" /> : null}
-          <Button size="sm" onClick={() => void refresh()} isDisabled={loading} variant="outline" colorScheme="blue">
-            Atualizar
-          </Button>
-        </Flex>
       </Flex>
-
-      {error ? (
-        <Text fontSize="sm" color="red.300" mb={4} fontWeight="medium">
-          {error}
-        </Text>
-      ) : null}
 
       {dump ? (
         <Flex
@@ -299,7 +283,7 @@ function MemoryTerminal() {
             <RegistersBlock registerValues={registerValues} />
           </Box>
         </Flex>
-      ) : !loading && !error ? (
+      ) : !loading ? (
         <Text fontSize="sm" color={accent.muted} mt={4}>
           Nenhum snapshot disponível.
         </Text>

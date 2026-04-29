@@ -40,7 +40,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
   public cycle = 0n;
 
-  public lastExecutedInstruction?: TDecodedInstruction;
+  public lastExecutedInstruction: TDecodedInstruction | null = null;
 
   /**
    * Simulator memory
@@ -105,8 +105,13 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   /**
    * Reset CPU registers to their initial states
    */
-  public abstract resetState(): void;
+  public resetState() {
+    this.memory = new Uint8Array();
+    this.cycle = 0n;
+    this.lastExecutedInstruction = null;
 
+    this.setHalted(true);
+  }
   /**
    * Function that will be used by the assembler
    * It takes a decoded instruction object and returns the instruction in bytecode

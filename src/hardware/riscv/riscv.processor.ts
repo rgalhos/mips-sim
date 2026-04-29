@@ -85,7 +85,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
   public resetState() {
     this.cpu = Object.assign({}, this.initialCpuState);
-    this.setHalted(true);
+
+    super.resetState();
   }
 
   public toBytecode(instruction: Partial<IDecodedRVInstruction>): bigint {
@@ -387,10 +388,10 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     switch (d._op) {
       case rv_opcode.lui:
-        this.registerWrite(d.rd, d.imm);
+        this.registerWrite(d.rd, u32(d.imm << 12n));
         break;
       case rv_opcode.auipc:
-        this.registerWrite(d.rd, u32(pc + d.imm));
+        this.registerWrite(d.rd, u32(pc + u32(d.imm << 12n)));
         break;
       case rv_opcode.jal:
         this.registerWrite(d.rd, pc + 4n);
@@ -617,6 +618,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     this.memory = new Uint8Array(); // force gc
     this.memory = new Uint8Array(this.memorySize); // @todo
 
+    this.cycle = 0n;
     this.cpu.pc = program[0]?.address || 0x0n; //|| this.PC_START;
     this.cpu.register[rv_reg.sp] = this.STACK_START;
 
