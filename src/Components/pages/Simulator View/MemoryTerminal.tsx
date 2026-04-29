@@ -1,5 +1,5 @@
 import { Box, Button, Flex, Spinner, Text } from '@chakra-ui/react';
-import { Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ICPU } from '../../../hardware/common/processor';
 import { useSimulator } from '../../../hooks/simulator.hook';
 
@@ -20,6 +20,12 @@ const accent = {
   regName: 'purple.300',
   muted: 'gray.400',
 } as const;
+
+const MEM_ROW_BYTES = 16;
+const MEM_ROW_HEIGHT_PX = 23;
+const MEM_VISIBLE_ROWS = 32;
+const MEM_OVERSCAN_ROWS = 8;
+const MEM_SCROLL_THROTTLE_MS = 100;
 
 const RegistersBlock = ({ registerValues }: { registerValues: Record<string, bigint> }) => {
   return (
@@ -45,7 +51,7 @@ const HexRow = ({ row }: { row: number[] }) => {
     <span>
       {row.map((r) => {
         const b = r.toString(16).toUpperCase().padStart(2, '0');
-        return <span className={`byte-${b[0]} byte2-${b[1]}`}>{b} </span>;
+        return <span className={`nibble-${b[0]} nibble2-${b[1]}`}>{b} </span>;
       })}
 
       {'        '}
@@ -54,18 +60,78 @@ const HexRow = ({ row }: { row: number[] }) => {
         const b = r.toString(16).toUpperCase().padStart(2, '0');
         const c = r > 31 && r < 127 ? String.fromCharCode(r) : '.';
 
-        return <span className={`byte-${b[0]} byte2-${b[1]}`}>{c}</span>;
+        return <span className={`nibble-${b[0]} nibble2-${b[1]}`}>{c}</span>;
       })}
     </span>
   );
 };
 
 function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: number }) {
-  const nRows = (end - start) / 16;
-  const rows: number[][] = [];
-  for (let i = 0; i < nRows; i++) {
-    rows.push(Array.from(dump.memory.slice(start + i * 16, start + (i + 1) * 16)));
-  }
+  const memory = dump.memory as Uint8Array;
+  const totalRows = Math.ceil((end - start) / MEM_ROW_BYTES);
+  const viewportPx = MEM_VISIBLE_ROWS * MEM_ROW_HEIGHT_PX;
+
+  const [scrollTop, setScrollTop] = useState(0);
+  const scrollTopPendingRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const throttleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCommitMsRef = useRef(-Infinity);
+
+  const firstVisible = Math.floor(scrollTop / MEM_ROW_HEIGHT_PX);
+  const lastVisible = Math.min(totalRows, Math.ceil((scrollTop + viewportPx) / MEM_ROW_HEIGHT_PX));
+  const rangeStart = Math.max(0, firstVisible - MEM_OVERSCAN_ROWS);
+  const rangeEnd = Math.min(totalRows, lastVisible + MEM_OVERSCAN_ROWS);
+
+  const visibleSlices = useMemo(() => {
+    const slices: number[][] = [];
+    for (let i = rangeStart; i < rangeEnd; i++) {
+      const off = start + i * MEM_ROW_BYTES;
+      slices.push(Array.from(memory.slice(off, off + MEM_ROW_BYTES)));
+    }
+    return slices;
+  }, [memory, start, rangeStart, rangeEnd]);
+
+  const padTop = rangeStart * MEM_ROW_HEIGHT_PX;
+  const padBottom = Math.max(0, totalRows - rangeEnd) * MEM_ROW_HEIGHT_PX;
+
+  const commitScrollTop = useCallback(() => {
+    lastCommitMsRef.current = performance.now();
+    setScrollTop(scrollTopPendingRef.current);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      if (throttleTimerRef.current != null) clearTimeout(throttleTimerRef.current);
+    };
+  }, []);
+
+  const onScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      scrollTopPendingRef.current = e.currentTarget.scrollTop;
+
+      if (rafRef.current != null) return;
+
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+
+        const now = performance.now();
+        const delta = now - lastCommitMsRef.current;
+
+        if (delta >= MEM_SCROLL_THROTTLE_MS) {
+          commitScrollTop();
+          return;
+        }
+
+        if (throttleTimerRef.current != null) clearTimeout(throttleTimerRef.current);
+        throttleTimerRef.current = setTimeout(() => {
+          throttleTimerRef.current = null;
+          commitScrollTop();
+        }, MEM_SCROLL_THROTTLE_MS - delta);
+      });
+    },
+    [commitScrollTop],
+  );
 
   return (
     <Box w="100%" h="100%" display="flex" flexDirection="column" minH={0} sx={monoStyles}>
@@ -73,8 +139,8 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
         Memory
       </Text>
       <Box
-        flex="1"
-        minH={0}
+        h={`${viewportPx}px`}
+        flexShrink={0}
         overflowY="auto"
         borderWidth="1px"
         borderColor={panel.borderColor}
@@ -82,17 +148,30 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
         bg={panel.bg}
         px={2}
         py={1.5}
+        onScroll={onScroll}
       >
-        <Text as="pre" fontSize="md" fontWeight="bold" lineHeight="1.45" whiteSpace="pre" color="gray.300" m={0}>
-          {rows.map((row, i) => (
-            <Fragment key={'rowmem' + i}>
-              {(start + i * 16).toString(16).toUpperCase().padStart(8, '0')}
-              {'  '}
-              <HexRow row={row} />
-              {'\n'}
-            </Fragment>
-          ))}
-        </Text>
+        <Box pt={`${padTop}px`} pb={`${padBottom}px`}>
+          {visibleSlices.map((row, j) => {
+            const i = rangeStart + j;
+            return (
+              <Text
+                as="div"
+                key={`rowmem-${i}`}
+                fontSize="md"
+                fontWeight="bold"
+                lineHeight={`${MEM_ROW_HEIGHT_PX}px`}
+                minH={`${MEM_ROW_HEIGHT_PX}px`}
+                whiteSpace="pre"
+                color="gray.300"
+                m={0}
+              >
+                {(start + i * MEM_ROW_BYTES).toString(16).toUpperCase().padStart(8, '0')}
+                {'  '}
+                <HexRow row={row} />
+              </Text>
+            );
+          })}
+        </Box>
       </Box>
     </Box>
   );
@@ -141,24 +220,24 @@ function MemoryTerminal() {
       pt={2}
       sx={{
         // https://simonomi.dev/blog/color-code-your-bytes/
-        '.byte-0.byte2-0': { color: 'gray' },
-        '.byte-0': { color: 'oklch(75% .18 360)' },
-        '.byte-1': { color: 'oklch(75% .18 23)' },
-        '.byte-2': { color: 'oklch(75% .18 50)' },
-        '.byte-3': { color: 'oklch(75% .18 65)' },
-        '.byte-4': { color: 'oklch(75% .18 77)' },
-        '.byte-5': { color: 'oklch(75% .18 103)' },
-        '.byte-6': { color: 'oklch(75% .18 130)' },
-        '.byte-7': { color: 'oklch(75% .18 142)' },
-        '.byte-8': { color: 'oklch(75% .18 150)' },
-        '.byte-9': { color: 'oklch(75% .18 163)' },
-        '.byte-A': { color: 'oklch(75% .18 184)' },
-        '.byte-B': { color: 'oklch(75% .18 209)' },
-        '.byte-C': { color: 'oklch(75% .18 232)' },
-        '.byte-D': { color: 'oklch(75% .18 254)' },
-        '.byte-E': { color: 'oklch(75% .18 294)' },
-        '.byte-F': { color: 'oklch(75% .18 328)' },
-        '.byte-F.byte2-F': { color: 'white' },
+        '.nibble-0.nibble2-0': { color: 'gray' },
+        '.nibble-0': { color: 'oklch(75% .18 360)' },
+        '.nibble-1': { color: 'oklch(75% .18 23)' },
+        '.nibble-2': { color: 'oklch(75% .18 50)' },
+        '.nibble-3': { color: 'oklch(75% .18 65)' },
+        '.nibble-4': { color: 'oklch(75% .18 77)' },
+        '.nibble-5': { color: 'oklch(75% .18 103)' },
+        '.nibble-6': { color: 'oklch(75% .18 130)' },
+        '.nibble-7': { color: 'oklch(75% .18 142)' },
+        '.nibble-8': { color: 'oklch(75% .18 150)' },
+        '.nibble-9': { color: 'oklch(75% .18 163)' },
+        '.nibble-A': { color: 'oklch(75% .18 184)' },
+        '.nibble-B': { color: 'oklch(75% .18 209)' },
+        '.nibble-C': { color: 'oklch(75% .18 232)' },
+        '.nibble-D': { color: 'oklch(75% .18 254)' },
+        '.nibble-E': { color: 'oklch(75% .18 294)' },
+        '.nibble-F': { color: 'oklch(75% .18 328)' },
+        '.nibble-F.nibble2-F': { color: 'white' },
       }}
     >
       <Flex align="center" justify="space-between" flexWrap="wrap" gap={3} mb={2}>
@@ -190,7 +269,7 @@ function MemoryTerminal() {
           maxH="min(75vh, 720px)"
         >
           <Box flex="1 1 58%" minW={0} minH={0} display="flex" flexDirection="column" alignSelf="stretch">
-            <MemoryHexBlock dump={dump} start={0} end={1024} />
+            <MemoryHexBlock dump={dump} start={0} end={simulator.processor.memorySize} />
           </Box>
           <Box
             flex={{ base: 'none', lg: '0 0 22rem' }}
