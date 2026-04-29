@@ -272,7 +272,12 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           continue;
         }
 
-        inst.decoded.imm = labelAddr;
+        // rv32i: j-type é relativo ao PC, u-type (lui/auipc) é endereço absoluto
+        if (inst.decoded.codec === rv_codec.j) {
+          inst.decoded.imm = labelAddr - inst.address;
+        } else {
+          inst.decoded.imm = labelAddr;
+        }
         inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
       } else if (
         (inst.decoded.codec === rv_codec.s || inst.decoded.codec === rv_codec.b) &&
@@ -285,7 +290,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           continue;
         }
 
-        inst.decoded.imm = labelAddr;
+        // rv32i: branch offset é relativo ao PC
+        inst.decoded.imm = labelAddr - inst.address;
         inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
       }
     }

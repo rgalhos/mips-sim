@@ -1,6 +1,6 @@
 import { Box, Button, Flex, Spinner, Text } from '@chakra-ui/react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ICPU } from '../../../hardware/common/processor';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { IWorkerCPUDump } from '../../../hardware/common/worker-service';
 import { useSimulator } from '../../../hooks/simulator.hook';
 
 const monoStyles = {
@@ -36,9 +36,9 @@ const RegistersBlock = ({ registerValues }: { registerValues: Record<string, big
       <Box flex="1" minH={0} overflowY="auto" pr={1} sx={monoStyles}>
         <Text as="div" fontSize="xs" lineHeight="1.65" whiteSpace="pre" color="gray.300">
           {Object.entries(registerValues).map(([reg, val]) => (
-            <>
+            <Fragment key={reg}>
               {reg.padEnd(5, ' ')} 0x{val.toString(16).toUpperCase().padStart(8, '0')} ({val.toString(10)}) {'\n'}
-            </>
+            </Fragment>
           ))}
         </Text>
       </Box>
@@ -49,18 +49,26 @@ const RegistersBlock = ({ registerValues }: { registerValues: Record<string, big
 const HexRow = ({ row }: { row: number[] }) => {
   return (
     <span>
-      {row.map((r) => {
+      {row.map((r, i) => {
         const b = r.toString(16).toUpperCase().padStart(2, '0');
-        return <span className={`nibble-${b[0]} nibble2-${b[1]}`}>{b} </span>;
+        return (
+          <span key={'hexrow' + i + b} className={`nibble-${b[0]} nibble2-${b[1]}`}>
+            {b}{' '}
+          </span>
+        );
       })}
 
       {'        '}
 
-      {row.map((r) => {
+      {row.map((r, i) => {
         const b = r.toString(16).toUpperCase().padStart(2, '0');
         const c = r > 31 && r < 127 ? String.fromCharCode(r) : '.';
 
-        return <span className={`nibble-${b[0]} nibble2-${b[1]}`}>{c}</span>;
+        return (
+          <span key={'strhexrow' + i + b} className={`nibble-${b[0]} nibble2-${b[1]}`}>
+            {c}
+          </span>
+        );
       })}
     </span>
   );
@@ -156,7 +164,7 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
             return (
               <Text
                 as="div"
-                key={`rowmem-${i}`}
+                key={start + i * MEM_ROW_BYTES}
                 fontSize="md"
                 fontWeight="bold"
                 lineHeight={`${MEM_ROW_HEIGHT_PX}px`}
@@ -179,7 +187,7 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
 
 function MemoryTerminal() {
   const { simulator } = useSimulator();
-  const [dump, setDump] = useState<{ memory: Uint8Array; cpu: ICPU; cycle: bigint } | null>(null);
+  const [dump, setDump] = useState<IWorkerCPUDump | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -242,7 +250,12 @@ function MemoryTerminal() {
     >
       <Flex align="center" justify="space-between" flexWrap="wrap" gap={3} mb={2}>
         <Flex direction="column" justify="space-between" flexWrap="wrap" gap={3} mb={2}>
-          <Text fontWeight="bold">Last executed instruction: @todo (0x@todo)</Text>
+          <Text fontWeight="bold">
+            Last executed instruction:{' '}
+            {!dump?.lastExecutedInstruction
+              ? '-'
+              : simulator.processor.stringifyInstruction(dump.lastExecutedInstruction)}
+          </Text>
           <Text fontWeight="bold">Current cycle: {Number(dump?.cycle) || 0}</Text>
         </Flex>
         <Flex align="center" gap={3}>

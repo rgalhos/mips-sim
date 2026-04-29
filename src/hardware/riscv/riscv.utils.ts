@@ -28,12 +28,11 @@ export function operand_funct7(inst: bigint): number {
   return Number((u32(inst) >> 25n) & 0x7fn);
 }
 
-// @todo CONFERIR
-/** I-type immediate [31:20], sign-extended to 32 bits */
 export function operand_iimm12(inst: bigint): bigint {
   const u = u32(inst);
-  const imm = u >> 20n;
-  return (imm << 20n) >> 20n;
+  let imm = (u >> 20n) & 0xfffn;
+  if (imm & 0x800n) imm |= ~0xfffn;
+  return imm | 0n;
 }
 
 // @todo CONFERIR

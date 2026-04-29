@@ -19,6 +19,14 @@ export const enum EWorkerCommand {
   SYNC_WORKER = 'SYNC_WORKER',
 }
 
+export interface IWorkerCPUDump {
+  memory: Uint8Array;
+  cpu: ICPU;
+  cycle: bigint;
+  halted: boolean;
+  lastExecutedInstruction: any;
+}
+
 export type WorkerMessage =
   | {
       command: EWorkerCommand.SET_CPU_HALT;
@@ -71,7 +79,7 @@ export type WorkerMessageResponse =
     }
   | {
       command: EWorkerCommand.CPU_DUMP;
-      data: { memory: Uint8Array; cpu: ICPU; cycle: bigint };
+      data: IWorkerCPUDump;
     }
   | {
       command: EWorkerCommand.CPU_SETUP | EWorkerCommand.CPU_RUN | EWorkerCommand.CPU_STEP | EWorkerCommand.CPU_RESET;
@@ -159,7 +167,7 @@ export class WorkerService {
     this._postMessage({ command: EWorkerCommand.LOAD_PROGRAM, data: program } as WorkerMessage);
   }
 
-  requestCpuDump(timeoutMs = 3000): Promise<{ memory: Uint8Array; cpu: ICPU; cycle: bigint }> {
+  requestCpuDump(timeoutMs = 3000): Promise<IWorkerCPUDump> {
     const worker = this._worker;
     if (!worker) {
       return Promise.reject(new Error('Worker CPU não está ativo'));

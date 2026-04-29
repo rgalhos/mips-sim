@@ -40,6 +40,8 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
   public cycle = 0n;
 
+  public lastExecutedInstruction?: TDecodedInstruction;
+
   /**
    * Simulator memory
    */

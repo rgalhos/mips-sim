@@ -377,6 +377,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public execute(d: IDecodedRVInstruction): void {
     console.log('WIMS: rv.execute: ' + this.stringifyInstruction(d), d);
 
+    this.lastExecutedInstruction = d;
+
     this.cycle++;
 
     const pc = this.cpu.pc;

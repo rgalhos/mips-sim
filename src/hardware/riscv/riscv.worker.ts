@@ -58,7 +58,9 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
           pc: cpu.cpu.pc,
           register: { ...cpu.cpu.register },
         },
+        halted: cpu.halted,
         cycle: cpu.cycle,
+        lastExecutedInstruction: cpu.lastExecutedInstruction,
       },
     });
   } else if (command === EWorkerCommand.ASSEMBLE_CODE) {
