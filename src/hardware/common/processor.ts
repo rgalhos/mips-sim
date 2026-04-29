@@ -38,6 +38,8 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
    */
   public readonly defaultMemorySize = 32768;
 
+  public cycle = 0n;
+
   /**
    * Simulator memory
    */
@@ -47,6 +49,14 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
    * Memory size
    */
   private _memorySize = this.defaultMemorySize;
+
+  public get memorySize() {
+    return this._memorySize;
+  }
+
+  public setMemorySize(size: number) {
+    return (this._memorySize = size);
+  }
 
   /**
    * Architecture base addresses
@@ -63,9 +73,11 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   /**
    * CPU
    */
-  protected abstract readonly cpu: ICPU;
+  public abstract cpu: ICPU;
 
-  private _halted = false;
+  protected instructionCache: Record<number, TDecodedInstruction> = {};
+
+  private _halted = true;
 
   /**
    * Is the CPU halted?
@@ -89,6 +101,11 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   }
 
   /**
+   * Reset CPU registers to their initial states
+   */
+  public abstract resetState(): void;
+
+  /**
    * Function that will be used by the assembler
    * It takes a decoded instruction object and returns the instruction in bytecode
    */
@@ -109,6 +126,16 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
    * Helper function used to stringify an instruction
    */
   abstract stringifyInstruction(instruction: Partial<TDecodedInstruction>): string;
+
+  /**
+   * Normal cpu execution
+   */
+  public abstract run(): void;
+
+  /**
+   * Execute single instruction (step)
+   */
+  public abstract step(): void;
 
   protected registerRead(reg: number): bigint {
     if (!this.registers[reg]) {

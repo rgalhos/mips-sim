@@ -23,9 +23,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   public readonly processor: RVProcessor = new RVProcessor();
 
-  public instructionCache: Record<number, IDecodedRVInstruction> = {};
-
-  protected readonly cpuWorkerLocation = new URL('./riscv.worker.js', import.meta.url);
+  protected createCpuWorkerInstance(workerOptions?: WorkerOptions) {
+    return new Worker(new URL('./riscv.worker.ts', import.meta.url), workerOptions);
+  }
 
   public assembleLine(tokens: IToken[], constants: Record<string, IToken>) {
     const tkFirst = tokens[0];
@@ -127,7 +127,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     };
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
 
-    this.processor.memory = new Uint8Array(32768);
+    this.processor.memory = new Uint8Array(this.processor.memorySize);
 
     let currentAddr = 0x0n;
     let currentLabel = '';
@@ -141,7 +141,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
 
       const tokens = tokenize(line);
-      console.log(tokens);
+      //console.log(tokens);
 
       if (tokens.length === 0) {
         continue;
@@ -241,9 +241,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         // instruction addresses must be 4-byte aligned
         currentAddr = (currentAddr + 3n) & ~0x3n;
 
-        console.log(line);
+        //console.log(line);
         const decoded = this.assembleLine(tokens, constants);
-        console.log(decoded);
+        //console.log(decoded);
 
         assembledInstructions.push({
           code: line,
@@ -294,10 +294,6 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     for (const inst of assembledInstructions) {
       console.log('writing at:', inst.address, 'val:', inst.decoded);
       this.processor.memoryWrite(inst.address, inst.decoded.bytecode, 32);
-
-      if (inst.decoded.codec !== rv_codec.illegal) {
-        this.instructionCache[Number(inst.decoded.bytecode)] = inst.decoded;
-      }
     }
 
     return assembledInstructions;

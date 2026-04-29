@@ -25,6 +25,11 @@ import {
   u32,
 } from './riscv.utils';
 
+/** RV32I: valor inteiro com sinal em 32 bits (BigInt). */
+function s32(n: bigint): bigint {
+  return (n << 32n) >> 32n;
+}
+
 export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly registers = rv_reg;
   public readonly instructions = rv_opcode;
@@ -38,7 +43,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
   public program: IAssembledInstruction[] = [];
 
-  protected readonly cpu: IRVCPU = {
+  private readonly initialCpuState: IRVCPU = {
     register: {
       [rv_reg.zero]: 0n,
       [rv_reg.ra]: 0n,
@@ -75,6 +80,13 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     },
     pc: this.PC_START,
   };
+
+  public cpu: IRVCPU = Object.assign({}, this.initialCpuState);
+
+  public resetState() {
+    this.cpu = Object.assign({}, this.initialCpuState);
+    this.setHalted(true);
+  }
 
   public toBytecode(instruction: Partial<IDecodedRVInstruction>): bigint {
     const op = instruction._op ?? rv_opcode.illegal;
@@ -287,12 +299,12 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       };
     }
 
-    const codec = RV_OPCODE_DATA[op].codec;
+    const op_info = RV_OPCODE_DATA[op];
     const dec: IDecodedRVInstruction = {
       bytecode,
-      _op: rv_opcode.illegal,
-      opcode: 0,
-      codec,
+      _op: op,
+      opcode: op_info.opcode,
+      codec: op_info.codec,
       rd: rv_reg.zero,
       rs1: rv_reg.zero,
       rs2: rv_reg.zero,
@@ -300,7 +312,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       imm: 0n,
     };
 
-    switch (codec) {
+    switch (op_info.codec) {
       case rv_codec.r:
         dec.rd = operand_rd(bytecode) as rv_reg;
         dec.rs1 = operand_rs1(bytecode) as rv_reg;
@@ -337,17 +349,214 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     return dec;
   }
 
+  public fetch() {
+    if (this.cpu.pc - 4n >= this.memory.length) {
+      return 0xf00fffffn;
+    }
+
+    return this.memoryRead(this.cpu.pc, 32);
+  }
+
+  public decode(inst: bigint) {
+    const intInst = Number(inst);
+    const cached = this.instructionCache[intInst];
+
+    if (cached) {
+      return cached;
+    }
+
+    const dec = this.fromBytecode(inst);
+
+    if (dec.codec !== rv_codec.illegal) {
+      this.instructionCache[intInst] = dec;
+    }
+
+    return dec;
+  }
+
   public execute(d: IDecodedRVInstruction): void {
-    console.log('WIMS: rv.execute: ' + this.stringifyInstruction(d));
+    console.log('WIMS: rv.execute: ' + this.stringifyInstruction(d), d);
+
+    this.cycle++;
+
+    const pc = this.cpu.pc;
+    const v1 = this.registerRead(d.rs1);
+    const v2 = this.registerRead(d.rs2);
 
     switch (d._op) {
       case rv_opcode.lui:
         this.registerWrite(d.rd, d.imm);
         break;
+      case rv_opcode.auipc:
+        this.registerWrite(d.rd, u32(pc + d.imm));
+        break;
+      case rv_opcode.jal:
+        this.registerWrite(d.rd, pc + 4n);
+        this.cpu.pc = u32(pc + d.imm);
+        break;
+      case rv_opcode.jalr: {
+        const t = u32(v1 + d.imm) & ~1n;
+        this.registerWrite(d.rd, pc + 4n);
+        this.cpu.pc = t;
+        break;
+      }
+      case rv_opcode.beq:
+        if (v1 === v2) this.cpu.pc = u32(pc + d.imm);
+        break;
+      case rv_opcode.bne:
+        if (v1 !== v2) this.cpu.pc = u32(pc + d.imm);
+        break;
+      case rv_opcode.blt:
+        if (s32(v1) < s32(v2)) this.cpu.pc = u32(pc + d.imm);
+        break;
+      case rv_opcode.bge:
+        if (s32(v1) >= s32(v2)) this.cpu.pc = u32(pc + d.imm);
+        break;
+      case rv_opcode.bltu:
+        if (u32(v1) < u32(v2)) this.cpu.pc = u32(pc + d.imm);
+        break;
+      case rv_opcode.bgeu:
+        if (u32(v1) >= u32(v2)) this.cpu.pc = u32(pc + d.imm);
+        break;
+      case rv_opcode.lb: {
+        const addr = u32(v1 + d.imm);
+        let b = this.memoryRead(addr, 8) & 0xffn;
+        if (b & 0x80n) b |= ~0xffn;
+        this.registerWrite(d.rd, u32(b));
+        break;
+      }
+      case rv_opcode.lh: {
+        const addr = u32(v1 + d.imm);
+        let h = this.memoryRead(addr, 16) & 0xffffn;
+        if (h & 0x8000n) h |= ~0xffffn;
+        this.registerWrite(d.rd, u32(h));
+        break;
+      }
+      case rv_opcode.lw: {
+        const addr = u32(v1 + d.imm);
+        this.registerWrite(d.rd, u32(this.memoryRead(addr, 32)));
+        break;
+      }
+      case rv_opcode.lbu: {
+        const addr = u32(v1 + d.imm);
+        this.registerWrite(d.rd, this.memoryRead(addr, 8) & 0xffn);
+        break;
+      }
+      case rv_opcode.lhu: {
+        const addr = u32(v1 + d.imm);
+        this.registerWrite(d.rd, this.memoryRead(addr, 16) & 0xffffn);
+        break;
+      }
+      case rv_opcode.sb:
+        this.memoryWrite(u32(v1 + d.imm), v2 & 0xffn, 8);
+        break;
+      case rv_opcode.sh:
+        this.memoryWrite(u32(v1 + d.imm), v2 & 0xffffn, 16);
+        break;
+      case rv_opcode.sw:
+        this.memoryWrite(u32(v1 + d.imm), v2, 32);
+        break;
+      case rv_opcode.addi:
+        this.registerWrite(d.rd, u32(v1 + d.imm));
+        break;
+      case rv_opcode.slti:
+        this.registerWrite(d.rd, s32(v1) < s32(d.imm) ? 1n : 0n);
+        break;
+      case rv_opcode.sltiu:
+        this.registerWrite(d.rd, u32(v1) < u32(d.imm) ? 1n : 0n);
+        break;
+      case rv_opcode.xori:
+        this.registerWrite(d.rd, u32(v1 ^ d.imm));
+        break;
+      case rv_opcode.ori:
+        this.registerWrite(d.rd, u32(v1 | d.imm));
+        break;
+      case rv_opcode.andi:
+        this.registerWrite(d.rd, u32(v1 & d.imm));
+        break;
+      case rv_opcode.slli:
+        this.registerWrite(d.rd, u32(u32(v1) << (d.imm & 0x1fn)));
+        break;
+      case rv_opcode.srli:
+        this.registerWrite(d.rd, u32(v1) >> (d.imm & 0x1fn));
+        break;
+      case rv_opcode.srai:
+        this.registerWrite(d.rd, u32(s32(v1) >> (d.imm & 0x1fn)));
+        break;
+      case rv_opcode.add:
+        this.registerWrite(d.rd, u32(v1 + v2));
+        break;
+      case rv_opcode.sub:
+        this.registerWrite(d.rd, u32(v1 - v2));
+        break;
+      case rv_opcode.sll:
+        this.registerWrite(d.rd, u32(u32(v1) << (v2 & 0x1fn)));
+        break;
+      case rv_opcode.slt:
+        this.registerWrite(d.rd, s32(v1) < s32(v2) ? 1n : 0n);
+        break;
+      case rv_opcode.sltu:
+        this.registerWrite(d.rd, u32(v1) < u32(v2) ? 1n : 0n);
+        break;
+      case rv_opcode.xor:
+        this.registerWrite(d.rd, u32(v1 ^ v2));
+        break;
+      case rv_opcode.srl:
+        this.registerWrite(d.rd, u32(u32(v1) >> (v2 & 0x1fn)));
+        break;
+      case rv_opcode.sra:
+        this.registerWrite(d.rd, u32(s32(v1) >> (v2 & 0x1fn)));
+        break;
+      case rv_opcode.or:
+        this.registerWrite(d.rd, u32(v1 | v2));
+        break;
+      case rv_opcode.and:
+        this.registerWrite(d.rd, u32(v1 & v2));
+        break;
     }
   }
 
-  public run() {}
+  public run() {
+    console.log('@todo run');
+
+    let inst = this.fetch();
+    let dec = this.decode(inst);
+    while (!this.halted && dec.codec !== rv_codec.illegal) {
+      const prevPc = this.cpu.pc;
+      this.execute(dec);
+      const isUncondJump = dec._op === rv_opcode.jal || dec._op === rv_opcode.jalr;
+      if (!isUncondJump && this.cpu.pc === prevPc) {
+        this.cpu.pc += 4n;
+      }
+
+      inst = this.fetch();
+      dec = this.decode(inst);
+    }
+
+    if (dec.codec === rv_codec.illegal) {
+      console.log('cpu.run: stepped into illegal instruction', { halted: this.halted, inst, dec, pc: this.cpu.pc });
+    }
+
+    console.log('cpu: debug: run stopped', { halted: this.halted, inst, dec });
+  }
+
+  public step() {
+    const inst = this.fetch();
+    const dec = this.decode(inst);
+
+    console.log('cpu.step: stepped', { halted: this.halted, inst, dec, pc: this.cpu.pc });
+
+    if (dec.codec === rv_codec.illegal) {
+      console.log('cpu.step: stepped into illegal instruction', { halted: this.halted, inst, dec, pc: this.cpu.pc });
+    }
+
+    const prevPc = this.cpu.pc;
+    this.execute(dec);
+    const isUncondJump = dec._op === rv_opcode.jal || dec._op === rv_opcode.jalr;
+    if (!isUncondJump && this.cpu.pc === prevPc) {
+      this.cpu.pc += 4n;
+    }
+  }
 
   public stringifyInstruction(instruction: Partial<IDecodedRVInstruction>): string {
     const opcode = instruction._op || rv_opcode.illegal;
@@ -404,9 +613,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
   public loadProgram(program: Array<IAssembledInstruction<IDecodedRVInstruction>>) {
     this.memory = new Uint8Array(); // force gc
-    this.memory = new Uint8Array(this.defaultMemorySize); // @todo
+    this.memory = new Uint8Array(this.memorySize); // @todo
 
-    this.cpu.pc = program[0]?.address || this.PC_START;
+    this.cpu.pc = program[0]?.address || 0x0n; //|| this.PC_START;
     this.cpu.register[rv_reg.sp] = this.STACK_START;
 
     for (const v of program) {
@@ -415,7 +624,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     }
 
     for (const v of program) {
-      console.log('0x' + this.memoryRead(v.address, 32).toString(16));
+      console.log('0x' + this.memoryRead(v.address, 32).toString(16).padStart(8, '0'));
     }
   }
 }

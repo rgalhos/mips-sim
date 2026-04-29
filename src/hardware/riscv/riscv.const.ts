@@ -165,7 +165,7 @@ export const RV_CODEC_FORMAT = {
 
 // É imprescindível que os elementos de RV_OPCODE_DATA estejam na mesma ordem que os do enum rv_opcode
 export const RV_OPCODE_DATA = [
-  { name: 'illegal', codec: rv_codec.illegal, format: 'ILLEGAL', opcode: null, funct3: null, funct7: null },
+  { name: 'illegal', codec: rv_codec.illegal, format: 'ILLEGAL', opcode: 0, funct3: null, funct7: null },
   { name: 'lui',     codec: rv_codec.u, format: RV_CODEC_FORMAT[rv_codec.u], opcode: 0b0110111, funct3: null, funct7: null },
   { name: 'auipc',   codec: rv_codec.u, format: RV_CODEC_FORMAT[rv_codec.u], opcode: 0b0010111, funct3: null, funct7: null },
   { name: 'jal',     codec: rv_codec.j, format: RV_CODEC_FORMAT[rv_codec.j], opcode: 0b1101111, funct3: null, funct7: null },

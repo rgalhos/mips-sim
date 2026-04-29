@@ -26,8 +26,6 @@ import { FaDownload, FaFolderOpen } from "react-icons/fa";
 import LoadProgramModal from "./LoadProgramModal";
 import WorkerService from "../../../../Service/WorkerService";
 import Screen, { ScreenRenderer } from "./Screen";
-import MemoryTerminal from "./MemoryTerminal";
-
 export default function EditorView(props: {
   runBtn: Function;
   assembleBtn: Function;
@@ -159,21 +157,6 @@ export default function EditorView(props: {
               Debug
             </Button>
 
-            <Button
-              style={{
-                position: "relative",
-                borderBottom: currentTerminal == 2 ? "solid" : "none",
-                backgroundColor: "none",
-                background: "none",
-                borderRadius: "0px",
-                top: -40,
-                right: 20,
-                zIndex:10
-              }}
-              onClick={() => setCurrentTerminal(2)}
-            >
-              Memory
-            </Button>
           </Stack>
 
           {/* Console  */}
@@ -198,13 +181,6 @@ export default function EditorView(props: {
                 Logger.instance.clearDebug();
               }}
             />
-          ) : (
-            <></>
-          )}
-
-            {/* Registers terminal  */}
-          {currentTerminal == 2 ? (
-           <MemoryTerminal/>
           ) : (
             <></>
           )}

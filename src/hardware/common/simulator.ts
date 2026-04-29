@@ -27,29 +27,51 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
 
   public abstract readonly registerKeywords: string[];
 
-  protected abstract readonly cpuWorkerLocation: string | URL;
-
   public readonly workerService = new WorkerService();
 
-  private _cpuWorkerRunning = false;
+  /**
+   * Memory size
+   */
+  private _memorySize = 0;
+
+  public get memorySize() {
+    return this._memorySize || this.processor.defaultMemorySize;
+  }
+
+  public setMemorySize(size: number) {
+    this.workerService.setMemorySize(size);
+    return (this._memorySize = size);
+  }
 
   get cpuWorker() {
     return this.workerService.worker;
   }
 
   get cpuWorkerRunning() {
-    return this._cpuWorkerRunning;
+    return this.workerService.workerRunning;
   }
 
+  protected abstract createCpuWorkerInstance(workerOptions?: WorkerOptions): Worker;
+
+  public abstract assembleCode(code: string): Array<IAssembledInstruction>;
+
   public createCpuWorker(workerOptions?: WorkerOptions) {
-    this.workerService.createCpuWorker(this.cpuWorkerLocation, workerOptions);
+    this.workerService.createCpuWorker(() => this.createCpuWorkerInstance(workerOptions));
+  }
+
+  public syncWorker() {
+    if (!this.workerService.worker) {
+      return;
+    }
+
+    console.log('syncWorker', { proc: this.processor });
+
+    this.workerService.syncWorker(this.processor);
   }
 
   public handleKeyPress(event: KeyboardEvent) {
     console.log('simulator: received unhandled key press event', { event });
   }
-
-  public abstract assembleCode(code: string): Array<IAssembledInstruction>;
 
   public linkToManual(instruction: string): string {
     void instruction;
