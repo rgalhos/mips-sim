@@ -15,7 +15,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   public static readonly manual: IUserManual;
 
-  public readonly instructionKeywords = Object.keys({ ...rv_opcode, ...rv_opcode_pseudo, ...rv_directives })
+  public readonly instructionKeywords = Object.keys({ ...rv_opcode, ...rv_opcode_pseudo })
     .filter((v) => Number.isNaN(+v))
     .slice(1) /* rv_opcode.illegal */;
 

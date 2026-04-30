@@ -1,5 +1,5 @@
 import { useColorMode } from '@chakra-ui/react';
-import Editor from '@monaco-editor/react';
+import Editor, { Monaco } from '@monaco-editor/react';
 import { useMemo, useRef } from 'react';
 import SharedData from '../Service/SharedData';
 import { useSimulator } from '../hooks/simulator.hook';
@@ -10,14 +10,19 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
   const monacoRef = useRef(null);
 
   const consts = useMemo(() => simulator.consts, [simulator]);
-  const directives = useMemo(() => simulator.directives.map((v) => '.' + v.toUpperCase()), [simulator]);
-  const keywords = useMemo(() => {
-    return [...simulator.instructionKeywords, ...simulator.instructionKeywords.map((v) => v.toUpperCase())];
-  }, [simulator]);
+  const directives = useMemo(
+    () => simulator.directives.concat(simulator.directives.map((v) => v.toUpperCase())),
+    [simulator],
+  );
+  const keywords = useMemo(
+    () => simulator.instructionKeywords.concat(simulator.instructionKeywords.map((v) => v.toUpperCase())),
+    [simulator],
+  );
+  const registers = useMemo(() => simulator.registerKeywords, [simulator]);
 
   const share: SharedData = SharedData.instance;
 
-  function handleEditorWillMount(monaco: any) {
+  function handleEditorWillMount(monaco: Monaco) {
     // here you can access to the monaco instance before it is initialized
     // register the language
     monaco.languages.register({ id: 'mips' });
@@ -28,10 +33,10 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
       tokenizer: {
         root: [
+          [/^\s*\.?[a-zA-Z0-9_]+:/, { token: 'annotation' }], // label
+
           [/\.[a-zA-Z]+/, 'keyword'], // directives
           [/[A-Z][A-Z_+]+/, 'type.identifier'], // consts
-
-          [/\.?[a-zA-Z0-9_]+:/, { token: 'annotation' }], // label
 
           [
             /[a-z_$][\w$]*/,
@@ -94,28 +99,38 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       ],
     });
 
-    //TODO: fix suggestions - suggesting instructions that are not in the instruction set
-    // let suggestions = keywords.map((k) => {
-    //   return {
-    //     label: k,
-    //     kind: monaco.languages.CompletionItemKind.Keyword,
-    //     insertText: k,
-    //   };
-    // });
-
     // TODO: check the impact of un-commenting this
     monaco.languages.registerCompletionItemProvider('mips', {
-      provideCompletionItems: (model: any, position: any) => {
-        const suggestions = [
-          ...keywords.map((k) => {
-            return {
-              label: k,
+      // @ts-expect-error bleeeeeeh
+      provideCompletionItems: () => {
+        return {
+          suggestions: [
+            ...keywords.map((keyword) => ({
+              insertText: keyword,
+              label: keyword,
               kind: monaco.languages.CompletionItemKind.Keyword,
-              insertText: k,
-            };
-          }),
-        ];
-        return { suggestions: suggestions };
+              range: 0,
+            })),
+            ...consts.map((c) => ({
+              insertText: c,
+              label: c,
+              kind: monaco.languages.CompletionItemKind.Constant,
+              range: 0,
+            })),
+            ...directives.map((directive) => ({
+              insertText: directive,
+              label: directive,
+              kind: monaco.languages.CompletionItemKind.EnumMember, // uuuh....
+              range: 0,
+            })),
+            ...registers.map((register) => ({
+              insertText: register,
+              label: register,
+              kind: monaco.languages.CompletionItemKind.EnumMember, // uuuh....
+              range: 0,
+            })),
+          ],
+        };
       },
     });
   }
