@@ -42,6 +42,8 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
   public lastExecutedInstruction: TDecodedInstruction | null = null;
 
+  public _memoryOperationDiff: Record<number, number> = {};
+
   /**
    * Simulator memory
    */
@@ -171,14 +173,18 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 32: {
         this.memory[address + 3] = Number((value >> 24n) & 0xffn);
+        this._memoryOperationDiff[address + 3] = Number((value >> 24n) & 0xffn);
         this.memory[address + 2] = Number((value >> 16n) & 0xffn);
+        this._memoryOperationDiff[address + 2] = Number((value >> 16n) & 0xffn);
       }
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 16: {
         this.memory[address + 1] = Number((value >> 8n) & 0xffn);
+        this._memoryOperationDiff[address + 1] = Number((value >> 8n) & 0xffn);
       } // eslint-disable-next-line no-fallthrough
       default: {
         this.memory[address + 0] = Number(value & 0xffn);
+        this._memoryOperationDiff[address + 0] = Number(value & 0xffn);
       }
     }
   }

@@ -97,7 +97,7 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
       slices.push(Array.from(memory.slice(off, off + MEM_ROW_BYTES)));
     }
     return slices;
-  }, [memory, start, rangeStart, rangeEnd]);
+  }, [memory, start, rangeStart, rangeEnd, dump.cycle]);
 
   const padTop = rangeStart * MEM_ROW_HEIGHT_PX;
   const padBottom = Math.max(0, totalRows - rangeEnd) * MEM_ROW_HEIGHT_PX;
@@ -191,7 +191,30 @@ function MemoryTerminal() {
   const [loading, setLoading] = useState(true);
 
   const onDump = useCallback((response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
-    setDump(response.data);
+    const newDump = response.data;
+
+    setDump((oldDump) => {
+      let memory;
+      if (newDump.memory.length === 0) {
+        memory = oldDump!.memory;
+      } else {
+        memory = newDump.memory;
+      }
+
+      for (const [addr, val] of Object.entries(newDump.memoryDiff)) {
+        memory[Number(addr)] = val;
+      }
+
+      return {
+        cpu: newDump.cpu,
+        cycle: newDump.cycle,
+        halted: newDump.halted,
+        lastExecutedInstruction: newDump.lastExecutedInstruction,
+        memory: memory,
+        memoryDiff: {},
+      };
+    });
+
     setLoading(false);
   }, []);
 

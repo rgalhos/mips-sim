@@ -1,13 +1,35 @@
 import { useColorMode } from '@chakra-ui/react';
+import { Global, css } from '@emotion/react';
 import Editor, { Monaco } from '@monaco-editor/react';
 import { useMemo, useRef } from 'react';
 import SharedData from '../Service/SharedData';
 import { useSimulator } from '../hooks/simulator.hook';
 
+const breakpointGlyphStyles = css`
+  .mips-assembly-breakpoint-glyph {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .mips-assembly-breakpoint-glyph::before {
+    content: '';
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #ed2939;
+  }
+  .monaco-editor .margin-view-numbers .line-numbers {
+    cursor: pointer;
+  }
+`;
+
 function AssemblyEditor(props: { onEditorChange: (value: string | undefined, event: any) => void }) {
   const { simulator } = useSimulator();
   const { colorMode } = useColorMode();
-  const monacoRef = useRef(null);
+  const breakpointDecorationIdsRef = useRef<string[]>([]);
+  const breakpointsRef = useRef(new Set<number>());
 
   const consts = useMemo(() => simulator.consts, [simulator]);
   const directives = useMemo(
@@ -23,10 +45,7 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
   const share: SharedData = SharedData.instance;
 
   function handleEditorWillMount(monaco: Monaco) {
-    // here you can access to the monaco instance before it is initialized
-    // register the language
     monaco.languages.register({ id: 'mips' });
-    // register a tokens provider for the language
     monaco.languages.setMonarchTokensProvider('mips', {
       keywords: keywords.concat(directives),
       typeKeywords: consts,
@@ -64,7 +83,6 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       },
     });
 
-    // define a new theme that contains only rules that match this language
     monaco.editor.defineTheme('mipsdark', {
       base: 'vs-dark',
       inherit: true,
@@ -99,7 +117,6 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       ],
     });
 
-    // TODO: check the impact of un-commenting this
     monaco.languages.registerCompletionItemProvider('mips', {
       // @ts-expect-error bleeeeeeh
       provideCompletionItems: () => {
@@ -135,10 +152,29 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
     });
   }
 
-  function handleEditorDidMount(editor: any, monaco: any) {
-    // here is another way to get monaco instance
-    // you can also store it in `useRef` for further usage
-    monacoRef.current = editor;
+  function applyBreakpointDecorations(editor: any, monaco: Monaco, lines: Set<number>) {
+    const model = editor.getModel();
+    if (!model) return;
+
+    const sorted = Array.from(lines).sort((a, b) => a - b);
+    const decos = sorted.map((line) => ({
+      range: new monaco.Range(line, 1, line, 1),
+      options: {
+        stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+        glyphMarginClassName: 'mips-assembly-breakpoint-glyph',
+        glyphMargin: { position: monaco.editor.GlyphMarginLane.Center },
+        overviewRuler: {
+          color: 'rgba(229, 20, 0, 0.55)',
+          darkColor: 'rgba(229, 20, 0, 0.85)',
+          position: monaco.editor.OverviewRulerLane.Left,
+        },
+      },
+    }));
+
+    breakpointDecorationIdsRef.current = editor.deltaDecorations(breakpointDecorationIdsRef.current, decos);
+  }
+
+  function handleEditorDidMount(editor: any, monaco: Monaco) {
     share.monacoEditor = editor;
     share.monaco = monaco;
 
@@ -148,24 +184,82 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
     if (!share.code) {
       editor.setValue(share.code);
     } else editor.setValue(defaultcode);
+
+    applyBreakpointDecorations(editor, monaco, breakpointsRef.current);
+
+    let layoutRaf = 0;
+    const scheduleLayout = () => {
+      if (layoutRaf !== 0) return;
+      layoutRaf = requestAnimationFrame(() => {
+        layoutRaf = 0;
+        editor.layout();
+      });
+    };
+
+    window.addEventListener('resize', scheduleLayout);
+
+    const container = editor.getDomNode()?.parentElement;
+    const resizeObserver =
+      container &&
+      new ResizeObserver(() => {
+        scheduleLayout();
+      });
+    if (container && resizeObserver) {
+      resizeObserver.observe(container);
+    }
+
+    const disposable = editor.onMouseDown((e: any) => {
+      if (!e.event.leftButton) return;
+      const targetType = e.target.type;
+      if (
+        targetType !== monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS &&
+        targetType !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN
+      ) {
+        return;
+      }
+      const line = e.target.position?.lineNumber;
+      if (line == null) return;
+      e.event.preventDefault();
+      e.event.stopPropagation();
+      const bp = breakpointsRef.current;
+      if (bp.has(line)) bp.delete(line);
+      else bp.add(line);
+      applyBreakpointDecorations(editor, monaco, new Set(bp));
+    });
+
+    editor.onDidDispose(() => {
+      disposable.dispose();
+      window.removeEventListener('resize', scheduleLayout);
+      if (layoutRaf !== 0) {
+        cancelAnimationFrame(layoutRaf);
+        layoutRaf = 0;
+      }
+      resizeObserver?.disconnect();
+    });
   }
 
   const defaultcode = share.defaultCode;
 
   return (
-    <Editor
-      onChange={props.onEditorChange}
-      height="80vh"
-      defaultLanguage="mips"
-      theme={colorMode === 'dark' ? 'mipsdark' : 'mipslight'}
-      defaultValue={'# MIPS Assembly Sim. by Reinaldo Assis \n# Project supervisor: prof. Bruno Costa\n\n'}
-      options={{
-        scrollBeyondLastLine: false,
-        fontSize: 20,
-      }}
-      beforeMount={handleEditorWillMount}
-      onMount={handleEditorDidMount}
-    />
+    <>
+      <Global styles={breakpointGlyphStyles} />
+
+      <Editor
+        onChange={props.onEditorChange}
+        height="80vh"
+        defaultLanguage="mips"
+        theme={colorMode === 'dark' ? 'mipsdark' : 'mipslight'}
+        defaultValue={'# MIPS Assembly Sim. by Reinaldo Assis \n# Project supervisor: prof. Bruno Costa\n\n'}
+        options={{
+          automaticLayout: false,
+          scrollBeyondLastLine: false,
+          fontSize: 20,
+          glyphMargin: true,
+        }}
+        beforeMount={handleEditorWillMount}
+        onMount={handleEditorDidMount}
+      />
+    </>
   );
 }
 

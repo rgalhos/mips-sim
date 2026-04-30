@@ -22,6 +22,7 @@ export const enum EWorkerCommand {
 
 export interface IWorkerCPUDump {
   memory: Uint8Array;
+  memoryDiff: Record<number, number>;
   cpu: ICPU;
   cycle: bigint;
   halted: boolean;

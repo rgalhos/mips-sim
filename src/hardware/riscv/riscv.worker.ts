@@ -10,11 +10,15 @@ const postMessage = (message: WorkerMessageResponse) => {
   self.postMessage(message);
 };
 
-const postCpuDump = () => {
+const postCpuDump = (fullDump = false) => {
+  const memoryDiff = cpu._memoryOperationDiff;
+  cpu._memoryOperationDiff = {};
+
   postMessage({
     command: EWorkerCommand.CPU_DUMP,
     data: {
-      memory: cpu.memory,
+      memory: fullDump ? cpu.memory : new Uint8Array(),
+      memoryDiff: memoryDiff,
       cpu: {
         pc: cpu.cpu.pc,
         register: { ...cpu.cpu.register },
@@ -87,7 +91,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
 
     console.log('SYNC INSIDE WORKER', { cpu, data });
 
-    debouncedPostCpuDump();
+    postCpuDump(true);
   }
 };
 
