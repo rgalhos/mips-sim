@@ -21,6 +21,10 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   public readonly registerKeywords = Object.keys(rv_reg).filter((v) => Number.isNaN(+v));
 
+  public readonly directives = Object.keys(rv_directives).filter((v) => Number.isNaN(+v));
+
+  public readonly consts = ['PC_START', 'STACK_START', 'SCREEN_MEM_START', 'SCREEN_MEM_END', 'INPUT_BUFFER_ADDR'];
+
   public readonly processor: RVProcessor = new RVProcessor();
 
   protected createCpuWorkerInstance(workerOptions?: WorkerOptions) {

@@ -27,6 +27,10 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
 
   public abstract readonly registerKeywords: string[];
 
+  public abstract readonly directives: string[];
+
+  public abstract readonly consts: string[];
+
   public readonly workerService = new WorkerService();
 
   /**

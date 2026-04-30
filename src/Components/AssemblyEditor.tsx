@@ -9,7 +9,8 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
   const { colorMode } = useColorMode();
   const monacoRef = useRef(null);
 
-  const directives = ['def', 'dw', 'org', 'include'];
+  const consts = useMemo(() => simulator.consts, [simulator]);
+  const directives = useMemo(() => simulator.directives.map((v) => '.' + v.toUpperCase()), [simulator]);
   const keywords = useMemo(() => {
     return [...simulator.instructionKeywords, ...simulator.instructionKeywords.map((v) => v.toUpperCase())];
   }, [simulator]);
@@ -23,20 +24,37 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
     // register a tokens provider for the language
     monaco.languages.setMonarchTokensProvider('mips', {
       keywords: keywords.concat(directives),
+      typeKeywords: consts,
+      escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
       tokenizer: {
         root: [
+          [/\.[a-zA-Z]+/, 'keyword'], // directives
+          [/[A-Z][A-Z_+]+/, 'type.identifier'], // consts
+
+          [/\.?[a-zA-Z0-9_]+:/, { token: 'annotation' }], // label
+
           [
-            /@?\$?[a-zA-Z][\w$]*/,
-            {
-              cases: {
-                '@keywords': 'keyword',
-                '@default': 'identifier',
-              },
-            },
+            /[a-z_$][\w$]*/,
+            { cases: { '@typeKeywords': 'keyword', '@keywords': 'keyword', '@default': 'identifier' } },
           ],
-          [/".*?"/, 'string'],
-          [/(0[xX])?\d+/, 'number'],
+
+          [/\b0[xX][0-9a-fA-F]+\b/, 'number.hex'],
+          [/\b0[bB][01]+\b/, 'number.binary'],
+          [/\d+\b/, 'number'],
+
           [/#.*$/, 'comment'],
+
+          [/"([^"\\]|\\.)*$/, 'string.invalid'], // non-teminated string
+          [/'/, 'string.invalid'],
+          [/(')(@escapes)(')/, ['string', 'string.escape', 'string']],
+          [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
+          [/'[^\\']'/, 'string'],
+        ],
+        string: [
+          [/[^\\"]+/, 'string'],
+          [/@escapes/, 'string.escape'],
+          [/\\./, 'string.escape.invalid'],
+          [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }],
         ],
       },
     });
