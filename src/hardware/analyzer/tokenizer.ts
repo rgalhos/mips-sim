@@ -4,6 +4,7 @@ export enum ETokenType {
   CHAR,
   NUMBER,
   LABEL,
+  RELOC,
   INVALID,
   EOL,
 }
@@ -13,6 +14,7 @@ export type IToken =
       type: ETokenType.IDENTIFIER | ETokenType.STRING | ETokenType.CHAR | ETokenType.LABEL;
       value: string;
     }
+  | { type: ETokenType.RELOC; value: string }
   | { type: ETokenType.NUMBER; value: number }
   | { type: ETokenType.INVALID | ETokenType.EOL; value: string | number | null };
 
@@ -69,6 +71,99 @@ export function tokenize(line: string) {
       i = i + 3;
       continue;
     }
+    // relocation operator %name ( ... )
+    else if (c === '%') {
+      const nameStart = i + 1;
+      if (nameStart >= line.length || !/[a-zA-Z_.]/.test(line[nameStart])) {
+        tokens.push({ type: ETokenType.INVALID, value: '%' });
+        break;
+      }
+      let j = nameStart + 1;
+      while (j < line.length && /[a-zA-Z0-9_]/.test(line[j])) {
+        j++;
+      }
+      tokens.push({ type: ETokenType.RELOC, value: line.slice(nameStart, j).toLowerCase() });
+      i = j;
+      while (i < line.length && /\s/.test(line[i])) {
+        i++;
+      }
+      if (i >= line.length || line[i] !== '(') {
+        tokens.push({ type: ETokenType.INVALID, value: '(' });
+        break;
+      }
+      i++;
+      while (i < line.length && /\s/.test(line[i])) {
+        i++;
+      }
+      if (i >= line.length) {
+        tokens.push({ type: ETokenType.INVALID, value: null });
+        break;
+      }
+      c = line[i];
+      // inner: identifier
+      if (/[a-zA-Z_.]/.test(c)) {
+        let k = i + 1;
+        let idVal = c;
+        while (k < line.length && /[a-zA-Z0-9_]/.test(line[k])) {
+          idVal += line[k];
+          k++;
+        }
+        tokens.push({ type: ETokenType.IDENTIFIER, value: idVal });
+        i = k;
+      }
+      // inner: number
+      else if (/[0-9-]/.test(c)) {
+        let k = i + 1;
+        let isNegative = 1;
+        let nc = c;
+        if (nc === '-') {
+          isNegative = -1;
+          if (k >= line.length) {
+            tokens.push({ type: ETokenType.INVALID, value: '-' });
+            break;
+          }
+          nc = line[k++];
+        }
+        let numStr = nc;
+        if (nc === '0' && k < line.length && /[xX]/.test(line[k])) {
+          numStr += line[k++];
+          while (k < line.length && /[0-9a-fA-F]/.test(line[k])) {
+            numStr += line[k++];
+          }
+        } else if (nc === '0' && k < line.length && /[bB]/.test(line[k])) {
+          numStr += line[k++];
+          while (k < line.length && /[01]/.test(line[k])) {
+            numStr += line[k++];
+          }
+        } else if (/[0-9]/.test(nc)) {
+          while (k < line.length && /[0-9]/.test(line[k])) {
+            numStr += line[k++];
+          }
+        } else {
+          tokens.push({ type: ETokenType.INVALID, value: nc });
+          break;
+        }
+        const v = Number(numStr) * isNegative;
+        if (isNaN(v)) {
+          tokens.push({ type: ETokenType.INVALID, value: v });
+          break;
+        }
+        tokens.push({ type: ETokenType.NUMBER, value: v });
+        i = k;
+      } else {
+        tokens.push({ type: ETokenType.INVALID, value: c });
+        break;
+      }
+      while (i < line.length && /\s/.test(line[i])) {
+        i++;
+      }
+      if (i >= line.length || line[i] !== ')') {
+        tokens.push({ type: ETokenType.INVALID, value: ')' });
+        break;
+      }
+      i++;
+      continue;
+    }
     // identifier
     else if (/[a-zA-Z_.]/.test(c)) {
       let j = i + 1;
@@ -82,7 +177,12 @@ export function tokenize(line: string) {
         tokens.push({ type: ETokenType.LABEL, value });
         i++;
       } else {
-        if (readingOffset && tokens[tokens.length - 1] && tokens[tokens.length - 1].type === ETokenType.NUMBER) {
+        const prev = tokens[tokens.length - 1];
+        if (
+          readingOffset &&
+          prev &&
+          (prev.type === ETokenType.NUMBER || prev.type === ETokenType.IDENTIFIER)
+        ) {
           const offset = tokens.pop()!;
           tokens.push({ type: ETokenType.IDENTIFIER, value });
           tokens.push(offset);
@@ -94,7 +194,7 @@ export function tokenize(line: string) {
     }
     // number
     // eslint-disable-next-line no-useless-escape
-    else if (/[0-9\-]/.test(c)) {
+    else if (/[0-9-]/.test(c)) {
       let j = i + 1;
       let isNegative = 1;
 

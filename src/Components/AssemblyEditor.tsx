@@ -1,35 +1,12 @@
 import { useColorMode } from '@chakra-ui/react';
-import { Global, css } from '@emotion/react';
 import Editor, { Monaco } from '@monaco-editor/react';
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import SharedData from '../Service/SharedData';
 import { useSimulator } from '../hooks/simulator.hook';
-
-const breakpointGlyphStyles = css`
-  .mips-assembly-breakpoint-glyph {
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-
-  .mips-assembly-breakpoint-glyph::before {
-    content: '';
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: #ed2939;
-  }
-  .monaco-editor .margin-view-numbers .line-numbers {
-    cursor: pointer;
-  }
-`;
 
 function AssemblyEditor(props: { onEditorChange: (value: string | undefined, event: any) => void }) {
   const { simulator } = useSimulator();
   const { colorMode } = useColorMode();
-  const breakpointDecorationIdsRef = useRef<string[]>([]);
-  const breakpointsRef = useRef(new Set<number>());
 
   const consts = useMemo(() => simulator.consts, [simulator]);
   const directives = useMemo(
@@ -54,7 +31,7 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
         root: [
           [/^\s*\.?[a-zA-Z0-9_]+:/, { token: 'annotation' }], // label
 
-          [/\.[a-zA-Z]+/, 'keyword'], // directives
+          [/[\.%][a-zA-Z]+/, 'keyword'], // directives
           [/[A-Z][A-Z_+]+/, 'type.identifier'], // consts
 
           [
@@ -150,28 +127,29 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
         };
       },
     });
-  }
 
-  function applyBreakpointDecorations(editor: any, monaco: Monaco, lines: Set<number>) {
-    const model = editor.getModel();
-    if (!model) return;
+    const manualMap = Object.fromEntries(
+      simulator.manual.instructions
+        .map((inst) => [inst.name, [{ value: inst.operation }, { value: inst.description }]])
+        .concat(
+          simulator.manual.registers.map((reg) => [reg.name, [{ value: `**${reg.kind}** — ${reg.description}` }]]),
+        ),
+    );
 
-    const sorted = Array.from(lines).sort((a, b) => a - b);
-    const decos = sorted.map((line) => ({
-      range: new monaco.Range(line, 1, line, 1),
-      options: {
-        stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-        glyphMarginClassName: 'mips-assembly-breakpoint-glyph',
-        glyphMargin: { position: monaco.editor.GlyphMarginLane.Center },
-        overviewRuler: {
-          color: 'rgba(229, 20, 0, 0.55)',
-          darkColor: 'rgba(229, 20, 0, 0.85)',
-          position: monaco.editor.OverviewRulerLane.Left,
-        },
+    monaco.languages.registerHoverProvider('mips', {
+      provideHover: (model, position) => {
+        const word = model.getWordAtPosition(position);
+
+        if (word && word.word) {
+          const w = word.word.toLowerCase();
+          const entry = manualMap[w];
+
+          if (entry) {
+            return { contents: entry };
+          }
+        }
       },
-    }));
-
-    breakpointDecorationIdsRef.current = editor.deltaDecorations(breakpointDecorationIdsRef.current, decos);
+    });
   }
 
   function handleEditorDidMount(editor: any, monaco: Monaco) {
@@ -184,8 +162,6 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
     if (!share.code) {
       editor.setValue(share.code);
     } else editor.setValue(defaultcode);
-
-    applyBreakpointDecorations(editor, monaco, breakpointsRef.current);
 
     let layoutRaf = 0;
     const scheduleLayout = () => {
@@ -208,27 +184,7 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       resizeObserver.observe(container);
     }
 
-    const disposable = editor.onMouseDown((e: any) => {
-      if (!e.event.leftButton) return;
-      const targetType = e.target.type;
-      if (
-        targetType !== monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS &&
-        targetType !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN
-      ) {
-        return;
-      }
-      const line = e.target.position?.lineNumber;
-      if (line == null) return;
-      e.event.preventDefault();
-      e.event.stopPropagation();
-      const bp = breakpointsRef.current;
-      if (bp.has(line)) bp.delete(line);
-      else bp.add(line);
-      applyBreakpointDecorations(editor, monaco, new Set(bp));
-    });
-
     editor.onDidDispose(() => {
-      disposable.dispose();
       window.removeEventListener('resize', scheduleLayout);
       if (layoutRaf !== 0) {
         cancelAnimationFrame(layoutRaf);
@@ -241,25 +197,21 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
   const defaultcode = share.defaultCode;
 
   return (
-    <>
-      <Global styles={breakpointGlyphStyles} />
-
-      <Editor
-        onChange={props.onEditorChange}
-        height="80vh"
-        defaultLanguage="mips"
-        theme={colorMode === 'dark' ? 'mipsdark' : 'mipslight'}
-        defaultValue={'# MIPS Assembly Sim. by Reinaldo Assis \n# Project supervisor: prof. Bruno Costa\n\n'}
-        options={{
-          automaticLayout: false,
-          scrollBeyondLastLine: false,
-          fontSize: 20,
-          glyphMargin: true,
-        }}
-        beforeMount={handleEditorWillMount}
-        onMount={handleEditorDidMount}
-      />
-    </>
+    <Editor
+      onChange={props.onEditorChange}
+      height="80vh"
+      defaultLanguage="mips"
+      theme={colorMode === 'dark' ? 'mipsdark' : 'mipslight'}
+      defaultValue={'# MIPS Assembly Sim. by Reinaldo Assis \n# Project supervisor: prof. Bruno Costa\n\n'}
+      options={{
+        automaticLayout: false,
+        scrollBeyondLastLine: false,
+        fontSize: 20,
+        glyphMargin: true,
+      }}
+      beforeMount={handleEditorWillMount}
+      onMount={handleEditorDidMount}
+    />
   );
 }
 

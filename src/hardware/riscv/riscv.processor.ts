@@ -36,8 +36,18 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly opcodeInfo = RV_OPCODE_DATA;
 
   //protected readonly DRAM_BASE_ADDRESS = 0x80000000n;
-  public readonly PC_START = 0x1000n;
-  public readonly STACK_START = 0x7c00n;
+  public readonly PC_START = 0x0000n;
+  public readonly PROGRAM_END = 0x2fffn;
+  public readonly RODATA_START = 0x3000n;
+  public readonly RODATA_END = 0x3fffn;
+  public readonly DATA_START = 0x4000n;
+  public readonly DATA_END = 0x4fffn;
+  public readonly BSS_START = 0x5000n;
+  public readonly BSS_END = 0x4fffn;
+  public readonly FRAMEBUFFER_START = 0x7000n;
+  public readonly FRAMEBUFFER_END = 0x7e10n;
+  public readonly STACK_START = 0x8000n;
+  public readonly STACK_END = 0x7e10n;
 
   public readonly INSTRUCTION_LENGTH = 4;
 
@@ -47,7 +57,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     register: {
       [rv_reg.zero]: 0n,
       [rv_reg.ra]: 0n,
-      [rv_reg.sp]: 0n,
+      [rv_reg.sp]: this.STACK_START,
       [rv_reg.gp]: 0n,
       [rv_reg.tp]: 0n,
       [rv_reg.t0]: 0n,
@@ -516,31 +526,14 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       case rv_opcode.and:
         this.registerWrite(d.rd, u32(v1 & v2));
         break;
+      case rv_opcode.ebreak:
+        this.setHalted(true);
+        break;
     }
   }
 
   public run() {
     console.log('@todo run');
-
-    let inst = this.fetch();
-    let dec = this.decode(inst);
-    while (!this.halted && dec.codec !== rv_codec.illegal) {
-      const prevPc = this.cpu.pc;
-      this.execute(dec);
-      const isUncondJump = dec._op === rv_opcode.jal || dec._op === rv_opcode.jalr;
-      if (!isUncondJump && this.cpu.pc === prevPc) {
-        this.cpu.pc += 4n;
-      }
-
-      inst = this.fetch();
-      dec = this.decode(inst);
-    }
-
-    if (dec.codec === rv_codec.illegal) {
-      console.log('cpu.run: stepped into illegal instruction', { halted: this.halted, inst, dec, pc: this.cpu.pc });
-    }
-
-    console.log('cpu: debug: run stopped', { halted: this.halted, inst, dec });
   }
 
   public step() {
@@ -550,7 +543,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     console.log('cpu.step: stepped', { halted: this.halted, inst, dec, pc: this.cpu.pc });
 
     if (dec.codec === rv_codec.illegal) {
-      console.log('cpu.step: stepped into illegal instruction', { halted: this.halted, inst, dec, pc: this.cpu.pc });
+      console.log('cpu.step: stepped into illegal instruction, halting', { halted: this.halted, inst, dec, pc: this.cpu.pc });
+      this.setHalted(true);
+      return;
     }
 
     const prevPc = this.cpu.pc;
@@ -587,9 +582,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       } else if (c === 'i') {
         str += imm;
       } else if (c === 'x') {
-        str += '0x' + imm.toString(16).toUpperCase();
+        str += '0x' + (imm & 0xffffffffn).toString(16).toUpperCase();
       } else if (c === 'X') {
-        str += '0x' + imm.toString(16).toUpperCase().padStart(8, '0');
+        str += '0x' + (imm & 0xffffffffn).toString(16).toUpperCase().padStart(8, '0');
       } else if (c === 'j') {
         str += imm;
       } else {

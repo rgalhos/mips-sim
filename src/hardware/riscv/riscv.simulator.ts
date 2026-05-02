@@ -1,19 +1,31 @@
 import { ETokenType, IToken, tokenize } from '../analyzer/tokenizer';
 import { IUserManual } from '../common/manual';
 import { IAssembledInstruction, ISimulator } from '../common/simulator';
-import { rv_codec, rv_directives, rv_opcode, RV_OPCODE_DATA, rv_opcode_pseudo, rv_reg } from './riscv.const';
+import {
+  rv_codec,
+  rv_directives,
+  rv_opcode,
+  RV_OPCODE_DATA,
+  rv_opcode_pseudo,
+  rv_reg,
+  rv_syscalls,
+} from './riscv.const';
 import { RVProcessor } from './riscv.processor';
 import { IDecodedRVInstruction } from './riscv.types';
+import { splitHiLoS32 } from './riscv.utils';
+import { rvManual } from './user/riscv.manual';
 
 const throwUnexpectedToken = (tokens: IToken[]) => {
   console.log('rv: unexpected token', tokens);
-  return new Error('rv: unexpected token');
+  return new Error('rv: unexpected token', { cause: 'UNEXPECTED_TOKEN' });
 };
+
+const RV_RELOC_OPS = new Set(['hi', 'lo', 'pcrel_hi', 'pcrel_lo']);
 
 export class RVSimulator extends ISimulator<RVProcessor> {
   static name = 'RISC-V (RV32I)';
 
-  public static readonly manual: IUserManual;
+  public readonly manual: IUserManual = rvManual;
 
   public readonly instructionKeywords = Object.keys({ ...rv_opcode, ...rv_opcode_pseudo })
     .filter((v) => Number.isNaN(+v))
@@ -23,15 +35,221 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   public readonly directives = Object.keys(rv_directives).filter((v) => Number.isNaN(+v));
 
-  public readonly consts = ['PC_START', 'STACK_START', 'SCREEN_MEM_START', 'SCREEN_MEM_END', 'INPUT_BUFFER_ADDR'];
+  public readonly consts = [
+    'PC_START',
+    'STACK_START',
+    'FRAMEBUFFER_START',
+    'FRAMEBUFFER_END',
+    'INPUT_BUFFER_ADDR',
+    'SYSCALL_PRINT_INT',
+    'SYSCALL_PRINT_STRING',
+    'SYSCALL_PRINT_CHAR',
+    'SYSCALL_UPDATE_SCREEN',
+    'OPTION_EXPLICIT_SCREEN_UPDATE',
+  ];
 
   public readonly processor: RVProcessor = new RVProcessor();
+
+  public _optExplicitScreenUpdate = false;
 
   protected createCpuWorkerInstance(workerOptions?: WorkerOptions) {
     return new Worker(new URL('./riscv.worker.ts', import.meta.url), workerOptions);
   }
 
-  public assembleLine(tokens: IToken[], constants: Record<string, IToken>) {
+  private followConstSubst(t: IToken, constants: Record<string, IToken>): IToken {
+    let cur = t;
+    const seen = new Set<string>();
+
+    while (cur.type === ETokenType.IDENTIFIER) {
+      const next = constants[cur.value];
+      if (!next) break;
+      if (seen.has(cur.value)) throw new Error('rv: circular .equ');
+      seen.add(cur.value);
+      cur = next;
+    }
+
+    return cur;
+  }
+
+  private resolveConstantName(name: string, constants: Record<string, IToken>): bigint | undefined {
+    const t = constants[name];
+    if (!t) return undefined;
+    const cur = this.followConstSubst(t, constants);
+    if (cur.type === ETokenType.NUMBER) return BigInt(cur.value as number);
+    return undefined;
+  }
+
+  private ensureNumericImmediate(t: IToken | undefined, constants: Record<string, IToken>): bigint {
+    if (!t) throw throwUnexpectedToken([]);
+    const cur = this.followConstSubst(t, constants);
+    if (cur.type !== ETokenType.NUMBER) throw throwUnexpectedToken([cur]);
+    return BigInt(cur.value as number);
+  }
+
+  private ensureRegisterToken(t: IToken | undefined, constants: Record<string, IToken>): number {
+    if (!t) throw throwUnexpectedToken([]);
+    const cur = this.followConstSubst(t, constants);
+    const v = String(cur.value).toLowerCase();
+    const r = rv_reg[v as keyof typeof rv_reg];
+    if (typeof r === 'undefined') throw throwUnexpectedToken([cur]);
+    return r;
+  }
+
+  // 'pcrel_lo' assume que a ultima instrução é um AUIPC em pc-4 (auipc+addi pair).
+  private relocImmediate(op: string, symbolVal: bigint, instAddr: bigint): bigint {
+    if (!RV_RELOC_OPS.has(op)) {
+      throw new Error(`rv: unknown relocation operator %${op}`);
+    }
+
+    switch (op) {
+      case 'hi':
+        return splitHiLoS32(symbolVal).hi;
+      case 'lo':
+        return splitHiLoS32(symbolVal).lo;
+      case 'pcrel_hi':
+        return splitHiLoS32(symbolVal - instAddr).hi;
+      case 'pcrel_lo':
+        return splitHiLoS32(symbolVal - (instAddr - 4n)).lo;
+      default:
+        throw new Error(`rv: unknown relocation operator %${op}`);
+    }
+  }
+
+  private decodeImmediate(
+    tokens: IToken[],
+    immIdx: number,
+    constants: Record<string, IToken>,
+    pc: bigint,
+    codec: IDecodedRVInstruction['codec'],
+  ): bigint {
+    const immTok = tokens[immIdx];
+    if (!immTok) throw throwUnexpectedToken(tokens);
+
+    if (immTok.type === ETokenType.RELOC) {
+      const op = immTok.value;
+      if (!RV_RELOC_OPS.has(op)) throw new Error(`rv: unknown relocation operator %${op}`);
+
+      const operand = tokens[immIdx + 1];
+      if (!operand) throw throwUnexpectedToken(tokens);
+
+      if (operand.type === ETokenType.NUMBER) {
+        return this.relocImmediate(op, BigInt(operand.value as number), pc);
+      }
+      if (operand.type === ETokenType.IDENTIFIER) {
+        const c = this.resolveConstantName(operand.value, constants);
+        if (c !== undefined) return this.relocImmediate(op, c, pc);
+        return 0n;
+      }
+      throw throwUnexpectedToken([operand]);
+    }
+
+    if (immTok.type === ETokenType.NUMBER) {
+      return BigInt(immTok.value as number);
+    }
+    if (immTok.type === ETokenType.IDENTIFIER) {
+      const c = this.resolveConstantName(immTok.value, constants);
+      if (c !== undefined) {
+        if (codec === rv_codec.j || codec === rv_codec.b) return c - pc;
+        if (codec === rv_codec.u) return (c >> 12n) & 0xfffffn;
+        return c;
+      }
+      return 0n;
+    }
+
+    throw throwUnexpectedToken([immTok]);
+  }
+
+  private handlePseudoInstruction(
+    tokens: IToken[],
+    constants: Record<string, IToken>,
+    pc: bigint,
+  ): IDecodedRVInstruction[] {
+    const invalid: IDecodedRVInstruction = {
+      bytecode: 0n,
+      codec: rv_codec.illegal,
+      _op: rv_opcode.illegal,
+      opcode: 0,
+      imm: 0n,
+      rd: rv_reg.zero,
+      rs1: rv_reg.zero,
+      rs2: rv_reg.zero,
+      rs3: rv_reg.zero,
+    };
+
+    const tkFirst = tokens[0];
+    const tok1 = tokens[1];
+    const tok2 = tokens[2];
+    const pseudo = tkFirst.value?.toString().toLowerCase() as keyof typeof rv_opcode_pseudo;
+
+    switch (pseudo) {
+      case 'nop': {
+        return this.assembleLine(tokenize('addi zero, zero, 0'), {}, 0n, true);
+      }
+      case 'mv': {
+        const rd = this.ensureRegisterToken(tok1, constants);
+        const rs1 = this.ensureRegisterToken(tok2, constants);
+        return this.assembleLine(tokenize(`addi x${rd}, x${rs1}, 0`), {}, 0n, true);
+      }
+      case 'la': {
+        const rd = this.ensureRegisterToken(tok1, constants);
+        const imm = this.ensureNumericImmediate(tok2, constants);
+        return [
+          ...this.assembleLine(tokenize(`auipc x${rd}, %hi(${imm})`), {}, pc, true),
+          ...this.assembleLine(tokenize(`addi x${rd}, x${rd}, %lo(${imm})`), {}, 0n, true),
+        ];
+      }
+      // case 'j': {
+      //   const imm = this.ensureNumericImmediate(tok2, constants);
+      //   return this.assembleLine(tokenize(`jal ra, ${imm}`), {}, 0n, true);
+      // }
+      // case 'jump': {
+      //
+      // }
+      case 'not': {
+        const rd = this.ensureRegisterToken(tok1, constants);
+        const rs1 = this.ensureRegisterToken(tok2, constants);
+        return this.assembleLine(tokenize(`xori x${rd}, x${rs1}, -1`), {}, 0n, true);
+      }
+      case 'neg': {
+        const rd = this.ensureRegisterToken(tok1, constants);
+        const rs1 = this.ensureRegisterToken(tok2, constants);
+        return this.assembleLine(tokenize(`sub x${rd}, zero, x${rs1}`), {}, 0n, true);
+      }
+      case 'seqz': {
+        const rd = this.ensureRegisterToken(tok1, constants);
+        const rs1 = this.ensureRegisterToken(tok2, constants);
+        return this.assembleLine(tokenize(`sltiu x${rd}, x${rs1}, 1`), {}, 0n, true);
+      }
+      case 'snez': {
+        const rd = this.ensureRegisterToken(tok1, constants);
+        const rs1 = this.ensureRegisterToken(tok2, constants);
+        return this.assembleLine(tokenize(`sltu x${rd}, zero, x${rs1}`), {}, 0n, true);
+      }
+      case 'sltz': {
+        const rd = this.ensureRegisterToken(tok1, constants);
+        const rs1 = this.ensureRegisterToken(tok2, constants);
+        return this.assembleLine(tokenize(`slt x${rd}, x${rs1}, zero`), {}, 0n, true);
+      }
+      case 'sgtz': {
+        const rd = this.ensureRegisterToken(tok1, constants);
+        const rs1 = this.ensureRegisterToken(tok2, constants);
+        return this.assembleLine(tokenize(`slt x${rd}, x${rs1}, zero`), {}, 0n, true);
+      }
+      // BLA BLA BLA @todo resto das instruções
+      case 'ret': {
+        return this.assembleLine(tokenize('jalr zero, ra, 0'), {}, 0n, true);
+      }
+    }
+
+    return [invalid];
+  }
+
+  public assembleLine(
+    tokens: IToken[],
+    constants: Record<string, IToken>,
+    pc: bigint,
+    handledPseudo = false,
+  ): IDecodedRVInstruction[] {
     const tkFirst = tokens[0];
     if (!tkFirst || tkFirst.type !== ETokenType.IDENTIFIER) {
       throw throwUnexpectedToken(tokens);
@@ -49,9 +267,15 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       rs3: rv_reg.zero,
     };
 
-    const op = String(tkFirst.value) as keyof typeof rv_opcode;
+    const op = tkFirst.value.toLowerCase() as keyof typeof rv_opcode;
     const data = RV_OPCODE_DATA[rv_opcode[op]];
-    if (!data || !data.opcode) return dec;
+    if (!data || !data.opcode) {
+      if (!handledPseudo && !!rv_opcode_pseudo[tkFirst.type]) {
+        return this.handlePseudoInstruction(tokens, constants, pc);
+      }
+
+      return [dec];
+    }
 
     dec._op = rv_opcode[op];
     dec.opcode = data.opcode;
@@ -61,59 +285,35 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     const tok2 = tokens[2];
     const tok3 = tokens[3];
 
-    const decodeConstOrFallback = (t: IToken) => {
-      if (!t) throw throwUnexpectedToken([t]);
-      else if (t.value !== ETokenType.IDENTIFIER) return t;
-      return constants[t.value] || t;
-    };
-
-    const ensureRegister = (t: IToken): number => {
-      const dec = decodeConstOrFallback(t);
-      const v = (dec.value as string).toLowerCase();
-      const r = rv_reg[v as keyof typeof rv_reg];
-      if (typeof r === 'undefined') throw throwUnexpectedToken([dec]);
-      return r;
-    };
-
-    const ensureNumber = (t: IToken): bigint => {
-      const dec = decodeConstOrFallback(t);
-      if (!dec || dec.type !== ETokenType.NUMBER) throwUnexpectedToken([dec]);
-      return BigInt(dec.value as number);
-    };
-
     switch (dec.codec) {
       case rv_codec.r:
-        dec.rd = ensureRegister(tok1);
-        dec.rs1 = ensureRegister(tok2);
-        dec.rs2 = ensureRegister(tok3);
+        dec.rd = this.ensureRegisterToken(tok1, constants);
+        dec.rs1 = this.ensureRegisterToken(tok2, constants);
+        dec.rs2 = this.ensureRegisterToken(tok3, constants);
         break;
       case rv_codec.i:
-        dec.rd = ensureRegister(tok1);
-        dec.rs1 = ensureRegister(tok2);
-        dec.imm = ensureNumber(tok3);
+        if (dec._op === rv_opcode.ebreak) break;
+
+        dec.rd = this.ensureRegisterToken(tok1, constants);
+        dec.rs1 = this.ensureRegisterToken(tok2, constants);
+        dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
         break;
       case rv_codec.s:
       case rv_codec.b:
-        dec.rs1 = ensureRegister(tok1);
-        dec.rs2 = ensureRegister(tok2);
-        if (tok3.type === ETokenType.NUMBER) {
-          // else: is a label. treat it later
-          dec.imm = ensureNumber(tok3);
-        }
+        dec.rs1 = this.ensureRegisterToken(tok1, constants);
+        dec.rs2 = this.ensureRegisterToken(tok2, constants);
+        dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
         break;
       case rv_codec.u:
       case rv_codec.j:
-        dec.rd = ensureRegister(tok1);
-        if (tok2.type === ETokenType.NUMBER) {
-          // else: is a label. treat it later
-          dec.imm = ensureNumber(tok2);
-        }
+        dec.rd = this.ensureRegisterToken(tok1, constants);
+        dec.imm = this.decodeImmediate(tokens, 2, constants, pc, dec.codec) & 0xfffffn;
         break;
     }
 
     dec.bytecode = this.processor.toBytecode(dec);
 
-    return dec;
+    return [dec];
   }
 
   /**
@@ -121,13 +321,21 @@ export class RVSimulator extends ISimulator<RVProcessor> {
    * reinicia a memória, faz o assembler, popula os dados na memória, gera as representações
    * intermediárias e as salva no cache de instruções.
    */
-  public assembleCode(code: string): Array<IAssembledInstruction<IDecodedRVInstruction>> {
+  public assembleCode(code: 'string'): Array<IAssembledInstruction<IDecodedRVInstruction>> {
     // label->address translation table
     const labels: Record<string, bigint> = {};
     // constant->value translation table
     const constants: Record<string, IToken> = {
       PC_START: { type: ETokenType.NUMBER, value: Number(this.processor.PC_START) },
       STACK_START: { type: ETokenType.NUMBER, value: Number(this.processor.STACK_START) },
+      FRAMEBUFFER_START: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_START) }, // @todo
+      FRAMEBUFFER_END: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_END) }, // @todo
+      INPUT_BUFFER_ADDR: { type: ETokenType.NUMBER, value: 0xf00f }, // @todo
+      SYSCALL_PRINT_INT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_int },
+      SYSCALL_PRINT_STRING: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_string },
+      SYSCALL_PRINT_CHAR: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_char },
+      SYSCALL_UPDATE_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_update_screen },
+      OPTION_EXPLICIT_SCREEN_UPDATE: { type: ETokenType.NUMBER, value: 0xf001 },
     };
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
 
@@ -180,12 +388,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
         if (['.byte', '.half', '.word', '.dword', '.space'].includes(directive)) {
           const tkValue = tokens[1];
-
-          if (!tkValue || tkValue.type !== ETokenType.NUMBER) {
-            throw throwUnexpectedToken(tokens);
-          }
-
-          const val = BigInt(tkValue.value);
+          const val = this.ensureNumericImmediate(tkValue, constants);
 
           if (directive === '.byte') {
             this.processor.memoryWrite(currentAddr, val, 8);
@@ -200,18 +403,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
             currentAddr += val;
           }
         } else if (directive === '.org') {
-          let tkValue = tokens[1];
-          if (tkValue && tkValue.type === ETokenType.IDENTIFIER) {
-            tkValue = constants[tkValue.value];
-          }
-
-          if (!tkValue || tkValue.type !== ETokenType.NUMBER) {
-            throw throwUnexpectedToken(tokens);
-          }
-
-          const val = BigInt(tkValue.value);
-
-          currentAddr = val;
+          currentAddr = this.ensureNumericImmediate(tokens[1], constants);
         } else if (directive === '.ascii' || directive === '.asciz' || directive === '.string') {
           const tkValue = tokens[1];
 
@@ -238,6 +430,22 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           }
 
           constants[tkName.value] = tkVal;
+        } else if (directive === '.text') {
+          currentAddr = this.processor.PC_START;
+        } else if (directive === '.rodata') {
+          currentAddr = this.processor.RODATA_START;
+        } else if (directive === '.bss') {
+          currentAddr = this.processor.BSS_START;
+        } else if (directive === '.data') {
+          currentAddr = this.processor.DATA_START;
+        } else if (directive === '.option') {
+          const val = tokens[1]?.value;
+
+          if (val === 'OPTION_EXPLICIT_SCREEN_UPDATE') {
+            this._optExplicitScreenUpdate = true;
+          } else {
+            throw throwUnexpectedToken(tokens);
+          }
         }
       }
       // identifier (instruction)
@@ -246,58 +454,84 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         currentAddr = (currentAddr + 3n) & ~0x3n;
 
         //console.log(line);
-        const decoded = this.assembleLine(tokens, constants);
-        //console.log(decoded);
+        const decodedInstructions = this.assembleLine(tokens, constants, currentAddr);
 
-        assembledInstructions.push({
-          code: line,
-          lineNumber: idx,
-          tokens,
-          decoded,
-          address: currentAddr,
-          scope: currentLabel,
-        });
+        for (const decoded of decodedInstructions) {
+          //console.log(decoded);
 
-        currentAddr += 4n;
+          assembledInstructions.push({
+            code: line,
+            lineNumber: idx,
+            tokens,
+            decoded,
+            address: currentAddr,
+            scope: currentLabel,
+          });
+
+          currentAddr += 4n;
+        }
       } else {
         throw throwUnexpectedToken(tokens);
       }
     }
 
     for (const inst of assembledInstructions) {
-      if (
-        (inst.decoded.codec === rv_codec.u || inst.decoded.codec === rv_codec.j) &&
-        inst.tokens[2].type === ETokenType.IDENTIFIER
-      ) {
-        const labelName = inst.scope + inst.tokens[2].value;
-        const labelAddr = labels[labelName];
-        if (typeof labelAddr === 'undefined') {
-          console.error('rv: inexistent label: ', labelName);
-          continue;
-        }
-
-        // rv32i: J-type é PC-rel.; U-type usa campo alto de 20 bits = endereço_do_rótulo >> 12.
-        if (inst.decoded.codec === rv_codec.j) {
-          inst.decoded.imm = labelAddr - inst.address;
-        } else {
-          inst.decoded.imm = (labelAddr >> 12n) & 0xfffffn;
-        }
-        inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
-      } else if (
-        (inst.decoded.codec === rv_codec.s || inst.decoded.codec === rv_codec.b) &&
-        inst.tokens[3].type === ETokenType.IDENTIFIER
-      ) {
-        const labelName = inst.scope + inst.tokens[3].value;
-        const labelAddr = labels[labelName];
-        if (typeof labelAddr === 'undefined') {
-          console.error('rv: inexistent label: ', labelName);
-          continue;
-        }
-
-        // rv32i: branch offset é relativo ao PC
-        inst.decoded.imm = labelAddr - inst.address;
-        inst.decoded.bytecode = this.processor.toBytecode(inst.decoded);
+      const { decoded, tokens, address, scope } = inst;
+      let immIdx: number | undefined;
+      if (decoded.codec === rv_codec.i || decoded.codec === rv_codec.s || decoded.codec === rv_codec.b) {
+        immIdx = 3;
+      } else if (decoded.codec === rv_codec.u || decoded.codec === rv_codec.j) {
+        immIdx = 2;
       }
+
+      if (immIdx === undefined || immIdx >= tokens.length) continue;
+
+      const immTok = tokens[immIdx];
+
+      if (immTok?.type === ETokenType.RELOC) {
+        const op = immTok.value;
+        if (!RV_RELOC_OPS.has(op)) {
+          throw new Error(`rv: unknown relocation operator %${op}`);
+        }
+
+        const operand = tokens[immIdx + 1];
+        if (!operand) throw throwUnexpectedToken(tokens);
+        if (operand.type === ETokenType.NUMBER) continue;
+        if (operand.type !== ETokenType.IDENTIFIER) throw throwUnexpectedToken(tokens);
+        if (this.resolveConstantName(operand.value, constants) !== undefined) continue;
+
+        const labelName = scope + operand.value;
+        const labelAddr = labels[labelName];
+        if (typeof labelAddr === 'undefined') {
+          console.error('rv: inexistent label: ', labelName);
+          continue;
+        }
+
+        decoded.imm = this.relocImmediate(op, labelAddr, address);
+        decoded.bytecode = this.processor.toBytecode(decoded);
+
+        continue;
+      }
+
+      if (!immTok || immTok.type !== ETokenType.IDENTIFIER) continue;
+
+      if (this.resolveConstantName(immTok.value, constants) !== undefined) continue;
+
+      const labelName = scope + immTok.value;
+      const labelAddr = labels[labelName];
+      if (typeof labelAddr === 'undefined') {
+        console.error('rv: inexistent label: ', labelName);
+        continue;
+      }
+
+      if (decoded.codec === rv_codec.j || decoded.codec === rv_codec.b || decoded.codec === rv_codec.s) {
+        decoded.imm = labelAddr - address;
+      } else if (decoded.codec === rv_codec.u) {
+        decoded.imm = (labelAddr >> 12n) & 0xfffffn;
+      } else if (decoded.codec === rv_codec.i) {
+        decoded.imm = labelAddr;
+      }
+      decoded.bytecode = this.processor.toBytecode(decoded);
     }
 
     // write instructions to memory
@@ -313,9 +547,3 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     return `https://riscv.github.io/riscv-unified-db/manual/html/isa/isa_20240411/insts/${instruction.toLowerCase()}.html`;
   }
 }
-
-// @ts-expect-error nijiiinnininini
-window.__RV = new RVSimulator();
-
-const x = new RVSimulator();
-void x;

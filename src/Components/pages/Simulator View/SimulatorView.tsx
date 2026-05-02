@@ -21,9 +21,10 @@ import { useEffect, useRef, useState } from 'react';
 import { BsFileEarmarkCode, BsTerminalFill } from 'react-icons/bs';
 import { CgScreen } from 'react-icons/cg';
 import { FaDownload, FaFolderOpen } from 'react-icons/fa';
-import { HiPlay } from 'react-icons/hi';
+import { HiPause, HiPlay } from 'react-icons/hi';
 import { IoMdSave } from 'react-icons/io';
 import { RiRewindFill, RiSettings2Fill } from 'react-icons/ri';
+import { EWorkerCommand, WorkerMessageResponse } from '../../../hardware/common/worker-service';
 import { IAssembledInstruction } from '../../../hardware/common/simulator';
 import { useSimulator } from '../../../hooks/simulator.hook';
 import Logger from '../../../Service/Logger';
@@ -41,6 +42,10 @@ import MemoryTerminal from './MemoryTerminal';
 
 function HiPlayIcon() {
   return <Icon as={HiPlay} style={{ transform: 'scale(1.4)' }} />;
+}
+
+function HiPauseIcon() {
+  return <Icon as={HiPause} style={{ transform: 'scale(1.4)' }} />;
 }
 
 function TerminalFill() {
@@ -67,6 +72,8 @@ export default function SimulatorView() {
   const [configModalOpen, setConfigModalOpen] = useState<boolean>(false);
   const [loadProgramModalOpen, setLoadProgramModalOpen] = useState<boolean>(false);
   const [screenModalOpen, setScreenModalOpen] = useState<boolean>(false);
+
+  const [cpuHalted, setCpuHalted] = useState(true);
 
   const toolbarBg = useColorModeValue('gray.50', 'gray.900');
   const toolbarBorder = useColorModeValue('gray.200', 'gray.700');
@@ -111,6 +118,20 @@ export default function SimulatorView() {
   useEffect(() => {
     setScreenRendererCanva();
   }, [screenModalOpen]);
+
+  useEffect(() => {
+    const ws = simulator.workerService;
+    const onCpuDump = (response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
+      setCpuHalted(response.data.halted);
+
+    };
+    ws.on(EWorkerCommand.CPU_DUMP, onCpuDump);
+    ws.requestCpuDump();
+
+    return () => {
+      ws.off(EWorkerCommand.CPU_DUMP, onCpuDump);
+    };
+  }, [simulator.workerService]);
 
   function onEditorChange(value: string | undefined, event: any) {
     setCode(value!);
@@ -182,18 +203,17 @@ export default function SimulatorView() {
     }
   }
 
-  function runCode() {
+  function toggleRunPause() {
     if (!simulator.workerService.worker) {
       simulator.createCpuWorker();
     }
 
-    const success = assembleCode();
-    if (!success) {
-      return;
+    if (cpuHalted) {
+      simulator.workerService.runCode();
+    } else {
+      setCpuHalted(true);
+      simulator.workerService.setHalted(true);
     }
-
-    simulator.workerService.runCode();
-    console.log('@todo runCode');
   }
 
   function callExecuteStep() {
@@ -242,18 +262,18 @@ export default function SimulatorView() {
               Run
             </IconButton>
           </Tooltip>
-          <Tooltip label="Run">
+          <Tooltip label={cpuHalted ? 'Run' : 'Pause'}>
             <IconButton
-              icon={<HiPlayIcon />}
-              colorScheme="teal"
+              icon={cpuHalted ? <HiPlayIcon /> : <HiPauseIcon />}
+              colorScheme={cpuHalted ? 'teal' : 'orange'}
               variant="solid"
-              onClick={() => runCode()}
-              aria-label="Run program"
+              onClick={() => toggleRunPause()}
+              aria-label={cpuHalted ? 'Run program' : 'Pause execution'}
               borderRadius={50}
               size="sm"
               zIndex={10}
             >
-              Run
+              {cpuHalted ? 'Run' : 'Pause'}
             </IconButton>
           </Tooltip>
           <Tooltip label="Run next instruction">

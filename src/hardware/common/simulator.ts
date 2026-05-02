@@ -19,7 +19,7 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
    * Object that will be used to mount the examples.
    * This object must be static.
    */
-  public static readonly manual: IUserManual;
+  public abstract readonly manual: IUserManual;
 
   public abstract readonly processor: TProcessor;
 

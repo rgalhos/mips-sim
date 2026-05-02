@@ -1,10 +1,11 @@
 /* eslint-disable no-restricted-globals -- DedicatedWorkerGlobalScope */
-import { debounce } from '../../utils';
 import type { WorkerMessage, WorkerMessageResponse } from '../common/worker-service';
 import { EWorkerCommand } from '../common/worker-service';
 import { RVProcessor } from './riscv.processor';
 
 const cpu = new RVProcessor();
+
+const CPU_DUMP_EVERY_N_CYCLES = 10n;
 
 const postMessage = (message: WorkerMessageResponse) => {
   self.postMessage(message);
@@ -30,7 +31,41 @@ const postCpuDump = (fullDump = false) => {
   });
 };
 
-const debouncedPostCpuDump = debounce(postCpuDump, 100);
+const shouldPostDumpAfterStep = () =>
+  cpu.halted || (cpu.cycle > 0n && cpu.cycle % CPU_DUMP_EVERY_N_CYCLES === 0n);
+
+let runTimer: ReturnType<typeof setTimeout> | null = null;
+
+const cancelRunLoop = () => {
+  if (runTimer !== null) {
+    clearTimeout(runTimer);
+    runTimer = null;
+  }
+};
+
+const runLoopTick = () => {
+  runTimer = null;
+  if (cpu.halted) {
+    return;
+  }
+
+  cpu.step();
+  if (shouldPostDumpAfterStep()) {
+    postCpuDump();
+  }
+
+  if (cpu.halted) {
+    return;
+  }
+
+  const hz = Math.max(1, cpu.frequency);
+  runTimer = setTimeout(runLoopTick, 1000 / hz);
+};
+
+const startRunLoop = () => {
+  cancelRunLoop();
+  runLoopTick();
+};
 
 self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   const { command, data } = event.data;
@@ -40,27 +75,32 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   if (command === EWorkerCommand.CPU_SETUP) {
     //@todo
   } else if (command === EWorkerCommand.CPU_RESET) {
+    cancelRunLoop();
     cpu.resetState();
   } else if (command === EWorkerCommand.CPU_RUN) {
-    cpu.resetState();
-    cpu.setHalted(false);
+    cpu.setHalted(!cpu.halted);
 
-    console.log('shall run!!!!!!!!!!!!!!!!!!');
+    if (cpu.halted) {
+      cancelRunLoop();
+    } else {
+      startRunLoop();
+    }
 
-    cpu.run();
-    debouncedPostCpuDump();
+    postCpuDump();
   } else if (command === EWorkerCommand.CPU_STEP) {
+    cancelRunLoop();
     cpu.setHalted(true);
 
-    console.log('shall step!!!!!!!!!!!!!!!!!!');
-
     cpu.step();
-    debouncedPostCpuDump();
+    postCpuDump();
   } else if (command === EWorkerCommand.SET_CPU_HALT) {
+    if (data) {
+      cancelRunLoop();
+    }
     cpu.setHalted(data);
 
     // postMessage({ command: EWorkerCommand.GET_CPU_HALT, data: halted });
-    debouncedPostCpuDump();
+    postCpuDump();
   } else if (command === EWorkerCommand.GET_CPU_HALT) {
     postMessage({ command: EWorkerCommand.GET_CPU_HALT, data: cpu.halted });
   } else if (command === EWorkerCommand.SET_FREQUENCY) {
@@ -70,11 +110,12 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   } else if (command === EWorkerCommand.GET_FREQUENCY) {
     postMessage({ command: EWorkerCommand.GET_FREQUENCY, data: cpu.frequency });
   } else if (command === EWorkerCommand.LOAD_PROGRAM) {
+    cancelRunLoop();
     console.log('cpu worker: debug: program loaded', { program: data, cpu });
 
     cpu.loadProgram(data as Parameters<RVProcessor['loadProgram']>[0]);
 
-    debouncedPostCpuDump();
+    postCpuDump();
   } else if (command === EWorkerCommand.MEMORY_RETRIEVE) {
     postMessage({ command: EWorkerCommand.MEMORY_RETRIEVE, data: cpu.memory });
   } else if (command === EWorkerCommand.CPU_DUMP) {
@@ -84,6 +125,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   } else if (command === EWorkerCommand.SET_MEMORY_SIZE) {
     cpu.setMemorySize(data);
   } else if (command === EWorkerCommand.SYNC_WORKER) {
+    cancelRunLoop();
     cpu.resetState();
 
     cpu.cpu = data.cpu;

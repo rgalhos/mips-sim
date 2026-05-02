@@ -6,10 +6,11 @@ export interface IUserManual {
 export interface IManualRegister {
   name: string;
   kind: string;
+  description: string;
 }
 
 export interface IManualInstruction {
   name: string;
   operation: string;
-  desciption: string;
+  description: string;
 }

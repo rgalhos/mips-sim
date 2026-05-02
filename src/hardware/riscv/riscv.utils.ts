@@ -274,3 +274,31 @@ export function encodeJType(op: rv_opcode, rd: bigint, imm: bigint): bigint {
   if (op !== rv_opcode.jal) return 0n;
   return 0b1101111n | (reg5(rd) << 7n) | pack_j_imm(imm);
 }
+
+export function toS32(n: bigint): bigint {
+  const mod = 1n << 32n;
+  let x = ((n % mod) + mod) % mod;
+  if (x >= 1n << 31n) x -= mod;
+  return x;
+}
+
+/** I-type / S-type: imediato de 12 bits com sinal (valor já semântico, não só truncado). */
+export function signedImm12Encodeable(imm: bigint): boolean {
+  const s = toS32(imm);
+  return s >= -2048n && s <= 2047n;
+}
+
+/** B-type: offset relativo em bytes, par, 13 bits com sinal (LSB implícito 0). */
+export function branchOffsetEncodeable(imm: bigint): boolean {
+  const s = toS32(imm);
+  if (s % 2n !== 0n) return false;
+  return s >= -4096n && s <= 4094n;
+}
+
+export function splitHiLoS32(value: bigint): { hi: bigint; lo: bigint } {
+  const s32 = toS32(value);
+  const raw12 = s32 & 0xfffn;
+  const lo = raw12 >= 0x800n ? raw12 - 0x1000n : raw12;
+  const hi = ((s32 - lo) >> 12n) & 0xfffffn;
+  return { hi, lo };
+}

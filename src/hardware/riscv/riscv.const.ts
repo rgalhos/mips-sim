@@ -124,15 +124,17 @@ export enum rv_opcode {
 // https://www.scribd.com/document/854447210/RISC-V-Pseudo-Instructions
 export enum rv_opcode_pseudo {
   nop, // addi zero, zero, 0
-  // li,
-  // la,
+  la, // auipc rd, symbol[31:12] + addi rd, rd, symbol[11:0]
+  li,
+  j, // jal zero, offset
+  jump, // jump offset, rt -> auipc rt, offset[31:12] + jalr x0, offset[11:0](rt)
   mv, // addi rd, rs1, 0
   not, // xori rd, rs1, -1
   neg, // sub rd, zero, rs1
   seqz, // sltiu rd, rs1, 1
   snez, // sltu rd, zero, rs1
   sltz, // slt rd, rs1, zero
-  sgtz, // slt rd, zero, rs1 
+  sgtz, // slt rd, zero, rs1
   beqz, // beq rs1, zero, offset
   bnez, // bne rs1, zero, offset
   blez, // bge zero, rs1, offset
@@ -152,6 +154,22 @@ export enum rv_directives {
   '.asciz',
   '.string',
   '.space',
+  '.option',
+  '.data',
+  '.text',
+  '.bss',
+  '.rodata',
+  '%hi',
+  '%lo',
+  '%pcrel_hi',
+  '%pcrel_lo',
+}
+
+export enum rv_syscalls {
+  syscall_print_int = 10,
+  syscall_print_string = 11,
+  syscall_print_char = 12,
+  syscall_update_screen = 20,
 }
 
 export const RV_CODEC_FORMAT = {
@@ -159,7 +177,7 @@ export const RV_CODEC_FORMAT = {
   [rv_codec.i]: 'O d, 1, i',
   [rv_codec.s]: 'O i, 1, 2',
   [rv_codec.b]: 'O 1, 2, X',
-  [rv_codec.j]: 'O d, X',
+  [rv_codec.j]: 'O d, x',
   [rv_codec.u]: 'O d, j',
 } as const;
 
