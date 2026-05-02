@@ -35,7 +35,7 @@ import ConfigModal from './Editor Tab/ConfigModal';
 import ConsoleTerminal from './Editor Tab/ConsoleTerminal';
 import DebugTerminal from './Editor Tab/DebugTerminal';
 import LoadProgramModal from './Editor Tab/LoadProgramModal';
-import Screen, { ScreenRenderer } from './Editor Tab/Screen';
+import Screen from './Editor Tab/Screen';
 import HardwareView from './HardwareView';
 import HexView from './HexView';
 import MemoryTerminal from './MemoryTerminal';
@@ -108,17 +108,6 @@ export default function SimulatorView() {
     });
   }, [consoleOpen, debugTxt, log]);
 
-  function setScreenRendererCanva() {
-    try {
-      let canva = (document.getElementById('screenCanvas') as HTMLCanvasElement).getContext('2d');
-      ScreenRenderer.instance.draw = canva;
-    } catch {}
-  }
-
-  useEffect(() => {
-    setScreenRendererCanva();
-  }, [screenModalOpen]);
-
   useEffect(() => {
     const ws = simulator.workerService;
     const onCpuDump = (response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
@@ -152,7 +141,6 @@ export default function SimulatorView() {
   }
 
   function assembleCode() {
-    setScreenRendererCanva();
     forceGetCode();
     setProgram(null);
 

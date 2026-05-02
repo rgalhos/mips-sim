@@ -1,4 +1,3 @@
-import { ScreenRenderer } from "../Components/pages/Simulator View/Editor Tab/Screen";
 import MonoMIPS from "../Hardware/Mono Mips/MonoMIPS";
 import SISMIPS from "../Hardware/SIS Mips/SIS";
 import { addr } from "../Hardware/TemplatePorcessor";

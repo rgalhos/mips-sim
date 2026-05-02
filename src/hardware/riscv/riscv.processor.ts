@@ -36,6 +36,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly opcodeInfo = RV_OPCODE_DATA;
 
   //protected readonly DRAM_BASE_ADDRESS = 0x80000000n;
+  public readonly defaultMemorySize = 0xc000;
   public readonly PC_START = 0x0000n;
   public readonly PROGRAM_END = 0x2fffn;
   public readonly RODATA_START = 0x3000n;
@@ -43,11 +44,11 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly DATA_START = 0x4000n;
   public readonly DATA_END = 0x4fffn;
   public readonly BSS_START = 0x5000n;
-  public readonly BSS_END = 0x4fffn;
-  public readonly FRAMEBUFFER_START = 0x7000n;
-  public readonly FRAMEBUFFER_END = 0x7e10n;
-  public readonly STACK_START = 0x8000n;
-  public readonly STACK_END = 0x7e10n;
+  public readonly BSS_END = 0x5fffn;
+  public readonly FRAMEBUFFER_START = 0x8000n;
+  public readonly FRAMEBUFFER_END = 0xa70fn;
+  public readonly STACK_START = 0xc000n;
+  public readonly STACK_END = 0xa710n;
 
   public readonly INSTRUCTION_LENGTH = 4;
 
@@ -543,7 +544,12 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     console.log('cpu.step: stepped', { halted: this.halted, inst, dec, pc: this.cpu.pc });
 
     if (dec.codec === rv_codec.illegal) {
-      console.log('cpu.step: stepped into illegal instruction, halting', { halted: this.halted, inst, dec, pc: this.cpu.pc });
+      console.log('cpu.step: stepped into illegal instruction, halting', {
+        halted: this.halted,
+        inst,
+        dec,
+        pc: this.cpu.pc,
+      });
       this.setHalted(true);
       return;
     }
@@ -562,7 +568,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     const rs1 = rv_reg[instruction.rs1 || rv_reg.zero];
     const rs2 = rv_reg[instruction.rs2 || rv_reg.zero];
     const rs3 = rv_reg[instruction.rs3 || rv_reg.zero];
-    const imm = instruction.imm || 0;
+    const imm = instruction.imm || 0n;
 
     const op_info = RV_OPCODE_DATA[opcode];
     const fmt = op_info.format;
@@ -604,6 +610,10 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   }
 
   protected registerWrite(reg: number, value: bigint) {
+    if (reg === rv_reg.sp && value >= this.STACK_END) {
+      throw new Error('stack overflow; register[sp] < STACK_END');
+    }
+
     if (reg !== rv_reg.zero) {
       return super.registerWrite(reg, value & 0xffffffffn);
     }

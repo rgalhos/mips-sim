@@ -192,10 +192,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
       case 'la': {
         const rd = this.ensureRegisterToken(tok1, constants);
-        const imm = this.ensureNumericImmediate(tok2, constants);
         return [
-          ...this.assembleLine(tokenize(`auipc x${rd}, %hi(${imm})`), {}, pc, true),
-          ...this.assembleLine(tokenize(`addi x${rd}, x${rd}, %lo(${imm})`), {}, 0n, true),
+          ...this.assembleLine(tokenize(`auipc x${rd}, %hi(${tok2.value})`), constants, pc, true),
+          ...this.assembleLine(tokenize(`addi x${rd}, x${rd}, %lo(${tok2.value})`), constants, pc, true),
         ];
       }
       // case 'j': {
@@ -386,22 +385,27 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       if (tkIdentifier.type === ETokenType.IDENTIFIER && tkIdentifier.value[0] === '.') {
         const directive = tkIdentifier.value.toLowerCase();
 
-        if (['.byte', '.half', '.word', '.dword', '.space'].includes(directive)) {
-          const tkValue = tokens[1];
-          const val = this.ensureNumericImmediate(tkValue, constants);
-
-          if (directive === '.byte') {
-            this.processor.memoryWrite(currentAddr, val, 8);
-            currentAddr += 1n;
-          } else if (directive === '.half') {
-            this.processor.memoryWrite(currentAddr, val, 16);
-            currentAddr += 2n;
-          } else if (directive === '.word') {
-            this.processor.memoryWrite(currentAddr, val, 32);
-            currentAddr += 4n;
-          } else if (directive === '.space') {
-            currentAddr += val;
+        if (['.byte', '.half', '.word'].includes(directive)) {
+          const argTokens = tokens.slice(1);
+          if (argTokens.length === 0) {
+            throw throwUnexpectedToken(tokens);
           }
+          for (const tk of argTokens) {
+            const val = this.ensureNumericImmediate(tk, constants);
+            if (directive === '.byte') {
+              this.processor.memoryWrite(currentAddr, val, 8);
+              currentAddr += 1n;
+            } else if (directive === '.half') {
+              this.processor.memoryWrite(currentAddr, val, 16);
+              currentAddr += 2n;
+            } else {
+              this.processor.memoryWrite(currentAddr, val, 32);
+              currentAddr += 4n;
+            }
+          }
+        } else if (directive === '.space') {
+          const val = this.ensureNumericImmediate(tokens[1], constants);
+          currentAddr += val;
         } else if (directive === '.org') {
           currentAddr = this.ensureNumericImmediate(tokens[1], constants);
         } else if (directive === '.ascii' || directive === '.asciz' || directive === '.string') {

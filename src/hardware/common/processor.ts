@@ -36,7 +36,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   /**
    * Default memory size
    */
-  public readonly defaultMemorySize = 32768;
+  public defaultMemorySize = 0xc000; // @todo - deixar coisado....
 
   public cycle = 0n;
 
@@ -66,8 +66,18 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
    * Architecture base addresses
    */
   public readonly DRAM_BASE_ADDRESS: bigint = 0x00000000000n;
-  public readonly PC_START: bigint = 0x1000n;
-  public readonly STACK_START: bigint = 0x7c00n;
+  public abstract readonly PC_START: bigint;
+  public abstract readonly PROGRAM_END: bigint;
+  public abstract readonly RODATA_START: bigint;
+  public abstract readonly RODATA_END: bigint;
+  public abstract readonly DATA_START: bigint;
+  public abstract readonly DATA_END: bigint;
+  public abstract readonly BSS_START: bigint;
+  public abstract readonly BSS_END: bigint;
+  public abstract readonly FRAMEBUFFER_START: bigint;
+  public abstract readonly FRAMEBUFFER_END: bigint;
+  public abstract readonly STACK_START: bigint;
+  public abstract readonly STACK_END: bigint;
 
   /**
    * Architecture instruction length
@@ -191,13 +201,13 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
   public memoryRead(address: number | bigint, bits: 8 | 16 | 32 | 64 = 8): bigint {
     address = Number(address);
-    // If address is empty we generate a random number (garbage) and save it to the address.
+    // deixei pra lá: If address is empty we generate a random number (garbage) and save it to the address.
     const read = (addr: number) => {
       let v = BigInt(this.memory[addr]);
-      if (typeof v === 'undefined') {
-        v = BigInt((Math.random() * 32768) & 255);
-        this.memoryWrite(addr, v);
-      }
+      // if (typeof v === 'undefined') {
+      //   v = BigInt((Math.random() * 32768) & 255);
+      //   this.memoryWrite(addr, v);
+      // }
       return v;
     };
 

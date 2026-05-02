@@ -1,87 +1,149 @@
-
-import React from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import Draggable from 'react-draggable';
-// import BinaryNumber from '../../../../Hardware/BinaryNumber';
-import { addr } from '../../../../Hardware/TemplatePorcessor';
+import { EWorkerCommand, WorkerMessageResponse } from '../../../../hardware/common/worker-service';
+import { useSimulator } from '../../../../hooks/simulator.hook';
 
-/*
-    IMPORTANT: screen memory starts at 2000 (decimal) and goes to 162.000 (decimal)
-*/
+const SCREEN_DIV_SIZE = 500;
+const SCREEN_SIZE = 100;
+const FRAMEBUFFER_PIXELS = SCREEN_SIZE * SCREEN_SIZE;
 
-
-const SCREEN_DIV_SIZE = 500
-
-const SCREEN_SIZE = 100
-
-const RATIO = SCREEN_DIV_SIZE / SCREEN_SIZE
-
-// const PIXEL_SIZE = 8
-
-export class ScreenRenderer {
-  public _draw: CanvasRenderingContext2D | null = null;
-
-  private static _instance: ScreenRenderer;
-
-  public static get instance() {
-    if (ScreenRenderer._instance == null) {
-      ScreenRenderer._instance = new ScreenRenderer(null);
-    }
-    return ScreenRenderer._instance;
-  }
-
-  public set draw(value: CanvasRenderingContext2D | null) {
-    this._draw = value;
-    if (this._draw == null) return;
-    this._draw.canvas.height = SCREEN_DIV_SIZE;
-    this._draw.canvas.width = SCREEN_DIV_SIZE;
-  }
-
-  public get draw() {
-    return this._draw;
-  }
-
-  constructor(_draw: CanvasRenderingContext2D | null) {
-    this._draw = _draw;
-
-  }
-
-  public _setPixel(x: number, y: number, color: string, pixelSize?: number) {
-    if (this._draw == null) return;
-    this._draw.fillStyle = color.replace("0x", "#") 
-    this._draw.fillRect(x, y, pixelSize ?? RATIO, pixelSize ?? RATIO);
-  }
-
-  public drawPixel(address: number, value: number) {
-    if (this._draw == null) return;
-    // where 2000 is the start address of screen memory map
-    
-    let y = Math.floor((address - 2000)/SCREEN_SIZE);
-    let x = (address - 2000) % (SCREEN_SIZE);
-
-    x *= RATIO;
-    y *= RATIO;
-
-    value = value & 0xffff;
-    let r = (value & 0b1111100000000000) >> 8;
-    let g = (value & 0b0000011111100000) >> 3;
-    let b = (value & 0b0000000000011111) << 3;
-
-
-    this._draw.fillStyle = `rgb(${r},${g},${b})`;
-    this._draw.fillRect(x, y, RATIO, RATIO);
-
-  }
-
+// Converte o formato RGB332 do simulador para RGB888 que o canvas aceita
+export function rgb332ToRgb888(v: number): [number, number, number] {
+  const r3 = (v >> 5) & 7;
+  const g3 = (v >> 2) & 7;
+  const b2 = v & 3;
+  return [Math.round((r3 * 255) / 7), Math.round((g3 * 255) / 7), Math.round((b2 * 255) / 3)];
 }
 
 export default function Screen() {
+  const { simulator } = useSimulator();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageDataRef = useRef<ImageData | null>(null);
+  const fbSnapshotRef = useRef<Uint8Array>(new Uint8Array(FRAMEBUFFER_PIXELS));
+  const mergedMemoryRef = useRef<Uint8Array | null>(null);
+  const fbLenWarnedRef = useRef(false);
 
-  // boxshadow: 0 0 10px 10px rgba(0, 0, 0, 0.5);
-  return <>
-    <Draggable>
-      <div style={{cursor: "grab" ,backgroundColor: "grey", width: SCREEN_DIV_SIZE, height: SCREEN_DIV_SIZE, left: window.screen.width / 2 - 200, top: window.screen.height / 2 - 300, zIndex: 10, position: "absolute", boxShadow: "0 2 10px 20px rgba(0, 0, 0, 0.5)"}}>
-        <canvas style={{ imageRendering: 'pixelated', position: "absolute"}} id="screenCanvas"></canvas>
-      </div>
-    </Draggable>
-  </>
+  const redraw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+
+    let imageData = imageDataRef.current;
+    if (!imageData || imageData.width !== SCREEN_SIZE || imageData.height !== SCREEN_SIZE) {
+      imageData = ctx.createImageData(SCREEN_SIZE, SCREEN_SIZE);
+      imageDataRef.current = imageData;
+    }
+
+    const fb = fbSnapshotRef.current;
+    const { data } = imageData;
+    for (let i = 0; i < FRAMEBUFFER_PIXELS; i++) {
+      const [r, g, b] = rgb332ToRgb888(fb[i]);
+      const o = i * 4;
+      data[o] = r;
+      data[o + 1] = g;
+      data[o + 2] = b;
+      data[o + 3] = 255;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }, []);
+
+  const onDump = useCallback(
+    (response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
+      const newDump = response.data;
+      const proc = simulator.processor;
+      const fbStart = Number(proc.FRAMEBUFFER_START);
+      const fbEnd = Number(proc.FRAMEBUFFER_END);
+      const fbByteLen = fbEnd - fbStart + 1;
+
+      let memory = mergedMemoryRef.current;
+      if (newDump.memory.length > 0) {
+        memory = new Uint8Array(newDump.memory);
+        mergedMemoryRef.current = memory;
+      } else if (!memory) {
+        memory = new Uint8Array(proc.memorySize);
+        mergedMemoryRef.current = memory;
+      }
+
+      const diffEntries = Object.entries(newDump.memoryDiff);
+      for (const [addrStr, val] of diffEntries) {
+        memory[Number(addrStr)] = val;
+      }
+
+      const framebufferTouched =
+        newDump.memory.length > 0 ||
+        diffEntries.some(([addrStr]) => {
+          const a = Number(addrStr);
+          return a >= fbStart && a <= fbEnd;
+        });
+
+      if (!framebufferTouched) {
+        return;
+      }
+
+      const fb = fbSnapshotRef.current;
+      const copyLen = Math.min(FRAMEBUFFER_PIXELS, fbByteLen, Math.max(0, memory.length - fbStart));
+      for (let i = 0; i < copyLen; i++) {
+        fb[i] = memory[fbStart + i]!;
+      }
+      for (let i = copyLen; i < FRAMEBUFFER_PIXELS; i++) {
+        fb[i] = 0;
+      }
+
+      if (fbByteLen !== FRAMEBUFFER_PIXELS && !fbLenWarnedRef.current) {
+        fbLenWarnedRef.current = true;
+        console.warn(
+          `[Screen] FRAMEBUFFER length ${fbByteLen} ≠ ${FRAMEBUFFER_PIXELS}; extra bytes ignored or padded with 0.`,
+        );
+      }
+
+      redraw();
+    },
+    [redraw, simulator.processor],
+  );
+
+  useEffect(() => {
+    redraw();
+  }, [redraw]);
+
+  useEffect(() => {
+    const ws = simulator.workerService;
+    ws.on(EWorkerCommand.CPU_DUMP, onDump);
+    ws.requestCpuDump();
+
+    return () => {
+      ws.off(EWorkerCommand.CPU_DUMP, onDump);
+    };
+  }, [simulator.workerService, onDump]);
+
+  return (
+    <>
+      <Draggable>
+        <div
+          style={{
+            cursor: 'grab',
+            backgroundColor: 'grey',
+            width: SCREEN_DIV_SIZE,
+            height: SCREEN_DIV_SIZE,
+            left: window.screen.width / 2 - 200,
+            top: window.screen.height / 2 - 300,
+            zIndex: 10,
+            position: 'absolute',
+            boxShadow: '0 2px 10px 20px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          <canvas
+            ref={canvasRef}
+            width={SCREEN_SIZE}
+            height={SCREEN_SIZE}
+            style={{
+              imageRendering: 'pixelated',
+              position: 'absolute',
+              width: SCREEN_DIV_SIZE,
+              height: SCREEN_DIV_SIZE,
+            }}
+          />
+        </div>
+      </Draggable>
+    </>
+  );
 }
