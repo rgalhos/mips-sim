@@ -51,6 +51,10 @@ const handleCpuStep = () => {
   } else if (shouldPostDumpAfterStep()) {
     postCpuDump();
   }
+
+  if (ret & rv_worker_commands.PRINT_STRING) {
+    postMessage({ command: EWorkerCommand.TERMINAL_PRINT, data: cpu._workerBuffer });
+  }
 };
 
 const runLoopTick = () => {
@@ -141,6 +145,8 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     console.log('SYNC INSIDE WORKER', { cpu, data });
 
     postCpuDump(true);
+    //@ts-expect-error data: never
+    postMessage({ command: EWorkerCommand.CPU_RESET });
   }
 };
 

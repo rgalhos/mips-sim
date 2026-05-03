@@ -24,22 +24,21 @@ import { FaDownload, FaFolderOpen } from 'react-icons/fa';
 import { HiPause, HiPlay } from 'react-icons/hi';
 import { IoMdSave } from 'react-icons/io';
 import { RiRewindFill, RiSettings2Fill } from 'react-icons/ri';
-import { EWorkerCommand, WorkerMessageResponse } from '../../../hardware/common/worker-service';
+import { stringifyTokenizerError } from '../../../hardware/analyzer/tokenizer';
 import { IAssembledInstruction } from '../../../hardware/common/simulator';
+import { EWorkerCommand, WorkerMessageResponse } from '../../../hardware/common/worker-service';
 import { useSimulator } from '../../../hooks/simulator.hook';
 import Logger from '../../../Service/Logger';
 import SharedData, { Instruction } from '../../../Service/SharedData';
 import WorkerService from '../../../Service/WorkerService';
-import EditorView from './Editor Tab/EditorTab';
 import ConfigModal from './Editor Tab/ConfigModal';
 import ConsoleTerminal from './Editor Tab/ConsoleTerminal';
 import DebugTerminal from './Editor Tab/DebugTerminal';
+import EditorView from './Editor Tab/EditorTab';
 import LoadProgramModal from './Editor Tab/LoadProgramModal';
 import Screen from './Editor Tab/Screen';
-import HardwareView from './HardwareView';
 import HexView from './HexView';
-import MemoryTerminal from './MemoryTerminal';
-import { stringifyTokenizerError } from '../../../hardware/analyzer/tokenizer';
+import MemoryView from './MemoryView';
 
 function HiPlayIcon() {
   return <Icon as={HiPlay} style={{ transform: 'scale(1.4)' }} />;
@@ -207,7 +206,7 @@ export default function SimulatorView() {
       <TabList style={{ zIndex: 50 }}>
         <Tab style={{ zIndex: 50 }}>Editor</Tab>
         <Tab style={{ zIndex: 50 }}>Hex View</Tab>
-        <Tab style={{ zIndex: 50 }}>Datapath</Tab>
+        {/* <Tab style={{ zIndex: 50 }}>Datapath</Tab> */}
         <Tab style={{ zIndex: 50 }}>Memory</Tab>
       </TabList>
 
@@ -438,7 +437,7 @@ export default function SimulatorView() {
             position: 'relative',
             right: '11px',
             width: '102vw',
-            height: '250px',
+            height: '350px',
           }}
         >
           <Stack direction="row" spacing={4} zIndex={10}>
@@ -474,19 +473,10 @@ export default function SimulatorView() {
             </Button>
           </Stack>
 
-          {currentTerminal === 0 ? (
-            <ConsoleTerminal
-              value={consoleTxt}
-              onClear={() => {
-                setConsoleTxt('');
-                Logger.instance.clearConsole();
-              }}
-            />
-          ) : (
-            <></>
-          )}
-
-          {currentTerminal === 1 ? (
+          <Box display={currentTerminal === 0 ? 'block' : 'none'} aria-hidden={currentTerminal !== 0}>
+            <ConsoleTerminal />
+          </Box>
+          <Box display={currentTerminal === 1 ? 'block' : 'none'} aria-hidden={currentTerminal !== 1}>
             <DebugTerminal
               value={debugTxt}
               onClear={() => {
@@ -494,9 +484,7 @@ export default function SimulatorView() {
                 Logger.instance.clearDebug();
               }}
             />
-          ) : (
-            <></>
-          )}
+          </Box>
         </Box>
       </Slide>
 
@@ -520,12 +508,12 @@ export default function SimulatorView() {
           <HexView program={program ?? []} />
         </TabPanel>
 
-        <TabPanel>
+        {/* <TabPanel>
           <HardwareView callExecutableStep={callExecuteStep} />
-        </TabPanel>
+        </TabPanel> */}
 
         <TabPanel>
-          <MemoryTerminal />
+          <MemoryView />
         </TabPanel>
       </TabPanels>
 

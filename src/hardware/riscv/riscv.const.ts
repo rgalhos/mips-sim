@@ -178,6 +178,7 @@ export const enum rv_worker_commands {
   NONE = 0,
   SYNC_LISTENERS = 1 << 0,
   UPDATE_FRAMEBUFFER = 1 << 1,
+  PRINT_STRING = 1 << 2,
 }
 
 export const RV_CODEC_FORMAT = {

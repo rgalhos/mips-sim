@@ -64,6 +64,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     return new Worker(new URL('./riscv.worker.ts', import.meta.url), workerOptions);
   }
 
+  public examples = () =>
+    import(/* webpackChunkName: "riscv-examples" */ './user/riscv.examples').then((m) => m.rvExamples);
+
   private followConstSubst(t: IToken, constants: Record<string, IToken>): IToken {
     let cur = t;
     const seen = new Set<string>();

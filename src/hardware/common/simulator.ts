@@ -1,4 +1,5 @@
 import { IToken } from '../analyzer/tokenizer';
+import { IManualExample } from './examples';
 import type { IUserManual } from './manual';
 import type { IDecodedInstruction, IProcessor } from './processor';
 import { WorkerService } from './worker-service';
@@ -20,6 +21,8 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
    * This object must be static.
    */
   public abstract readonly manual: IUserManual;
+
+  public abstract examples: () => Promise<IManualExample[]>;
 
   public abstract readonly processor: TProcessor;
 

@@ -18,6 +18,7 @@ export const enum EWorkerCommand {
   MEMORY_OVERWRITE = 'MEMORY_OVERWRITE',
   ASSEMBLE_CODE = 'ASSEMBLE_CODE',
   SYNC_WORKER = 'SYNC_WORKER',
+  TERMINAL_PRINT = 'TERMINAL_PRINT',
 }
 
 export interface IWorkerCPUDump {
@@ -82,6 +83,10 @@ export type WorkerMessageResponse =
   | {
       command: EWorkerCommand.CPU_DUMP;
       data: IWorkerCPUDump;
+    }
+  | {
+      command: EWorkerCommand.TERMINAL_PRINT;
+      data: string;
     }
   | {
       command: EWorkerCommand.CPU_SETUP | EWorkerCommand.CPU_RUN | EWorkerCommand.CPU_STEP | EWorkerCommand.CPU_RESET;

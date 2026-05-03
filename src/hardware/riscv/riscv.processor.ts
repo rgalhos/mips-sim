@@ -534,7 +534,21 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         } else if (syscall === rv_syscalls.syscall_update_screen) {
           ret = rv_worker_commands.UPDATE_FRAMEBUFFER;
         } else if (syscall === rv_syscalls.syscall_print_string) {
-          //
+          const a0 = Number(this.registerRead(rv_reg.a0));
+          // meio paia mas é oq tem pra janta
+          const memory = this.memory.subarray(a0, 255);
+          let nulIdx = memory.findIndex((v) => v === 0);
+          nulIdx = nulIdx === -1 ? 255 : nulIdx;
+
+          const str = String.fromCharCode(...memory.slice(0, nulIdx));
+          this._workerBuffer = str;
+
+          ret = rv_worker_commands.PRINT_STRING;
+        } else if (syscall === rv_syscalls.syscall_print_int) {
+          const a0 = String(this.registerRead(rv_reg.a0));
+          this._workerBuffer = a0 + '\n';
+
+          ret = rv_worker_commands.PRINT_STRING;
         }
 
         return ret;
@@ -543,10 +557,6 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         this.setHalted(true);
         break;
     }
-  }
-
-  public run() {
-    console.log('@todo run');
   }
 
   public step() {

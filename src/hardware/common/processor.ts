@@ -44,6 +44,8 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
   public _memoryOperationDiff: Record<number, number> = {};
 
+  public _workerBuffer: any;
+
   /**
    * Simulator memory
    */
@@ -145,11 +147,6 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
    * Helper function used to stringify an instruction
    */
   abstract stringifyInstruction(instruction: Partial<TDecodedInstruction>): string;
-
-  /**
-   * Normal cpu execution
-   */
-  public abstract run(): void;
 
   /**
    * Execute single instruction (step)

@@ -185,7 +185,7 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
   );
 }
 
-function MemoryTerminal() {
+function MemoryView() {
   const { simulator } = useSimulator();
   const [dump, setDump] = useState<IWorkerCPUDump | null>(null);
   const [loading, setLoading] = useState(true);
@@ -315,4 +315,4 @@ function MemoryTerminal() {
   );
 }
 
-export default memo(MemoryTerminal);
+export default memo(MemoryView);
