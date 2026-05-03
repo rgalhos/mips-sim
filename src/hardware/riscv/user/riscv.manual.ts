@@ -98,4 +98,80 @@ export const rvManual: IUserManual = {
     { name: 'x30', alias: 't5', kind: 'temporary', description: 'Temporary (alias **t5**); caller-saved scratch.' },
     { name: 'x31', alias: 't6', kind: 'temporary', description: 'Temporary (alias **t6**); caller-saved scratch.' },
   ],
+  consts: [
+    {
+      name: 'PC_START',
+      description:
+        'Default address of the **.text** segment and typical entry point (**0x0000**). Use in `la`/`auipc` relocations.',
+    },
+    {
+      name: 'STACK_START',
+      description:
+        'Initial value loaded into **sp** after reset (**0xC000**).\nThe stack grows downward toward lower addresses.',
+    },
+    {
+      name: 'STACK_END',
+      description:
+        'End of the stack. Any write to **sp** with **sp >= STACK_END** throws.',
+    },
+    {
+      name: 'FRAMEBUFFER_START',
+      description:
+        'First byte of the linear framebuffer (**0x8000**). Contiguous through **FRAMEBUFFER_END**.\n\n'
+        + 'Each byte represents a pixel with a color in the **RGB332** format (3 bits for red, 3 bits for green, 2 bits for blue).\n\n'
+        + '**SYSCALL_CLEAR_SCREEN** zero-fills this range.',
+    },
+    {
+      name: 'FRAMEBUFFER_END',
+      description:
+        'Last address of the framebuffer region (**0xA70F**).\n\n'
+        + 'Each byte represents a pixel with a color in the **RGB332** format (3 bits for red, 3 bits for green, 2 bits for blue).\n\n'
+        + '**SYSCALL_CLEAR_SCREEN** zero-fills this range.',
+    },
+    {
+      name: 'INPUT_BUFFER_ADDR',
+      description:
+        'Memory-mapped word (**0xF00F**) where the host injects pending keyboard input for the program to read.',
+    },
+    {
+      name: 'SYSCALL_PRINT_INT',
+      description:
+        '**ecall** service number in **a7** (**10**).\n\n'
+        + 'Intended for printing **a0** as a decimal integer.\n\n'
+          + 'The int will be printed in the simulator terminal.'
+    },
+    {
+      name: 'SYSCALL_PRINT_STRING',
+      description:
+        '**ecall** service number in **a7** (**11**).\n\n'
+        + '**a0** should hold the address of a string (will print a maximum of 255 bytes or until it finds a null-terminator).\n\n'
+        + 'The string will be printed in the simulator terminal.',
+    },
+    {
+      name: 'SYSCALL_PRINT_CHAR',
+      description:
+        '**ecall** service number in **a7** (**12**).\n\n'
+        + '**a0** carries the low byte of the character to print.\n\n'
+        + 'The char will be printed in the simulator terminal.',
+    },
+    {
+      name: 'SYSCALL_UPDATE_SCREEN',
+      description:
+        '**ecall** service number in **a7** (**20**).\n'
+        + 'Flushes framebuffer changes to the UI.\n\n'
+        + 'Only effective when used along with `.option OPTION_EXPLICIT_SCREEN_UPDATE`',
+    },
+    {
+      name: 'SYSCALL_CLEAR_SCREEN',
+      description:
+        '**ecall** service number in **a7** (**21**).\n'
+        + 'Clears the framebuffer by filling it with zeroes',
+    },
+    {
+      name: 'OPTION_EXPLICIT_SCREEN_UPDATE',
+      description:
+        'Token for the **.option** keyword.\n\n'
+        + 'When used as `.option OPTION_EXPLICIT_SCREEN_UPDATE`, the simulator will only update the screen after **SYSCALL_UPDATE_SCREEN** instead of every step.',
+    },
+  ],
 };

@@ -133,6 +133,10 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       [{ value: inst.operation }, { value: inst.description }],
     ]);
 
+    manualEntries = manualEntries.concat(
+      simulator.manual.consts.map((c) => [c.name.toLowerCase(), [{ value: c.description }]]),
+    );
+
     for (const reg of simulator.manual.registers) {
       const desc = [{ value: `**${reg.kind}** — ${reg.description}` }];
 
@@ -144,6 +148,8 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
     }
 
     const manualMap = Object.fromEntries(manualEntries);
+
+    console.log({ manualMap });
 
     monaco.languages.registerHoverProvider('mips', {
       provideHover: (model, position) => {

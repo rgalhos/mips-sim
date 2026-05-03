@@ -1,8 +1,10 @@
-import { Badge, Flex, Heading, useColorModeValue } from '@chakra-ui/react';
+import { Badge, Divider, Flex, Heading, useColorModeValue } from '@chakra-ui/react';
 import { Table, TableContainer, Tbody, Td, Th, Thead, Tr } from '@chakra-ui/table';
+import {} from '@monaco-editor/react';
+import Markdown from 'react-markdown';
 import { useSimulator } from '../../../hooks/simulator.hook';
 
-export default function MonoTable() {
+export default function InstructionManual() {
   const { simulator } = useSimulator();
 
   const regColors = ['green', 'red', 'cyan', 'gray', 'purple', 'yellow'];
@@ -21,7 +23,8 @@ export default function MonoTable() {
           <Badge colorScheme={calcRegColor(reg.kind)}>{reg.alias || reg.name}</Badge>
         ))}
       </Flex>
-      <TableContainer>
+
+      <TableContainer sx={{ whiteSpace: 'pre-line', maxWidth: '1280px' }}>
         <Table
           variant="simple"
           style={{
@@ -38,15 +41,45 @@ export default function MonoTable() {
             </Tr>
           </Thead>
           <Tbody>
-            {simulator.manual.instructions.map((x) => {
+            {simulator.manual.instructions.map((inst) => {
               return (
                 <Tr>
-                  <Td>{x.name}</Td>
-                  <Td>{x.operation}</Td>
-                  <Td>{x.description}</Td>
+                  <Td>{inst.name}</Td>
+                  <Td>{inst.operation}</Td>
+                  <Td>
+                    <Markdown>{inst.description}</Markdown>
+                  </Td>
                 </Tr>
               );
             })}
+          </Tbody>
+        </Table>
+      </TableContainer>
+
+      <TableContainer sx={{ whiteSpace: 'pre-line', maxWidth: '1280px', marginTop: '60px' }}>
+        <Table
+          variant="simple"
+          style={{
+            backgroundColor: useColorModeValue('white', 'gray.900'),
+            borderRadius: 10,
+            boxShadow: '0px 0px 10px 0px rgba(0,0,0,0.1)',
+          }}
+        >
+          <Thead>
+            <Tr>
+              <Th>Constant</Th>
+              <Th>Description</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {simulator.manual.consts.map((c) => (
+              <Tr>
+                <Td>{c.name}</Td>
+                <Td>
+                  <Markdown>{c.description}</Markdown>
+                </Td>
+              </Tr>
+            ))}
           </Tbody>
         </Table>
       </TableContainer>

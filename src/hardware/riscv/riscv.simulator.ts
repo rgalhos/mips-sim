@@ -44,6 +44,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
   public readonly consts = [
     'PC_START',
     'STACK_START',
+    'STACK_END',
     'FRAMEBUFFER_START',
     'FRAMEBUFFER_END',
     'INPUT_BUFFER_ADDR',
@@ -359,6 +360,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     const constants: Record<string, IToken> = {
       PC_START: { type: ETokenType.NUMBER, value: Number(this.processor.PC_START), lineNumber: 0 },
       STACK_START: { type: ETokenType.NUMBER, value: Number(this.processor.STACK_START), lineNumber: 0 },
+      STACK_END: { type: ETokenType.NUMBER, value: Number(this.processor.STACK_END), lineNumber: 0 },
       FRAMEBUFFER_START: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_START), lineNumber: 0 },
       FRAMEBUFFER_END: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_END), lineNumber: 0 },
       INPUT_BUFFER_ADDR: { type: ETokenType.NUMBER, value: 0xf00f, lineNumber: 0 }, // @todo
