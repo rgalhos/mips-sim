@@ -195,7 +195,7 @@ function MemoryTerminal() {
 
     setDump((oldDump) => {
       let memory;
-      if (newDump.memory.length === 0) {
+      if (oldDump && newDump.memory.length === 0) {
         memory = oldDump!.memory;
       } else {
         memory = newDump.memory;

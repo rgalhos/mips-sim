@@ -1,94 +1,55 @@
-import {
-    Badge,
-    Card,
-    CardBody,
-    CardHeader,
-    Flex,
-    Heading,
-    useColorModeValue,
-  } from "@chakra-ui/react";
-  import {
-    Table,
-    TableCaption,
-    TableContainer,
-    Tbody,
-    Td,
-    Tfoot,
-    Th,
-    Thead,
-    Tr,
-  } from "@chakra-ui/table";
-  import React from "react";
-import InstructionSetPage from "./InstructionSet";
+import { Badge, Flex, Heading, useColorModeValue } from '@chakra-ui/react';
+import { Table, TableContainer, Tbody, Td, Th, Thead, Tr } from '@chakra-ui/table';
+import { useSimulator } from '../../../hooks/simulator.hook';
 
-export default function MonoTable()
-{
-    return (
-        <>
-          <Heading style={{ marginTop: 10, marginBottom: 20 }} size="md">
-            Monocycle Instruction Set
-          </Heading>
-  
-          <Flex gap={2} style={{ marginBottom: 10 }}>
-            <Heading size="sm">Registers:</Heading>
-            <Badge>ZERO</Badge>
-            <Badge>PC</Badge>
-            <Badge>HIGH</Badge>
-            <Badge>LOW</Badge>
-            <Badge colorScheme="green">T0</Badge>
-            <Badge colorScheme="green">T1</Badge>
-            <Badge colorScheme="green">T2</Badge>
-            <Badge colorScheme="green">T3</Badge>
-            <Badge colorScheme="green">T4</Badge>
-            <Badge colorScheme="green">T5</Badge>
-            <Badge colorScheme="green">T6</Badge>
-            <Badge colorScheme="red">A0</Badge>
-            <Badge colorScheme="red">A1</Badge>
-            <Badge colorScheme="red">A2</Badge>
-            <Badge colorScheme="red">A3</Badge>
-            <Badge colorScheme="cyan">S0</Badge>
-            <Badge colorScheme="cyan">S1</Badge>
-            <Badge colorScheme="cyan">S2</Badge>
-            <Badge colorScheme="cyan">S3</Badge>
-            <Badge colorScheme="cyan">S4</Badge>
-            <Badge colorScheme="cyan">S5</Badge>
-            <Badge colorScheme="cyan">S6</Badge>
-            <Badge colorScheme="red">RA</Badge>
-            <Badge colorScheme="red">SP</Badge>
-            <Badge colorScheme="purple">V0</Badge>
-            <Badge colorScheme="purple">V1</Badge>
-            {/* v0,v1,a0,a1,t0,t1,t2,t3,ra,pc,zero */}
-          </Flex>
-          <TableContainer>
-            <Table
-              variant="simple"
-              style={{
-                backgroundColor: useColorModeValue("white", "gray.900"),
-                borderRadius: 10,
-                boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)",
-              }}
-            >
-              <TableCaption>Instructions for the Monocycle Model</TableCaption>
-              <Thead>
+export default function MonoTable() {
+  const { simulator } = useSimulator();
+
+  const regColors = ['green', 'red', 'cyan', 'gray', 'purple', 'yellow'];
+  const calcRegColor = (kind: string) => regColors[kind.charCodeAt(0) % regColors.length];
+
+  return (
+    <>
+      <Heading style={{ marginTop: 10, marginBottom: 20 }} size="md">
+        {simulator.name} Instruction Set
+      </Heading>
+
+      <Flex gap={2} style={{ marginBottom: 10 }}>
+        <Heading size="sm">Registers:</Heading>
+
+        {simulator.manual.registers.map((reg) => (
+          <Badge colorScheme={calcRegColor(reg.kind)}>{reg.alias || reg.name}</Badge>
+        ))}
+      </Flex>
+      <TableContainer>
+        <Table
+          variant="simple"
+          style={{
+            backgroundColor: useColorModeValue('white', 'gray.900'),
+            borderRadius: 10,
+            boxShadow: '0px 0px 10px 0px rgba(0,0,0,0.1)',
+          }}
+        >
+          <Thead>
+            <Tr>
+              <Th>Instruction</Th>
+              <Th>Operation</Th>
+              <Th>Description</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {simulator.manual.instructions.map((x) => {
+              return (
                 <Tr>
-                  <Th>Instruction</Th>
-                  <Th>Operation</Th>
-                  <Th>Description</Th>
+                  <Td>{x.name}</Td>
+                  <Td>{x.operation}</Td>
+                  <Td>{x.description}</Td>
                 </Tr>
-              </Thead>
-              <Tbody>
-              {InstructionSetPage.Descriptions.filter(x => x.level <= 1).map(x => {
-                    return (<Tr>
-                        <Td>{x.name}</Td>
-                        <Td>{x.operation}</Td>
-                        <Td>
-                          {x.description}
-                        </Td>
-                      </Tr>)
-                })}
-              </Tbody>
-            </Table>
-          </TableContainer>
-        </>
-      );
+              );
+            })}
+          </Tbody>
+        </Table>
+      </TableContainer>
+    </>
+  );
 }

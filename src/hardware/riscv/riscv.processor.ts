@@ -1,6 +1,6 @@
 import { IProcessor } from '../common/processor';
 import { IAssembledInstruction } from '../common/simulator';
-import { rv_codec, rv_opcode, RV_OPCODE_DATA, rv_reg } from './riscv.const';
+import { rv_codec, rv_opcode, RV_OPCODE_DATA, rv_reg, rv_syscalls, rv_worker_commands } from './riscv.const';
 import { IDecodedRVInstruction, IRVCPU } from './riscv.types';
 import {
   encodeBType,
@@ -22,13 +22,9 @@ import {
   operand_simm12,
   pack_i_imm12,
   reg5,
+  s32,
   u32,
 } from './riscv.utils';
-
-/** RV32I: valor inteiro com sinal em 32 bits (BigInt). */
-function s32(n: bigint): bigint {
-  return (n << 32n) >> 32n;
-}
 
 export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly registers = rv_reg;
@@ -386,7 +382,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     return dec;
   }
 
-  public execute(d: IDecodedRVInstruction): void {
+  public execute(d: IDecodedRVInstruction): rv_worker_commands | void {
     console.log('WIMS: rv.execute: ' + this.stringifyInstruction(d), d);
 
     this.lastExecutedInstruction = d;
@@ -527,6 +523,22 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       case rv_opcode.and:
         this.registerWrite(d.rd, u32(v1 & v2));
         break;
+      case rv_opcode.ecall: {
+        const syscall = Number(this.registerRead(rv_reg.a7));
+        let ret = rv_worker_commands.NONE;
+
+        if (syscall === rv_syscalls.syscall_clear_screen) {
+          this.memory.fill(0, Number(this.FRAMEBUFFER_START), Number(this.FRAMEBUFFER_END));
+
+          ret = rv_worker_commands.SYNC_LISTENERS;
+        } else if (syscall === rv_syscalls.syscall_update_screen) {
+          ret = rv_worker_commands.UPDATE_FRAMEBUFFER;
+        } else if (syscall === rv_syscalls.syscall_print_string) {
+          //
+        }
+
+        return ret;
+      }
       case rv_opcode.ebreak:
         this.setHalted(true);
         break;
@@ -555,11 +567,13 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     }
 
     const prevPc = this.cpu.pc;
-    this.execute(dec);
+    const ret = this.execute(dec);
     const isUncondJump = dec._op === rv_opcode.jal || dec._op === rv_opcode.jalr;
     if (!isUncondJump && this.cpu.pc === prevPc) {
       this.cpu.pc += 4n;
     }
+
+    return ret;
   }
 
   public stringifyInstruction(instruction: Partial<IDecodedRVInstruction>): string {
@@ -573,6 +587,10 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     const op_info = RV_OPCODE_DATA[opcode];
     const fmt = op_info.format;
     let str = '';
+
+    if (instruction._op === rv_opcode.ebreak || instruction._op === rv_opcode.ecall) {
+      return op_info.name;
+    }
 
     for (const c of fmt) {
       if (c === 'O') {

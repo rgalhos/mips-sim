@@ -128,13 +128,22 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       },
     });
 
-    const manualMap = Object.fromEntries(
-      simulator.manual.instructions
-        .map((inst) => [inst.name, [{ value: inst.operation }, { value: inst.description }]])
-        .concat(
-          simulator.manual.registers.map((reg) => [reg.name, [{ value: `**${reg.kind}** — ${reg.description}` }]]),
-        ),
-    );
+    let manualEntries = simulator.manual.instructions.map((inst) => [
+      inst.name,
+      [{ value: inst.operation }, { value: inst.description }],
+    ]);
+
+    for (const reg of simulator.manual.registers) {
+      const desc = [{ value: `**${reg.kind}** — ${reg.description}` }];
+
+      manualEntries.push([reg.name, desc]);
+
+      if (reg.alias) {
+        manualEntries.push([reg.alias, desc]);
+      }
+    }
+
+    const manualMap = Object.fromEntries(manualEntries);
 
     monaco.languages.registerHoverProvider('mips', {
       provideHover: (model, position) => {
@@ -157,11 +166,6 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
     share.monaco = monaco;
 
     monaco.editor.setTheme(colorMode === 'dark' ? 'mipsdark' : 'mipslight');
-
-    // makes sure the editor mounts with the right code
-    if (!share.code) {
-      editor.setValue(share.code);
-    } else editor.setValue(defaultcode);
 
     let layoutRaf = 0;
     const scheduleLayout = () => {
@@ -186,15 +190,24 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
 
     editor.onDidDispose(() => {
       window.removeEventListener('resize', scheduleLayout);
+
       if (layoutRaf !== 0) {
         cancelAnimationFrame(layoutRaf);
         layoutRaf = 0;
       }
+
       resizeObserver?.disconnect();
     });
-  }
 
-  const defaultcode = share.defaultCode;
+    // makes sure the editor mounts with the right code
+    const defaultcode = share.defaultCode;
+
+    if (!share.code) {
+      editor.setValue(share.code);
+    } else {
+      editor.setValue(defaultcode);
+    }
+  }
 
   return (
     <Editor

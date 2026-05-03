@@ -4,6 +4,10 @@ export function u32(n: bigint): bigint {
   return n & 0xffffffffn;
 }
 
+export function s32(n: bigint): bigint {
+  return (n << 32n) >> 32n;
+}
+
 export function operand_opcode(inst: bigint): number {
   return Number(u32(inst) & 0x7fn);
 }

@@ -25,6 +25,8 @@ const RV_RELOC_OPS = new Set(['hi', 'lo', 'pcrel_hi', 'pcrel_lo']);
 export class RVSimulator extends ISimulator<RVProcessor> {
   static name = 'RISC-V (RV32I)';
 
+  public readonly name = RVSimulator.name;
+
   public readonly manual: IUserManual = rvManual;
 
   public readonly instructionKeywords = Object.keys({ ...rv_opcode, ...rv_opcode_pseudo })
@@ -45,6 +47,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     'SYSCALL_PRINT_STRING',
     'SYSCALL_PRINT_CHAR',
     'SYSCALL_UPDATE_SCREEN',
+    'SYSCALL_CLEAR_SCREEN',
     'OPTION_EXPLICIT_SCREEN_UPDATE',
   ];
 
@@ -291,7 +294,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         dec.rs2 = this.ensureRegisterToken(tok3, constants);
         break;
       case rv_codec.i:
-        if (dec._op === rv_opcode.ebreak) break;
+        if (dec._op === rv_opcode.ebreak || dec._op === rv_opcode.ecall) break;
 
         dec.rd = this.ensureRegisterToken(tok1, constants);
         dec.rs1 = this.ensureRegisterToken(tok2, constants);
@@ -334,6 +337,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       SYSCALL_PRINT_STRING: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_string },
       SYSCALL_PRINT_CHAR: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_char },
       SYSCALL_UPDATE_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_update_screen },
+      SYSCALL_CLEAR_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_clear_screen },
       OPTION_EXPLICIT_SCREEN_UPDATE: { type: ETokenType.NUMBER, value: 0xf001 },
     };
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];

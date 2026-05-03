@@ -13,7 +13,7 @@ export interface IAssembledInstruction<TDecoded extends IDecodedInstruction = ID
 }
 
 export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor<any>> {
-  static name = 'Uninitialized simulator';
+  public abstract readonly name: string;
 
   /**
    * Object that will be used to mount the examples.

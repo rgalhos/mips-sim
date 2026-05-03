@@ -205,8 +205,6 @@ export default function SimulatorView() {
   }
 
   function callExecuteStep() {
-    console.log('@todo execute step');
-
     if (!simulator.workerService.worker) {
       simulator.createCpuWorker();
     }
@@ -428,7 +426,9 @@ export default function SimulatorView() {
         </Flex>
       </Box>
 
-      {screenModalOpen ? <Screen /> : <></>}
+      <Box display={screenModalOpen ? 'block' : 'none'} aria-hidden={!screenModalOpen}>
+        <Screen visible={screenModalOpen} />
+      </Box>
 
       <Slide
         direction="bottom"

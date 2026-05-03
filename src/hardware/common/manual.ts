@@ -5,6 +5,7 @@ export interface IUserManual {
 
 export interface IManualRegister {
   name: string;
+  alias?: string;
   kind: string;
   description: string;
 }

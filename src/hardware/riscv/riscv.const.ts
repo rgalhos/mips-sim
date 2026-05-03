@@ -165,11 +165,18 @@ export enum rv_directives {
   '%pcrel_lo',
 }
 
-export enum rv_syscalls {
+export const enum rv_syscalls {
   syscall_print_int = 10,
   syscall_print_string = 11,
   syscall_print_char = 12,
   syscall_update_screen = 20,
+  syscall_clear_screen = 21,
+}
+
+export const enum rv_worker_commands {
+  NONE = 0,
+  SYNC_LISTENERS = 1 << 0,
+  UPDATE_FRAMEBUFFER = 1 << 1,
 }
 
 export const RV_CODEC_FORMAT = {

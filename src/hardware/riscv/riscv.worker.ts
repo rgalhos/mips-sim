@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-globals -- DedicatedWorkerGlobalScope */
 import type { WorkerMessage, WorkerMessageResponse } from '../common/worker-service';
 import { EWorkerCommand } from '../common/worker-service';
+import { rv_worker_commands } from './riscv.const';
 import { RVProcessor } from './riscv.processor';
 
 const cpu = new RVProcessor();
@@ -31,8 +32,7 @@ const postCpuDump = (fullDump = false) => {
   });
 };
 
-const shouldPostDumpAfterStep = () =>
-  cpu.halted || (cpu.cycle > 0n && cpu.cycle % CPU_DUMP_EVERY_N_CYCLES === 0n);
+const shouldPostDumpAfterStep = () => cpu.halted || (cpu.cycle > 0n && cpu.cycle % CPU_DUMP_EVERY_N_CYCLES === 0n);
 
 let runTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -43,16 +43,24 @@ const cancelRunLoop = () => {
   }
 };
 
+const handleCpuStep = () => {
+  const ret = +cpu.step();
+
+  if (ret & rv_worker_commands.SYNC_LISTENERS) {
+    postCpuDump(true);
+  } else if (shouldPostDumpAfterStep()) {
+    postCpuDump();
+  }
+};
+
 const runLoopTick = () => {
   runTimer = null;
+
   if (cpu.halted) {
     return;
   }
 
-  cpu.step();
-  if (shouldPostDumpAfterStep()) {
-    postCpuDump();
-  }
+  handleCpuStep();
 
   if (cpu.halted) {
     return;
@@ -91,8 +99,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     cancelRunLoop();
     cpu.setHalted(true);
 
-    cpu.step();
-    postCpuDump();
+    handleCpuStep();
   } else if (command === EWorkerCommand.SET_CPU_HALT) {
     if (data) {
       cancelRunLoop();
