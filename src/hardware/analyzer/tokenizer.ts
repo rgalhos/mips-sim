@@ -9,21 +9,71 @@ export enum ETokenType {
   EOL,
 }
 
-export type IToken =
+export type IToken = { lineNumber: number } & (
   | {
       type: ETokenType.IDENTIFIER | ETokenType.STRING | ETokenType.CHAR | ETokenType.LABEL;
       value: string;
     }
   | { type: ETokenType.RELOC; value: string }
   | { type: ETokenType.NUMBER; value: number }
-  | { type: ETokenType.INVALID | ETokenType.EOL; value: string | number | null };
+  | { type: ETokenType.INVALID | ETokenType.EOL; value: string | number | null }
+);
 
-export function tokenize(line: string) {
+export const throwUnexpectedToken = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_UNEXPECTED_TOKEN', { cause: tokens });
+};
+
+export const throwUndeclaredLabel = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_UNDECLARED_LABEL', { cause: tokens });
+};
+
+export const throwUnknownKeyword = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_UNKNOWN_KEYWORD', { cause: tokens });
+};
+
+export const throwCircularDeclaration = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_CIRCULAR_DECLARATION', { cause: tokens });
+};
+
+export const throwConflictingDeclaration = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_CONFLICTING_DECLARATION', { cause: tokens });
+};
+
+export const stringifyTokenizerError = (e: Error) => {
+  if (!e.message.startsWith('ASSEMBLER_')) return e.toString();
+
+  const lineNumber = ((e.cause as IToken[]) || []).find((v) => v.lineNumber !== 0)?.lineNumber || 0;
+  const invalid = ((e.cause as IToken[]) || []).find((v) => v.type === ETokenType.INVALID);
+  const fullLine = ((e.cause as IToken[]) || []).map((v) => v.value).join(' ');
+  let msg = '';
+
+  if (e.message === 'ASSEMBLER_UNEXPECTED_TOKEN') {
+    if (invalid) {
+      msg = `Found invalid token (${invalid.value}) at line ${lineNumber}: ${fullLine}`;
+    } else {
+      msg = `Unexpected token at line ${lineNumber}: ${fullLine}`;
+    }
+  } else if (e.message === 'ASSEMBLER_UNDECLARED_LABEL') {
+    msg = `Undeclared constant or label referenced at line ${lineNumber}: ${fullLine}`;
+  } else if (e.message === 'ASSEMBLER_UNKNOWN_KEYWORD') {
+    msg = `Invalid keyword at line ${lineNumber}: ${fullLine}`;
+  } else if (e.message === 'ASSEMBLER_CIRCULAR_DECLARATION') {
+    msg = `Circular declaration detected at line ${lineNumber}: ${fullLine}`;
+  } else if (e.message === 'ASSEMBLER_CONFLICTING_DECLARATION') {
+    msg = `Label or constant declared twice at line ${lineNumber}: ${fullLine}`;
+  }
+
+  return msg;
+};
+
+export function tokenize(line: string, lineNumber: number) {
   line = line.trim();
 
   const tokens: IToken[] = [];
 
   let readingOffset = false;
+  let readingReloc = false;
+  let relocSawArg = false;
   let i = 0;
 
   while (i < line.length) {
@@ -32,6 +82,11 @@ export function tokenize(line: string) {
     if (/\s/.test(c)) {
       i++;
       continue;
+    }
+
+    if (readingReloc && (c === '"' || c === "'" || c === '%')) {
+      tokens.push({ type: ETokenType.INVALID, value: c, lineNumber });
+      break;
     }
 
     // string
@@ -51,10 +106,10 @@ export function tokenize(line: string) {
         value += c;
         j++;
       }
-      tokens.push({ type: ETokenType.STRING, value });
+      tokens.push({ type: ETokenType.STRING, value, lineNumber });
       if (line[j] !== '"') {
         // end of line without "
-        tokens.push({ type: ETokenType.INVALID, value });
+        tokens.push({ type: ETokenType.INVALID, value, lineNumber });
         break;
       }
       i = j + 1;
@@ -63,9 +118,9 @@ export function tokenize(line: string) {
     // char
     else if (c === "'") {
       let value = line[i + 1];
-      tokens.push({ type: ETokenType.CHAR, value });
+      tokens.push({ type: ETokenType.CHAR, value, lineNumber });
       if (line[i + 2] !== "'") {
-        tokens.push({ type: ETokenType.INVALID, value: line[i + 2] });
+        tokens.push({ type: ETokenType.INVALID, value: line[i + 2], lineNumber });
         break;
       }
       i = i + 3;
@@ -75,20 +130,20 @@ export function tokenize(line: string) {
     else if (c === '%') {
       const nameStart = i + 1;
       if (nameStart >= line.length || !/[a-zA-Z_.]/.test(line[nameStart])) {
-        tokens.push({ type: ETokenType.INVALID, value: '%' });
+        tokens.push({ type: ETokenType.INVALID, value: '%', lineNumber });
         break;
       }
       let j = nameStart + 1;
       while (j < line.length && /[a-zA-Z0-9_]/.test(line[j])) {
         j++;
       }
-      tokens.push({ type: ETokenType.RELOC, value: line.slice(nameStart, j).toLowerCase() });
+      tokens.push({ type: ETokenType.RELOC, value: line.slice(nameStart, j).toLowerCase(), lineNumber });
       i = j;
       while (i < line.length && /\s/.test(line[i])) {
         i++;
       }
       if (i >= line.length || line[i] !== '(') {
-        tokens.push({ type: ETokenType.INVALID, value: '(' });
+        tokens.push({ type: ETokenType.INVALID, value: '(', lineNumber });
         break;
       }
       i++;
@@ -96,72 +151,15 @@ export function tokenize(line: string) {
         i++;
       }
       if (i >= line.length) {
-        tokens.push({ type: ETokenType.INVALID, value: null });
+        tokens.push({ type: ETokenType.INVALID, value: null, lineNumber });
         break;
       }
-      c = line[i];
-      // inner: identifier
-      if (/[a-zA-Z_.]/.test(c)) {
-        let k = i + 1;
-        let idVal = c;
-        while (k < line.length && /[a-zA-Z0-9_]/.test(line[k])) {
-          idVal += line[k];
-          k++;
-        }
-        tokens.push({ type: ETokenType.IDENTIFIER, value: idVal });
-        i = k;
-      }
-      // inner: number
-      else if (/[0-9-]/.test(c)) {
-        let k = i + 1;
-        let isNegative = 1;
-        let nc = c;
-        if (nc === '-') {
-          isNegative = -1;
-          if (k >= line.length) {
-            tokens.push({ type: ETokenType.INVALID, value: '-' });
-            break;
-          }
-          nc = line[k++];
-        }
-        let numStr = nc;
-        if (nc === '0' && k < line.length && /[xX]/.test(line[k])) {
-          numStr += line[k++];
-          while (k < line.length && /[0-9a-fA-F]/.test(line[k])) {
-            numStr += line[k++];
-          }
-        } else if (nc === '0' && k < line.length && /[bB]/.test(line[k])) {
-          numStr += line[k++];
-          while (k < line.length && /[01]/.test(line[k])) {
-            numStr += line[k++];
-          }
-        } else if (/[0-9]/.test(nc)) {
-          while (k < line.length && /[0-9]/.test(line[k])) {
-            numStr += line[k++];
-          }
-        } else {
-          tokens.push({ type: ETokenType.INVALID, value: nc });
-          break;
-        }
-        const v = Number(numStr) * isNegative;
-        if (isNaN(v)) {
-          tokens.push({ type: ETokenType.INVALID, value: v });
-          break;
-        }
-        tokens.push({ type: ETokenType.NUMBER, value: v });
-        i = k;
-      } else {
-        tokens.push({ type: ETokenType.INVALID, value: c });
+      if (line[i] === ')') {
+        tokens.push({ type: ETokenType.INVALID, value: ')', lineNumber });
         break;
       }
-      while (i < line.length && /\s/.test(line[i])) {
-        i++;
-      }
-      if (i >= line.length || line[i] !== ')') {
-        tokens.push({ type: ETokenType.INVALID, value: ')' });
-        break;
-      }
-      i++;
+      readingReloc = true;
+      relocSawArg = false;
       continue;
     }
     // identifier
@@ -173,28 +171,46 @@ export function tokenize(line: string) {
         j++;
       }
       i = j;
-      if (line[j] === ':') {
-        tokens.push({ type: ETokenType.LABEL, value });
+      if (readingReloc && line[j] === ':') {
+        tokens.push({ type: ETokenType.INVALID, value: ':', lineNumber });
+        break;
+      } else if (readingReloc && relocSawArg) {
+        tokens.push({ type: ETokenType.INVALID, value: value, lineNumber });
+        break;
+      } else if (line[j] === ':') {
+        tokens.push({ type: ETokenType.LABEL, value, lineNumber });
         i++;
-      } else {
+      } else if (readingOffset) {
         const prev = tokens[tokens.length - 1];
-        if (
-          readingOffset &&
-          prev &&
-          (prev.type === ETokenType.NUMBER || prev.type === ETokenType.IDENTIFIER)
-        ) {
+        const prev2 = tokens[tokens.length - 2];
+
+        if (prev2 && prev2.type === ETokenType.RELOC) {
+          const relocArgTok = tokens.pop()!;
+          const relocTok = tokens.pop()!;
+          tokens.push({ type: ETokenType.IDENTIFIER, value, lineNumber });
+          tokens.push(relocTok);
+          tokens.push(relocArgTok);
+        } else if (prev && (prev.type === ETokenType.NUMBER || prev.type === ETokenType.IDENTIFIER)) {
           const offset = tokens.pop()!;
-          tokens.push({ type: ETokenType.IDENTIFIER, value });
+          tokens.push({ type: ETokenType.IDENTIFIER, value, lineNumber });
           tokens.push(offset);
-        } else {
-          tokens.push({ type: ETokenType.IDENTIFIER, value });
         }
+      } else {
+        tokens.push({ type: ETokenType.IDENTIFIER, value, lineNumber });
+      }
+
+      if (readingReloc) {
+        relocSawArg = true;
       }
       continue;
     }
     // number
     // eslint-disable-next-line no-useless-escape
     else if (/[0-9-]/.test(c)) {
+      if (readingReloc && relocSawArg) {
+        tokens.push({ type: ETokenType.INVALID, value: c, lineNumber });
+        break;
+      }
       let j = i + 1;
       let isNegative = 1;
 
@@ -228,23 +244,30 @@ export function tokenize(line: string) {
           j++;
         }
       } else {
-        tokens.push({ type: ETokenType.INVALID, value });
+        tokens.push({ type: ETokenType.INVALID, value, lineNumber });
         break;
       }
 
       const v = Number(value) * isNegative;
       if (isNaN(v)) {
         // @todo tratar melhor aí em cima
-        tokens.push({ type: ETokenType.INVALID, value: v });
+        tokens.push({ type: ETokenType.INVALID, value: v, lineNumber });
         break;
       }
 
-      tokens.push({ type: ETokenType.NUMBER, value: v });
+      tokens.push({ type: ETokenType.NUMBER, value: v, lineNumber });
       i = j;
+      if (readingReloc) {
+        relocSawArg = true;
+      }
       continue;
     }
     // comma. ignore
     else if (c === ',') {
+      if (readingReloc) {
+        tokens.push({ type: ETokenType.INVALID, value: ',', lineNumber });
+        break;
+      }
       i++;
       continue;
     }
@@ -252,19 +275,39 @@ export function tokenize(line: string) {
     else if (c === '#') {
       break;
     } else if (c === '(') {
+      if (readingReloc) {
+        tokens.push({ type: ETokenType.INVALID, value: '(', lineNumber });
+        break;
+      }
       readingOffset = true;
       i++;
       continue;
     } else if (c === ')') {
-      readingOffset = false;
+      if (readingReloc) {
+        if (!relocSawArg) {
+          tokens.push({ type: ETokenType.INVALID, value: ')', lineNumber });
+          break;
+        }
+        readingReloc = false;
+        relocSawArg = false;
+      } else {
+        readingOffset = false;
+      }
       i++;
       continue;
     }
     // invalid char
     else {
-      tokens.push({ type: ETokenType.INVALID, value: c });
+      tokens.push({ type: ETokenType.INVALID, value: c, lineNumber });
       i++;
       break;
+    }
+  }
+
+  if (readingReloc || readingOffset) {
+    const last = tokens[tokens.length - 1];
+    if (!last || last.type !== ETokenType.INVALID) {
+      tokens.push({ type: ETokenType.INVALID, value: null, lineNumber });
     }
   }
 

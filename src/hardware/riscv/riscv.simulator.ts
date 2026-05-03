@@ -1,4 +1,13 @@
-import { ETokenType, IToken, tokenize } from '../analyzer/tokenizer';
+import {
+  ETokenType,
+  IToken,
+  throwCircularDeclaration,
+  throwConflictingDeclaration,
+  throwUndeclaredLabel,
+  throwUnexpectedToken,
+  throwUnknownKeyword,
+  tokenize,
+} from '../analyzer/tokenizer';
 import { IUserManual } from '../common/manual';
 import { IAssembledInstruction, ISimulator } from '../common/simulator';
 import {
@@ -14,11 +23,6 @@ import { RVProcessor } from './riscv.processor';
 import { IDecodedRVInstruction } from './riscv.types';
 import { splitHiLoS32 } from './riscv.utils';
 import { rvManual } from './user/riscv.manual';
-
-const throwUnexpectedToken = (tokens: IToken[]) => {
-  console.log('rv: unexpected token', tokens);
-  return new Error('rv: unexpected token', { cause: 'UNEXPECTED_TOKEN' });
-};
 
 const RV_RELOC_OPS = new Set(['hi', 'lo', 'pcrel_hi', 'pcrel_lo']);
 
@@ -66,9 +70,13 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     while (cur.type === ETokenType.IDENTIFIER) {
       const next = constants[cur.value];
       if (!next) break;
-      if (seen.has(cur.value)) throw new Error('rv: circular .equ');
+      if (seen.has(cur.value)) throw throwCircularDeclaration([t]);
       seen.add(cur.value);
       cur = next;
+    }
+
+    if (!cur) {
+      throw throwUndeclaredLabel([t]);
     }
 
     return cur;
@@ -85,7 +93,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
   private ensureNumericImmediate(t: IToken | undefined, constants: Record<string, IToken>): bigint {
     if (!t) throw throwUnexpectedToken([]);
     const cur = this.followConstSubst(t, constants);
-    if (cur.type !== ETokenType.NUMBER) throw throwUnexpectedToken([cur]);
+    if (cur.type !== ETokenType.NUMBER) throw throwUnexpectedToken([t]);
     return BigInt(cur.value as number);
   }
 
@@ -94,16 +102,12 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     const cur = this.followConstSubst(t, constants);
     const v = String(cur.value).toLowerCase();
     const r = rv_reg[v as keyof typeof rv_reg];
-    if (typeof r === 'undefined') throw throwUnexpectedToken([cur]);
+    if (typeof r === 'undefined') throw throwUnexpectedToken([t]);
     return r;
   }
 
   // 'pcrel_lo' assume que a ultima instrução é um AUIPC em pc-4 (auipc+addi pair).
   private relocImmediate(op: string, symbolVal: bigint, instAddr: bigint): bigint {
-    if (!RV_RELOC_OPS.has(op)) {
-      throw new Error(`rv: unknown relocation operator %${op}`);
-    }
-
     switch (op) {
       case 'hi':
         return splitHiLoS32(symbolVal).hi;
@@ -113,9 +117,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         return splitHiLoS32(symbolVal - instAddr).hi;
       case 'pcrel_lo':
         return splitHiLoS32(symbolVal - (instAddr - 4n)).lo;
-      default:
-        throw new Error(`rv: unknown relocation operator %${op}`);
     }
+
+    throw new Error(`rv: unknown relocation operator %${op}`);
   }
 
   private decodeImmediate(
@@ -130,7 +134,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
     if (immTok.type === ETokenType.RELOC) {
       const op = immTok.value;
-      if (!RV_RELOC_OPS.has(op)) throw new Error(`rv: unknown relocation operator %${op}`);
+      if (!RV_RELOC_OPS.has(op)) {
+        throw throwUnknownKeyword([immTok]);
+      }
 
       const operand = tokens[immIdx + 1];
       if (!operand) throw throwUnexpectedToken(tokens);
@@ -159,7 +165,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       return 0n;
     }
 
-    throw throwUnexpectedToken([immTok]);
+    throw throwUnexpectedToken(tokens);
   }
 
   private handlePseudoInstruction(
@@ -180,29 +186,32 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     };
 
     const tkFirst = tokens[0];
+    if (!tkFirst) return [invalid];
+
     const tok1 = tokens[1];
     const tok2 = tokens[2];
     const pseudo = tkFirst.value?.toString().toLowerCase() as keyof typeof rv_opcode_pseudo;
+    const lineNo = tkFirst.lineNumber;
 
     switch (pseudo) {
       case 'nop': {
-        return this.assembleLine(tokenize('addi zero, zero, 0'), {}, 0n, true);
+        return this.assembleLine(tokenize('addi zero, zero, 0', lineNo), {}, 0n, true);
       }
       case 'mv': {
         const rd = this.ensureRegisterToken(tok1, constants);
         const rs1 = this.ensureRegisterToken(tok2, constants);
-        return this.assembleLine(tokenize(`addi x${rd}, x${rs1}, 0`), {}, 0n, true);
+        return this.assembleLine(tokenize(`addi x${rd}, x${rs1}, 0`, lineNo), {}, 0n, true);
       }
       case 'la': {
         const rd = this.ensureRegisterToken(tok1, constants);
         return [
-          ...this.assembleLine(tokenize(`auipc x${rd}, %hi(${tok2.value})`), constants, pc, true),
-          ...this.assembleLine(tokenize(`addi x${rd}, x${rd}, %lo(${tok2.value})`), constants, pc, true),
+          ...this.assembleLine(tokenize(`auipc x${rd}, %hi(${tok2.value})`, lineNo), constants, pc, true),
+          ...this.assembleLine(tokenize(`addi x${rd}, x${rd}, %lo(${tok2.value})`, lineNo), constants, pc, true),
         ];
       }
       // case 'j': {
       //   const imm = this.ensureNumericImmediate(tok2, constants);
-      //   return this.assembleLine(tokenize(`jal ra, ${imm}`), {}, 0n, true);
+      //   return this.assembleLine(tokenize(`jal ra, ${imm}`, lineNo), {}, 0n, true);
       // }
       // case 'jump': {
       //
@@ -210,36 +219,56 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       case 'not': {
         const rd = this.ensureRegisterToken(tok1, constants);
         const rs1 = this.ensureRegisterToken(tok2, constants);
-        return this.assembleLine(tokenize(`xori x${rd}, x${rs1}, -1`), {}, 0n, true);
+        return this.assembleLine(tokenize(`xori x${rd}, x${rs1}, -1`, lineNo), {}, 0n, true);
       }
       case 'neg': {
         const rd = this.ensureRegisterToken(tok1, constants);
         const rs1 = this.ensureRegisterToken(tok2, constants);
-        return this.assembleLine(tokenize(`sub x${rd}, zero, x${rs1}`), {}, 0n, true);
+        return this.assembleLine(tokenize(`sub x${rd}, zero, x${rs1}`, lineNo), {}, 0n, true);
       }
       case 'seqz': {
         const rd = this.ensureRegisterToken(tok1, constants);
         const rs1 = this.ensureRegisterToken(tok2, constants);
-        return this.assembleLine(tokenize(`sltiu x${rd}, x${rs1}, 1`), {}, 0n, true);
+        return this.assembleLine(tokenize(`sltiu x${rd}, x${rs1}, 1`, lineNo), {}, 0n, true);
       }
       case 'snez': {
         const rd = this.ensureRegisterToken(tok1, constants);
         const rs1 = this.ensureRegisterToken(tok2, constants);
-        return this.assembleLine(tokenize(`sltu x${rd}, zero, x${rs1}`), {}, 0n, true);
+        return this.assembleLine(tokenize(`sltu x${rd}, zero, x${rs1}`, lineNo), {}, 0n, true);
       }
       case 'sltz': {
         const rd = this.ensureRegisterToken(tok1, constants);
         const rs1 = this.ensureRegisterToken(tok2, constants);
-        return this.assembleLine(tokenize(`slt x${rd}, x${rs1}, zero`), {}, 0n, true);
+        return this.assembleLine(tokenize(`slt x${rd}, x${rs1}, zero`, lineNo), {}, 0n, true);
       }
       case 'sgtz': {
         const rd = this.ensureRegisterToken(tok1, constants);
         const rs1 = this.ensureRegisterToken(tok2, constants);
-        return this.assembleLine(tokenize(`slt x${rd}, x${rs1}, zero`), {}, 0n, true);
+        return this.assembleLine(tokenize(`slt x${rd}, x${rs1}, zero`, lineNo), {}, 0n, true);
       }
       // BLA BLA BLA @todo resto das instruções
+      case 'call': {
+        let rt = rv_reg[rv_reg.ra];
+        let offset: string;
+
+        if (tok2) {
+          rt = tok1.value as keyof rv_reg;
+          offset = tok2.value as string;
+        } else if (tok1) {
+          offset = tok1.value as string;
+        } else {
+          throw throwUnexpectedToken(tokens);
+        }
+
+        console.log(tokens);
+
+        return [
+          ...this.assembleLine(tokenize(`auipc ${rt}, %pcrel_hi(${offset})`, lineNo), constants, pc, true),
+          // ...this.assembleLine(tokenize(`jalr ${rt}, %pcrel_lo(${offset})(${rt})`, lineNo), constants, pc, lineNumber,true),
+        ];
+      }
       case 'ret': {
-        return this.assembleLine(tokenize('jalr zero, ra, 0'), {}, 0n, true);
+        return this.assembleLine(tokenize('jalr zero, ra, 0', lineNo), {}, 0n, true);
       }
     }
 
@@ -328,17 +357,17 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     const labels: Record<string, bigint> = {};
     // constant->value translation table
     const constants: Record<string, IToken> = {
-      PC_START: { type: ETokenType.NUMBER, value: Number(this.processor.PC_START) },
-      STACK_START: { type: ETokenType.NUMBER, value: Number(this.processor.STACK_START) },
-      FRAMEBUFFER_START: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_START) }, // @todo
-      FRAMEBUFFER_END: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_END) }, // @todo
-      INPUT_BUFFER_ADDR: { type: ETokenType.NUMBER, value: 0xf00f }, // @todo
-      SYSCALL_PRINT_INT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_int },
-      SYSCALL_PRINT_STRING: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_string },
-      SYSCALL_PRINT_CHAR: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_char },
-      SYSCALL_UPDATE_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_update_screen },
-      SYSCALL_CLEAR_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_clear_screen },
-      OPTION_EXPLICIT_SCREEN_UPDATE: { type: ETokenType.NUMBER, value: 0xf001 },
+      PC_START: { type: ETokenType.NUMBER, value: Number(this.processor.PC_START), lineNumber: 0 },
+      STACK_START: { type: ETokenType.NUMBER, value: Number(this.processor.STACK_START), lineNumber: 0 },
+      FRAMEBUFFER_START: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_START), lineNumber: 0 },
+      FRAMEBUFFER_END: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_END), lineNumber: 0 },
+      INPUT_BUFFER_ADDR: { type: ETokenType.NUMBER, value: 0xf00f, lineNumber: 0 }, // @todo
+      SYSCALL_PRINT_INT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_int, lineNumber: 0 },
+      SYSCALL_PRINT_STRING: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_string, lineNumber: 0 },
+      SYSCALL_PRINT_CHAR: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_char, lineNumber: 0 },
+      SYSCALL_UPDATE_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_update_screen, lineNumber: 0 },
+      SYSCALL_CLEAR_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_clear_screen, lineNumber: 0 },
+      OPTION_EXPLICIT_SCREEN_UPDATE: { type: ETokenType.NUMBER, value: 0xf001, lineNumber: 0 },
     };
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
 
@@ -355,8 +384,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         continue;
       }
 
-      const tokens = tokenize(line);
-      //console.log(tokens);
+      // sempre soma 1 no idx já que a linha começa em 1, não em 0. isso vai dar um trickle down para todos os outros tokens
+      const tokens = tokenize(line, +idx + 1);
 
       if (tokens.length === 0) {
         continue;
@@ -372,7 +401,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         }
 
         if (!!labels[sLabel]) {
-          console.log('rv: label already declared: ' + sLabel);
+          throw throwConflictingDeclaration([tokens[0]]);
         }
 
         labels[sLabel] = BigInt(currentAddr);
@@ -454,6 +483,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           } else {
             throw throwUnexpectedToken(tokens);
           }
+        } else {
+          throw throwUnknownKeyword([tokens[0]]);
         }
       }
       // identifier (instruction)
@@ -461,11 +492,12 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         // instruction addresses must be 4-byte aligned
         currentAddr = (currentAddr + 3n) & ~0x3n;
 
-        //console.log(line);
         const decodedInstructions = this.assembleLine(tokens, constants, currentAddr);
 
         for (const decoded of decodedInstructions) {
-          //console.log(decoded);
+          if (decoded._op === rv_opcode.illegal) {
+            throw throwUnknownKeyword(tokens);
+          }
 
           assembledInstructions.push({
             code: line,
@@ -499,7 +531,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       if (immTok?.type === ETokenType.RELOC) {
         const op = immTok.value;
         if (!RV_RELOC_OPS.has(op)) {
-          throw new Error(`rv: unknown relocation operator %${op}`);
+          throw throwUnknownKeyword([immTok]);
         }
 
         const operand = tokens[immIdx + 1];
@@ -511,8 +543,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         const labelName = scope + operand.value;
         const labelAddr = labels[labelName];
         if (typeof labelAddr === 'undefined') {
-          console.error('rv: inexistent label: ', labelName);
-          continue;
+          throw throwUndeclaredLabel(tokens);
         }
 
         decoded.imm = this.relocImmediate(op, labelAddr, address);
@@ -528,8 +559,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       const labelName = scope + immTok.value;
       const labelAddr = labels[labelName];
       if (typeof labelAddr === 'undefined') {
-        console.error('rv: inexistent label: ', labelName);
-        continue;
+        throw throwUndeclaredLabel(tokens);
       }
 
       if (decoded.codec === rv_codec.j || decoded.codec === rv_codec.b || decoded.codec === rv_codec.s) {

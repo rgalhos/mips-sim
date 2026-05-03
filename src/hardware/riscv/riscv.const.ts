@@ -142,7 +142,8 @@ export enum rv_opcode_pseudo {
   bltz, // blt zero, rs1, offset
   bgtz, // blt zero, rs1, offset
   bgt, // blt rs1, zero, offset
-  ret,
+  call, // call offset -> auipc ra, %hi(offset) + jalr %lo(offset)(ra) // call rt, offset -> auipc rt, %hi(offset) + jalr %lo(offset)(rt)
+  ret, // jalr zero, ra, 0
 }
 
 export enum rv_directives {

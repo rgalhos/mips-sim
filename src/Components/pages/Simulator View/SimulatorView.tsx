@@ -39,6 +39,7 @@ import Screen from './Editor Tab/Screen';
 import HardwareView from './HardwareView';
 import HexView from './HexView';
 import MemoryTerminal from './MemoryTerminal';
+import { stringifyTokenizerError } from '../../../hardware/analyzer/tokenizer';
 
 function HiPlayIcon() {
   return <Icon as={HiPlay} style={{ transform: 'scale(1.4)' }} />;
@@ -112,7 +113,6 @@ export default function SimulatorView() {
     const ws = simulator.workerService;
     const onCpuDump = (response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
       setCpuHalted(response.data.halted);
-
     };
     ws.on(EWorkerCommand.CPU_DUMP, onCpuDump);
     ws.requestCpuDump();
@@ -156,6 +156,14 @@ export default function SimulatorView() {
 
       setProgram(assembled);
 
+      toast({
+        title: 'Code assembled',
+        description: 'Your code has been assembled',
+        status: 'success',
+        duration: 4000,
+        isClosable: true,
+      });
+
       return true;
     } catch (e) {
       share.program = [];
@@ -163,31 +171,13 @@ export default function SimulatorView() {
 
       toast({
         title: 'Assemble failed',
-        description: 'Your code has not been assembled, please check the terminal for errors',
+        description: stringifyTokenizerError(e as Error),
         status: 'error',
         duration: 4000,
         isClosable: true,
       });
 
       return false;
-    } finally {
-      if (log.getErrors().length === 0 && log.appErrors.length === 0) {
-        toast({
-          title: 'Code assembled',
-          description: 'Your code has been assembled',
-          status: 'success',
-          duration: 4000,
-          isClosable: true,
-        });
-      } else {
-        toast({
-          title: 'Assemble failed',
-          description: 'Your code has not been assembled, please check the terminal for errors',
-          status: 'error',
-          duration: 4000,
-          isClosable: true,
-        });
-      }
     }
   }
 
