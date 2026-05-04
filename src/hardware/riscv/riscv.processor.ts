@@ -526,8 +526,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         const syscall = Number(this.registerRead(rv_reg.a7));
         let ret = rv_worker_commands.NONE;
 
-        if (syscall === rv_syscalls.syscall_clear_screen) {
-          this.memory.fill(0, Number(this.FRAMEBUFFER_START), Number(this.FRAMEBUFFER_END));
+        if (syscall === rv_syscalls.syscall_fill_screen) {
+          const a0 = Number(this.registerRead(rv_reg.a0));
+          this.memory.fill(a0, Number(this.FRAMEBUFFER_START), Number(this.FRAMEBUFFER_END));
 
           ret = rv_worker_commands.SYNC_LISTENERS;
         } else if (syscall === rv_syscalls.syscall_update_screen) {

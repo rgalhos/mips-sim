@@ -54,7 +54,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     'SYSCALL_PRINT_STRING',
     'SYSCALL_PRINT_CHAR',
     'SYSCALL_UPDATE_SCREEN',
-    'SYSCALL_CLEAR_SCREEN',
+    'SYSCALL_FILL_SCREEN',
     'OPTION_EXPLICIT_SCREEN_UPDATE',
   ];
 
@@ -174,11 +174,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     throw throwUnexpectedToken(tokens);
   }
 
-  private handlePseudoInstruction(
-    tokens: IToken[],
-    constants: Record<string, IToken>,
-    pc: bigint,
-  ): RVAssembledLine[] {
+  private handlePseudoInstruction(tokens: IToken[], constants: Record<string, IToken>, pc: bigint): RVAssembledLine[] {
     const invalid: IDecodedRVInstruction = {
       bytecode: 0n,
       codec: rv_codec.illegal,
@@ -209,6 +205,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         return this.assembleLine(tokenize(`addi x${rd}, x${rs1}, 0`, lineNo), {}, 0n, true);
       }
       case 'la': {
+        console.log('la', tokens);
         const rd = this.ensureRegisterToken(tok1, constants);
         return [
           ...this.assembleLine(tokenize(`auipc x${rd}, %hi(${tok2.value})`, lineNo), constants, pc, true),
@@ -371,7 +368,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       SYSCALL_PRINT_STRING: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_string, lineNumber: 0 },
       SYSCALL_PRINT_CHAR: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_char, lineNumber: 0 },
       SYSCALL_UPDATE_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_update_screen, lineNumber: 0 },
-      SYSCALL_CLEAR_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_clear_screen, lineNumber: 0 },
+      SYSCALL_FILL_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_fill_screen, lineNumber: 0 },
       OPTION_EXPLICIT_SCREEN_UPDATE: { type: ETokenType.NUMBER, value: 0xf001, lineNumber: 0 },
     };
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];

@@ -171,7 +171,7 @@ export const enum rv_syscalls {
   syscall_print_string = 11,
   syscall_print_char = 12,
   syscall_update_screen = 20,
-  syscall_clear_screen = 21,
+  syscall_fill_screen = 21,
 }
 
 export const enum rv_worker_commands {

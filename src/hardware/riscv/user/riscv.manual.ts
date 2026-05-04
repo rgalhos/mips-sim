@@ -119,14 +119,14 @@ export const rvManual: IUserManual = {
       description:
         'First byte of the linear framebuffer (**0x8000**). Contiguous through **FRAMEBUFFER_END**.\n\n'
         + 'Each byte represents a pixel with a color in the **RGB332** format (3 bits for red, 3 bits for green, 2 bits for blue).\n\n'
-        + '**SYSCALL_CLEAR_SCREEN** zero-fills this range.',
+        + '**SYSCALL_FILL_SCREEN** fills this range.',
     },
     {
       name: 'FRAMEBUFFER_END',
       description:
         'Last address of the framebuffer region (**0xA70F**).\n\n'
         + 'Each byte represents a pixel with a color in the **RGB332** format (3 bits for red, 3 bits for green, 2 bits for blue).\n\n'
-        + '**SYSCALL_CLEAR_SCREEN** zero-fills this range.',
+        + '**SYSCALL_FILL_SCREEN** fills this range.',
     },
     {
       name: 'INPUT_BUFFER_ADDR',
@@ -162,10 +162,10 @@ export const rvManual: IUserManual = {
         + 'Only effective when used along with `.option OPTION_EXPLICIT_SCREEN_UPDATE`',
     },
     {
-      name: 'SYSCALL_CLEAR_SCREEN',
+      name: 'SYSCALL_FILL_SCREEN',
       description:
         '**ecall** service number in **a7** (**21**).\n'
-        + 'Clears the framebuffer by filling it with zeroes',
+        + 'Fills the framebuffer with the value in **a0**',
     },
     {
       name: 'OPTION_EXPLICIT_SCREEN_UPDATE',
