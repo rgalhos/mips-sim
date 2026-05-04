@@ -26,6 +26,8 @@ import { rvManual } from './user/riscv.manual';
 
 const RV_RELOC_OPS = new Set(['hi', 'lo', 'pcrel_hi', 'pcrel_lo']);
 
+type RVAssembledLine = { decoded: IDecodedRVInstruction; tokens: IToken[] };
+
 export class RVSimulator extends ISimulator<RVProcessor> {
   static name = 'RISC-V (RV32I)';
 
@@ -176,7 +178,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     tokens: IToken[],
     constants: Record<string, IToken>,
     pc: bigint,
-  ): IDecodedRVInstruction[] {
+  ): RVAssembledLine[] {
     const invalid: IDecodedRVInstruction = {
       bytecode: 0n,
       codec: rv_codec.illegal,
@@ -190,7 +192,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     };
 
     const tkFirst = tokens[0];
-    if (!tkFirst) return [invalid];
+    if (!tkFirst) return [{ decoded: invalid, tokens }];
 
     const tok1 = tokens[1];
     const tok2 = tokens[2];
@@ -252,11 +254,11 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
       // BLA BLA BLA @todo resto das instruções
       case 'call': {
-        let rt = rv_reg[rv_reg.ra];
+        let rt = rv_reg.ra;
         let offset: string;
 
         if (tok2) {
-          rt = tok1.value as keyof rv_reg;
+          rt = this.ensureRegisterToken(tok1, constants);
           offset = tok2.value as string;
         } else if (tok1) {
           offset = tok1.value as string;
@@ -264,11 +266,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           throw throwUnexpectedToken(tokens);
         }
 
-        console.log(tokens);
-
         return [
-          ...this.assembleLine(tokenize(`auipc ${rt}, %pcrel_hi(${offset})`, lineNo), constants, pc, true),
-          // ...this.assembleLine(tokenize(`jalr ${rt}, %pcrel_lo(${offset})(${rt})`, lineNo), constants, pc, lineNumber,true),
+          ...this.assembleLine(tokenize(`auipc x${rt}, %pcrel_hi(${offset})`, lineNo), constants, pc, true),
+          ...this.assembleLine(tokenize(`jalr x${rt}, %pcrel_lo(${offset})(x${rt})`, lineNo), constants, pc, true),
         ];
       }
       case 'ret': {
@@ -276,7 +276,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
     }
 
-    return [invalid];
+    return [{ decoded: invalid, tokens }];
   }
 
   public assembleLine(
@@ -284,7 +284,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     constants: Record<string, IToken>,
     pc: bigint,
     handledPseudo = false,
-  ): IDecodedRVInstruction[] {
+  ): RVAssembledLine[] {
     const tkFirst = tokens[0];
     if (!tkFirst || tkFirst.type !== ETokenType.IDENTIFIER) {
       throw throwUnexpectedToken(tokens);
@@ -309,7 +309,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         return this.handlePseudoInstruction(tokens, constants, pc);
       }
 
-      return [dec];
+      return [{ decoded: dec, tokens }];
     }
 
     dec._op = rv_opcode[op];
@@ -348,7 +348,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
     dec.bytecode = this.processor.toBytecode(dec);
 
-    return [dec];
+    return [{ decoded: dec, tokens }];
   }
 
   /**
@@ -499,7 +499,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
         const decodedInstructions = this.assembleLine(tokens, constants, currentAddr);
 
-        for (const decoded of decodedInstructions) {
+        for (const { decoded, tokens: instTokens } of decodedInstructions) {
           if (decoded._op === rv_opcode.illegal) {
             throw throwUnknownKeyword(tokens);
           }
@@ -507,7 +507,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           assembledInstructions.push({
             code: line,
             lineNumber: idx,
-            tokens,
+            tokens: instTokens,
             decoded,
             address: currentAddr,
             scope: currentLabel,
@@ -579,7 +579,6 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
     // write instructions to memory
     for (const inst of assembledInstructions) {
-      console.log('writing at:', inst.address, 'val:', inst.decoded);
       this.processor.memoryWrite(inst.address, inst.decoded.bytecode, 32);
     }
 

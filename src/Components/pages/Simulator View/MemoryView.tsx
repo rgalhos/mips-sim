@@ -1,5 +1,5 @@
 import { Box, Flex, Text } from '@chakra-ui/react';
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { EWorkerCommand, IWorkerCPUDump, WorkerMessageResponse } from '../../../hardware/common/worker-service';
 import { useSimulator } from '../../../hooks/simulator.hook';
 
@@ -27,55 +27,102 @@ const MEM_VISIBLE_ROWS = 32;
 const MEM_OVERSCAN_ROWS = 8;
 const MEM_SCROLL_THROTTLE_MS = 100;
 
-const RegistersBlock = ({ registerValues }: { registerValues: Record<string, bigint> }) => {
+function mergeCpuDump(prev: IWorkerCPUDump | null, incoming: IWorkerCPUDump): IWorkerCPUDump {
+  let memory: Uint8Array;
+  if (prev && incoming.memory.length === 0) {
+    memory = prev.memory;
+  } else {
+    memory = incoming.memory;
+  }
+
+  for (const [addr, val] of Object.entries(incoming.memoryDiff)) {
+    memory[Number(addr)] = val;
+  }
+
+  return {
+    cpu: incoming.cpu,
+    cycle: incoming.cycle,
+    halted: incoming.halted,
+    lastExecutedInstruction: incoming.lastExecutedInstruction,
+    memory,
+    memoryDiff: {},
+  };
+}
+
+function registerMapsEqual(a: Record<string, bigint>, b: Record<string, bigint>): boolean {
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  for (const k of keys) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+}
+
+const RegistersBlock = memo(function RegistersBlock({ registerValues }: { registerValues: Record<string, bigint> }) {
   return (
     <Box h="100%" display="flex" flexDirection="column" minH={0}>
       <Text color={accent.regName} fontWeight="bold" fontSize="sm" mb={2}>
         Registers
       </Text>
       <Box flex="1" minH={0} overflowY="auto" pr={1} sx={monoStyles}>
-        <Text as="div" fontSize="xs" lineHeight="1.65" whiteSpace="pre" color="gray.300">
+        <div style={{ fontSize: '12px', lineHeight: 1.65, whiteSpace: 'pre', color: 'var(--chakra-colors-gray-300)' }}>
           {Object.entries(registerValues).map(([reg, val]) => (
             <Fragment key={reg}>
               {reg.padEnd(5, ' ')} 0x{val.toString(16).toUpperCase().padStart(8, '0')} ({val.toString(10)}) {'\n'}
             </Fragment>
           ))}
-        </Text>
+        </div>
       </Box>
     </Box>
   );
-};
+}, (prev, next) => registerMapsEqual(prev.registerValues, next.registerValues));
 
-const HexRow = ({ row }: { row: number[] }) => {
+function HexRow({ memory, offset }: { memory: Uint8Array; offset: number }) {
+  const cells: ReactElement[] = [];
+  for (let i = 0; i < MEM_ROW_BYTES; i++) {
+    const r = memory[offset + i] ?? 0;
+    const b = r.toString(16).toUpperCase().padStart(2, '0');
+    cells.push(
+      <span key={`h${i}`} className={`nibble-${b[0]} nibble2-${b[1]}`}>
+        {b}{' '}
+      </span>,
+    );
+  }
+  const ascii: ReactElement[] = [];
+  for (let i = 0; i < MEM_ROW_BYTES; i++) {
+    const r = memory[offset + i] ?? 0;
+    const b = r.toString(16).toUpperCase().padStart(2, '0');
+    const c = r > 31 && r < 127 ? String.fromCharCode(r) : '.';
+    ascii.push(
+      <span key={`a${i}`} className={`nibble-${b[0]} nibble2-${b[1]}`}>
+        {c}
+      </span>,
+    );
+  }
   return (
     <span>
-      {row.map((r, i) => {
-        const b = r.toString(16).toUpperCase().padStart(2, '0');
-        return (
-          <span key={'hexrow' + i + b} className={`nibble-${b[0]} nibble2-${b[1]}`}>
-            {b}{' '}
-          </span>
-        );
-      })}
-
+      {cells}
       {'        '}
-
-      {row.map((r, i) => {
-        const b = r.toString(16).toUpperCase().padStart(2, '0');
-        const c = r > 31 && r < 127 ? String.fromCharCode(r) : '.';
-
-        return (
-          <span key={'strhexrow' + i + b} className={`nibble-${b[0]} nibble2-${b[1]}`}>
-            {c}
-          </span>
-        );
-      })}
+      {ascii}
     </span>
   );
-};
+}
 
-function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: number }) {
-  const memory = dump.memory as Uint8Array;
+const memoryHexBlockRowSx = {
+  ...monoStyles,
+  '.mem-hex-row': {
+    fontSize: 'md',
+    fontWeight: 'bold',
+    lineHeight: `${MEM_ROW_HEIGHT_PX}px`,
+    minHeight: `${MEM_ROW_HEIGHT_PX}px`,
+    whiteSpace: 'pre',
+    color: 'gray.300',
+    margin: 0,
+  },
+} as const;
+
+function MemoryHexBlock({ dump, start, end }: { dump: { memory: Uint8Array; cycle: bigint }; start: number; end: number }) {
+  const memory = dump.memory;
   const totalRows = Math.ceil((end - start) / MEM_ROW_BYTES);
   const viewportPx = MEM_VISIBLE_ROWS * MEM_ROW_HEIGHT_PX;
 
@@ -89,15 +136,6 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
   const lastVisible = Math.min(totalRows, Math.ceil((scrollTop + viewportPx) / MEM_ROW_HEIGHT_PX));
   const rangeStart = Math.max(0, firstVisible - MEM_OVERSCAN_ROWS);
   const rangeEnd = Math.min(totalRows, lastVisible + MEM_OVERSCAN_ROWS);
-
-  const visibleSlices = useMemo(() => {
-    const slices: number[][] = [];
-    for (let i = rangeStart; i < rangeEnd; i++) {
-      const off = start + i * MEM_ROW_BYTES;
-      slices.push(Array.from(memory.slice(off, off + MEM_ROW_BYTES)));
-    }
-    return slices;
-  }, [memory, start, rangeStart, rangeEnd, dump.cycle]);
 
   const padTop = rangeStart * MEM_ROW_HEIGHT_PX;
   const padBottom = Math.max(0, totalRows - rangeEnd) * MEM_ROW_HEIGHT_PX;
@@ -141,8 +179,21 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
     [commitScrollTop],
   );
 
+  const rows: ReactElement[] = [];
+  for (let i = rangeStart; i < rangeEnd; i++) {
+    const rowAddr = start + i * MEM_ROW_BYTES;
+    const offset = rowAddr;
+    rows.push(
+      <div key={rowAddr} className="mem-hex-row">
+        {rowAddr.toString(16).toUpperCase().padStart(8, '0')}
+        {'  '}
+        <HexRow memory={memory} offset={offset} />
+      </div>,
+    );
+  }
+
   return (
-    <Box w="100%" h="100%" display="flex" flexDirection="column" minH={0} sx={monoStyles}>
+    <Box w="100%" h="100%" display="flex" flexDirection="column" minH={0} sx={memoryHexBlockRowSx}>
       <Text color={accent.regName} fontWeight="bold" fontSize="sm" mb={1}>
         Memory
       </Text>
@@ -159,64 +210,39 @@ function MemoryHexBlock({ dump, start, end }: { dump: any; start: number; end: n
         onScroll={onScroll}
       >
         <Box pt={`${padTop}px`} pb={`${padBottom}px`}>
-          {visibleSlices.map((row, j) => {
-            const i = rangeStart + j;
-            return (
-              <Text
-                as="div"
-                key={start + i * MEM_ROW_BYTES}
-                fontSize="md"
-                fontWeight="bold"
-                lineHeight={`${MEM_ROW_HEIGHT_PX}px`}
-                minH={`${MEM_ROW_HEIGHT_PX}px`}
-                whiteSpace="pre"
-                color="gray.300"
-                m={0}
-              >
-                {(start + i * MEM_ROW_BYTES).toString(16).toUpperCase().padStart(8, '0')}
-                {'  '}
-                <HexRow row={row} />
-              </Text>
-            );
-          })}
+          {rows}
         </Box>
       </Box>
     </Box>
   );
 }
 
-function MemoryView() {
+function MemoryView({ visible = true }: { visible?: boolean }) {
   const { simulator } = useSimulator();
   const [dump, setDump] = useState<IWorkerCPUDump | null>(null);
   const [loading, setLoading] = useState(true);
+  const mergedDumpRef = useRef<IWorkerCPUDump | null>(null);
 
-  const onDump = useCallback((response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
-    const newDump = response.data;
+  const onDump = useCallback(
+    (response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
+      const newDump = response.data;
+      const merged = mergeCpuDump(mergedDumpRef.current, newDump);
+      mergedDumpRef.current = merged;
 
-    setDump((oldDump) => {
-      let memory;
-      if (oldDump && newDump.memory.length === 0) {
-        memory = oldDump!.memory;
-      } else {
-        memory = newDump.memory;
+      setLoading(false);
+      if (visible) {
+        setDump(merged);
       }
+    },
+    [visible],
+  );
 
-      for (const [addr, val] of Object.entries(newDump.memoryDiff)) {
-        memory[Number(addr)] = val;
-      }
-
-      return {
-        cpu: newDump.cpu,
-        cycle: newDump.cycle,
-        halted: newDump.halted,
-        lastExecutedInstruction: newDump.lastExecutedInstruction,
-        memory: memory,
-        memoryDiff: {},
-      };
-    });
-
-    setLoading(false);
-  }, []);
+  useEffect(() => {
+    if (!visible) return;
+    if (mergedDumpRef.current) {
+      setDump(mergedDumpRef.current);
+    }
+  }, [visible]);
 
   useEffect(() => {
     const ws = simulator.workerService;

@@ -383,10 +383,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   }
 
   public execute(d: IDecodedRVInstruction): rv_worker_commands | void {
-    console.log('WIMS: rv.execute: ' + this.stringifyInstruction(d), d);
+    // console.log('WIMS: rv.execute: ' + this.stringifyInstruction(d), d);
 
     this.lastExecutedInstruction = d;
-
     this.cycle++;
 
     const pc = this.cpu.pc;
@@ -536,7 +535,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         } else if (syscall === rv_syscalls.syscall_print_string) {
           const a0 = Number(this.registerRead(rv_reg.a0));
           // meio paia mas é oq tem pra janta
-          const memory = this.memory.subarray(a0, 255);
+          const memory = this.memory.subarray(a0, a0 + 255);
+
           let nulIdx = memory.findIndex((v) => v === 0);
           nulIdx = nulIdx === -1 ? 255 : nulIdx;
 
@@ -562,8 +562,6 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public step() {
     const inst = this.fetch();
     const dec = this.decode(inst);
-
-    console.log('cpu.step: stepped', { halted: this.halted, inst, dec, pc: this.cpu.pc });
 
     if (dec.codec === rv_codec.illegal) {
       console.log('cpu.step: stepped into illegal instruction, halting', {
@@ -658,10 +656,6 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     for (const v of program) {
       // @todo aceitar bytes
       this.memoryWrite(v.address, v.decoded.bytecode, 32);
-    }
-
-    for (const v of program) {
-      console.log('0x' + this.memoryRead(v.address, 32).toString(16).padStart(8, '0'));
     }
   }
 }

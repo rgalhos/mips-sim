@@ -24,8 +24,6 @@ export default function Screen({ visible = false }: { visible?: boolean }) {
   }
 
   const redraw = useCallback(() => {
-    console.log('redraw', visible);
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 

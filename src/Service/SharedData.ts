@@ -1,4 +1,5 @@
 import { IAssembledInstruction } from "../hardware/common/simulator";
+import { rvExamples } from "../hardware/riscv/user/riscv.examples";
 import { addr, INPUT_BUFFER_ADDR } from "../Hardware/TemplatePorcessor";
 import Logger from "./Logger";
 
@@ -72,7 +73,7 @@ export default class SharedData {
   public ibuffer : Array<number> = [0b0];
 
   //default editor code
-  public defaultCode : string = `addi $t0, $zero, 0 #f1\naddi $t1, $zero, 1 #f2\naddi $a0, $zero, 14 #n - 1\n\nfibonacci:\n\taddi $a0, $a0, -1\n\tadd $t2, $t0, $t1 #soma\n\tadd $t0, $zero, $t1 #f1 = f2\n\tadd $t1, $zero, $t2 #f2 = soma\n\tbeq $a0, $zero, main\n\tbne $a0, $zero, fibonacci\n\nmain:\n\taddi $v0, $t1, 0\n\tcall 1`;
+  public defaultCode : string = rvExamples[0].code;
 
   //current displayed page
   public changePage : Function = () => {}

@@ -28,7 +28,7 @@ addi val, zero, 1 # val = 1
 ecall # print
 
 addi t1, zero, 0 # t1 = 0
-addi t2, zero, 1 # t2 = 0
+addi t2, zero, 1 # t2 = 1
 
 fib:
     add val, t1, t2 # val = t1 + t2

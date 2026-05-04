@@ -72,6 +72,7 @@ export default function SimulatorView() {
   const [configModalOpen, setConfigModalOpen] = useState<boolean>(false);
   const [loadProgramModalOpen, setLoadProgramModalOpen] = useState<boolean>(false);
   const [screenModalOpen, setScreenModalOpen] = useState<boolean>(false);
+  const [mainTabIndex, setMainTabIndex] = useState(0);
 
   const [cpuHalted, setCpuHalted] = useState(true);
 
@@ -202,7 +203,7 @@ export default function SimulatorView() {
   }
 
   return (
-    <Tabs variant="soft-rounded" style={{ zIndex: 50 }}>
+    <Tabs index={mainTabIndex} onChange={setMainTabIndex} variant="soft-rounded" style={{ zIndex: 50 }}>
       <TabList style={{ zIndex: 50 }}>
         <Tab style={{ zIndex: 50 }}>Editor</Tab>
         <Tab style={{ zIndex: 50 }}>Hex View</Tab>
@@ -513,7 +514,7 @@ export default function SimulatorView() {
         </TabPanel> */}
 
         <TabPanel>
-          <MemoryView />
+          <MemoryView visible={mainTabIndex === 2} />
         </TabPanel>
       </TabPanels>
 
