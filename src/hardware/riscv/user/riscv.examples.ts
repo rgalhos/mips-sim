@@ -53,9 +53,9 @@ _rvExamples.push({
 # 
 # magick ic-logo.png -resize 100x100! -depth 8 rgb:output.bin
 # 
-# xxd -p -c3 output.bin | awk '{r = strtonum("0x" substr($0,1,2)); g = strtonum("0x" substr($0,3,2)); b = strtonum("0x" substr($0,5,2)); r3 = int(r / 32); g3 = int(g / 32); b2 = int(b / 64); byte = r3 * 32 + g3 * 4 + b2; printf ", %02x", byte }' | xxd -r -p > rgb332.bin2
+# xxd -p -c3 output.bin | awk '{r = strtonum("0x" substr($0,1,2)); g = strtonum("0x" substr($0,3,2)); b = strtonum("0x" substr($0,5,2)); r3 = int(r / 32); g3 = int(g / 32); b2 = int(b / 64); byte = r3 * 32 + g3 * 4 + b2; printf ", %02x", byte }' | xxd -r -p > rgb332.bin
 #
-# node -e 'input = fs.readFileSync("rgb332.bin"); lines = []; for (let i = 0; i < input.length; i += 100) { chunk = input.slice(i, i + 100); lines.push('.byte ' + Array.from(chunk, b => \`0x\${b.toString(16).padStart(2, "0")}\`).join(", ")); } fs.writeFileSync("output.txt", lines.join("\\n"));'
+# node -e "input = fs.readFileSync('rgb332.bin'); lines = []; for (let i = 0; i < input.length; i += 100) { chunk = input.slice(i, i + 100); lines.push('.byte ' + Array.from(chunk, b => \`0x\${b.toString(16).padStart(2, '0')}\`).join(', ')); } fs.writeFileSync('output.txt', lines.join('\n'));"
 #
 
 .org FB_START

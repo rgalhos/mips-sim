@@ -118,10 +118,6 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     const codec = RV_OPCODE_DATA[op].codec;
 
-    if (op === rv_opcode.fence) {
-      return u32(0b0001111n | (reg5(rd) << 7n) | (reg5(rs1) << 15n) | (pack_i_imm12(imm) << 20n));
-    }
-
     switch (codec) {
       case rv_codec.r:
         return u32(encodeRType(op, rd, rs1, rs2));
@@ -185,6 +181,36 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           case 0x7:
             op = rv_opcode.and;
             break;
+        }
+
+        // RV32M
+        if (operand_funct7(bytecode) === 0b0000001) {
+          switch (operand_funct3(bytecode)) {
+            case 0b000:
+              op = rv_opcode.mul;
+              break;
+            case 0b001:
+              op = rv_opcode.mulh;
+              break;
+            case 0b010:
+              op = rv_opcode.mulhsu;
+              break;
+            case 0b011:
+              op = rv_opcode.mulhu;
+              break;
+            case 0b100:
+              op = rv_opcode.div;
+              break;
+            case 0b101:
+              op = rv_opcode.divu;
+              break;
+            case 0b110:
+              op = rv_opcode.rem;
+              break;
+            case 0b111:
+              op = rv_opcode.remu;
+              break;
+          }
         }
         break;
       }
@@ -625,6 +651,32 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       }
       case rv_opcode.ebreak:
         this.setHalted(true);
+        break;
+
+      // RV32M
+      case rv_opcode.mul:
+        this.registerWrite(d.rd, (v1 * v2) & 0xffffffffn);
+        break;
+      case rv_opcode.mulh:
+        break;
+      case rv_opcode.mulhsu:
+        break;
+      case rv_opcode.mulhu:
+        break;
+      case rv_opcode.div:
+        let xd;
+        if (v2 === 0n) {
+          xd = BigInt.asUintN(32, -1n);
+        } else {
+          xd = (v1 / v2) & 0xffffffffn;
+        }
+        this.registerWrite(d.rd, xd);
+        break;
+      case rv_opcode.divu:
+        break;
+      case rv_opcode.rem:
+        break;
+      case rv_opcode.remu:
         break;
     }
   }

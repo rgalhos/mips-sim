@@ -39,7 +39,7 @@ export const rvManual: IUserManual = {
     { name: 'sra', operation: 'rd = rs1 >> rs2[4:0]', description: 'Arithmetic right shift of rs1 by the low 5 bits of rs2 into rd.' },
     { name: 'or', operation: 'rd = rs1 | rs2', description: 'Bitwise OR of rs1 and rs2 into rd.' },
     { name: 'and', operation: 'rd = rs1 & rs2', description: 'Bitwise AND of rs1 and rs2 into rd.' },
-    { name: 'fence', operation: 'fence pred, succ', description: 'Orders memory accesses; predecessor and successor sets control visible ordering among loads and stores.' },
+    // { name: 'fence', operation: 'fence pred, succ', description: 'Orders memory accesses; predecessor and successor sets control visible ordering among loads and stores.' },
     { name: 'ecall', operation: 'syscall / env call', description: 'Raises an environment-call exception to invoke the execution environment.' },
     { name: 'ebreak', operation: 'breakpoint', description: 'Raises a breakpoint exception for debuggers.' },
 
