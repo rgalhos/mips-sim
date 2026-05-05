@@ -8,12 +8,13 @@ const SCREEN_DIV_SIZE = 500;
 export default function Screen({ visible = false }: { visible?: boolean }) {
   const { simulator } = useSimulator();
 
-  const FB_START = Number(simulator.processor.FRAMEBUFFER_START);
-  const FB_END = Number(simulator.processor.FRAMEBUFFER_END);
+  const FB_START = Number(simulator.processor.FB_START);
+  const FB_END = Number(simulator.processor.FB_END);
   const FB_BYTE_LEN = Math.max(0, FB_END - FB_START + 1);
   const SCREEN_SIZE = Math.floor(Math.sqrt(FB_BYTE_LEN));
   const CANVAS_PIXELS = SCREEN_SIZE * SCREEN_SIZE;
 
+  const screenRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const imageDataRef = useRef<ImageData | null>(null);
@@ -114,6 +115,26 @@ export default function Screen({ visible = false }: { visible?: boolean }) {
     };
   }, [simulator.workerService, onDump]);
 
+  const handleKeyPress = useCallback(
+    (e: KeyboardEvent) => {
+      if (!visible) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      simulator.handleKeyPress(e);
+    },
+    [simulator, visible],
+  );
+
+  useEffect(() => {
+    const ref = screenRef.current;
+
+    ref?.addEventListener('keydown', handleKeyPress, true);
+
+    return () => ref?.removeEventListener('keydown', handleKeyPress, true);
+  }, [handleKeyPress]);
+
   return (
     <Draggable>
       <div
@@ -122,12 +143,13 @@ export default function Screen({ visible = false }: { visible?: boolean }) {
           backgroundColor: 'grey',
           width: SCREEN_DIV_SIZE,
           height: SCREEN_DIV_SIZE,
-          left: window.screen.width / 2 - 200,
-          top: window.screen.height / 2 - 300,
+          left: window.innerWidth / 2 - SCREEN_DIV_SIZE / 2,
+          top: window.innerHeight / 2 - SCREEN_DIV_SIZE / 2,
           zIndex: 10,
           position: 'absolute',
           boxShadow: '0 2px 10px 20px rgba(0, 0, 0, 0.5)',
         }}
+        onClick={() => screenRef.current?.focus({ preventScroll: true })}
       >
         <canvas
           ref={canvasRef}
@@ -140,6 +162,8 @@ export default function Screen({ visible = false }: { visible?: boolean }) {
             height: SCREEN_DIV_SIZE,
           }}
         />
+
+        <input type="text" style={{ opacity: 0, maxWidth: 0, maxHeight: 0 }} ref={screenRef} />
       </div>
     </Draggable>
   );

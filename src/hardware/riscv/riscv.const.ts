@@ -170,8 +170,10 @@ export const enum rv_syscalls {
   syscall_print_int = 10,
   syscall_print_string = 11,
   syscall_print_char = 12,
+  syscall_printf = 14,
   syscall_update_screen = 20,
   syscall_fill_screen = 21,
+  syscall_random_bytes = 30,
 }
 
 export const enum rv_worker_commands {
@@ -179,6 +181,27 @@ export const enum rv_worker_commands {
   SYNC_LISTENERS = 1 << 0,
   UPDATE_FRAMEBUFFER = 1 << 1,
   PRINT_STRING = 1 << 2,
+}
+
+export enum rv_consts {
+  // address
+  PC_START = 'PC_START',
+  STACK_START = 'STACK_START',
+  STACK_END = 'STACK_END',
+  FB_START = 'FB_START',
+  FB_END = 'FB_END',
+  KBD_STAT = 'KBD_STAT',
+  KBD_DATA = 'KBD_DATA',
+  // syscalls
+  SYSCALL_PRINT_INT = 'SYSCALL_PRINT_INT',
+  SYSCALL_PRINT_STRING = 'SYSCALL_PRINT_STRING',
+  SYSCALL_PRINT_CHAR = 'SYSCALL_PRINT_CHAR',
+  SYSCALL_PRINTF = 'SYSCALL_PRINTF',
+  SYSCALL_UPDATE_SCREEN = 'SYSCALL_UPDATE_SCREEN',
+  SYSCALL_FILL_SCREEN = 'SYSCALL_FILL_SCREEN',
+  SYSCALL_RANDOM_BYTES = 'SYSCALL_RANDOM_BYTES',
+  // misc
+  OPTION_EXPLICIT_SCREEN_UPDATE = 'OPTION_EXPLICIT_SCREEN_UPDATE',
 }
 
 export const RV_CODEC_FORMAT = {

@@ -71,13 +71,13 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
       return;
     }
 
-    console.log('syncWorker', { proc: this.processor });
-
     this.workerService.syncWorker(this.processor);
   }
 
   public handleKeyPress(event: KeyboardEvent) {
-    console.log('simulator: received unhandled key press event', { event });
+    if (this.workerService.workerRunning) {
+      this.workerService.sendKey(event.keyCode || event.which);
+    }
   }
 
   public linkToManual(instruction: string): string {

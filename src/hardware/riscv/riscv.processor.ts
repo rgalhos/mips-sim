@@ -33,18 +33,27 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
   //protected readonly DRAM_BASE_ADDRESS = 0x80000000n;
   public readonly defaultMemorySize = 0xc000;
+
   public readonly PC_START = 0x0000n;
   public readonly PROGRAM_END = 0x2fffn;
+
   public readonly RODATA_START = 0x3000n;
   public readonly RODATA_END = 0x3fffn;
+
   public readonly DATA_START = 0x4000n;
   public readonly DATA_END = 0x4fffn;
+
   public readonly BSS_START = 0x5000n;
   public readonly BSS_END = 0x5fffn;
-  public readonly FRAMEBUFFER_START = 0x8000n;
-  public readonly FRAMEBUFFER_END = 0xa70fn;
+
+  public readonly FB_START = 0x8000n;
+  public readonly FB_END = 0xa70fn;
+
   public readonly STACK_START = 0xc000n;
   public readonly STACK_END = 0xa710n;
+
+  public readonly KBD_STAT = 0x6000n;
+  public readonly KBD_DATA = 0x6004n;
 
   public readonly INSTRUCTION_LENGTH = 4;
 
@@ -528,7 +537,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
         if (syscall === rv_syscalls.syscall_fill_screen) {
           const a0 = Number(this.registerRead(rv_reg.a0));
-          this.memory.fill(a0, Number(this.FRAMEBUFFER_START), Number(this.FRAMEBUFFER_END));
+          this.memory.fill(a0, Number(this.FB_START), Number(this.FB_END));
 
           ret = rv_worker_commands.SYNC_LISTENERS;
         } else if (syscall === rv_syscalls.syscall_update_screen) {
@@ -545,11 +554,71 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           this._workerBuffer = str;
 
           ret = rv_worker_commands.PRINT_STRING;
+        } else if (syscall === rv_syscalls.syscall_printf) {
+          const a0 = Number(this.registerRead(rv_reg.a0));
+          // meio paia mas é oq tem pra janta
+          const memory = this.memory.subarray(a0, a0 + 255);
+
+          let nulIdx = memory.findIndex((v) => v === 0);
+          nulIdx = nulIdx === -1 ? 255 : nulIdx;
+
+          let i = 0;
+          const str = String.fromCharCode(...memory.slice(0, nulIdx)).replace(/%d|%u|%x|%X|%c|%p|%%/g, (match) => {
+            i++;
+            switch (match) {
+              case '%d':
+                return BigInt.asIntN(32, this.registerRead(rv_reg.a0 + i)).toString();
+              case '%u':
+                return this.registerRead(rv_reg.a0 + i).toString();
+              case '%x':
+                return this.registerRead(rv_reg.a0 + i).toString(16);
+              case '%X':
+                return this.registerRead(rv_reg.a0 + i)
+                  .toString(16)
+                  .toUpperCase();
+              case '%c':
+                return String.fromCharCode(Number(this.registerRead(rv_reg.a0 + i)) || 0);
+              case '%p':
+                return (
+                  '0x' +
+                  this.registerRead(rv_reg.a0 + i)
+                    .toString(16)
+                    .toUpperCase()
+                    .padStart(8, '0')
+                );
+              case '%%':
+                return '%';
+            }
+
+            return match;
+          });
+
+          this._workerBuffer = str;
+          ret = rv_worker_commands.PRINT_STRING;
         } else if (syscall === rv_syscalls.syscall_print_int) {
           const a0 = String(this.registerRead(rv_reg.a0));
           this._workerBuffer = a0 + '\n';
 
           ret = rv_worker_commands.PRINT_STRING;
+        } else if (syscall === rv_syscalls.syscall_random_bytes) {
+          const addr = this.registerRead(rv_reg.a0);
+          const bytes = Math.min(4, Number(this.registerRead(rv_reg.a1))) || 4;
+          const rand = BigInt(Math.round(Math.random() * 0xffffffff));
+
+          switch (bytes) {
+            // @ts-expect-error // eslint-disable-next-line no-fallthrough
+            case 4:
+              this.memoryWrite(addr + 3n, (rand >> 24n) & 0xffn, 8);
+            // @ts-expect-error // eslint-disable-next-line no-fallthrough
+            case 3:
+              this.memoryWrite(addr + 2n, (rand >> 16n) & 0xffn, 8);
+            // @ts-expect-error // eslint-disable-next-line no-fallthrough
+            case 2:
+              this.memoryWrite(addr + 1n, (rand >> 8n) & 0xffn, 8);
+            // eslint-disable-next-line no-fallthrough
+            default:
+              this.memoryWrite(addr + 0n, rand & 0xffn, 8);
+          }
         }
 
         return ret;

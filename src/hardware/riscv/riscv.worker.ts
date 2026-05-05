@@ -142,11 +142,12 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     cpu.cpu = data.cpu;
     cpu.memory = data.memory;
 
-    console.log('SYNC INSIDE WORKER', { cpu, data });
-
     postCpuDump(true);
     //@ts-expect-error data: never
     postMessage({ command: EWorkerCommand.CPU_RESET });
+  } else if (command === EWorkerCommand.KEY_EVENT) {
+    cpu.memoryWrite(cpu.KBD_STAT, 1n, 8);
+    cpu.memoryWrite(cpu.KBD_DATA, BigInt(data), 8);
   }
 };
 

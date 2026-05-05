@@ -1,5 +1,5 @@
 import { Icon, Textarea } from '@chakra-ui/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MdDelete } from 'react-icons/md';
 import { EWorkerCommand, WorkerMessageResponse } from '../../../../hardware/common/worker-service';
 import { useSimulator } from '../../../../hooks/simulator.hook';
@@ -7,6 +7,7 @@ import { useSimulator } from '../../../../hooks/simulator.hook';
 export default function ConsoleTerminal() {
   const { simulator } = useSimulator();
   const [output, setOutput] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>();
 
   function handleClear() {
     setOutput('');
@@ -26,6 +27,12 @@ export default function ConsoleTerminal() {
     };
   }, [simulator]);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+    }
+  }, [output]);
+
   return (
     <>
       <Icon
@@ -43,10 +50,11 @@ export default function ConsoleTerminal() {
         border="hidden"
         placeholder="Empty"
         value={output}
-        height="250px"
+        height="280px"
         style={{ position: 'relative', bottom: 50, userSelect: 'text' }}
         id="consoleTxtArea"
         scrollBehavior="smooth"
+        ref={textareaRef}
       ></Textarea>
     </>
   );

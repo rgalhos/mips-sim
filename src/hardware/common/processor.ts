@@ -76,8 +76,8 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   public abstract readonly DATA_END: bigint;
   public abstract readonly BSS_START: bigint;
   public abstract readonly BSS_END: bigint;
-  public abstract readonly FRAMEBUFFER_START: bigint;
-  public abstract readonly FRAMEBUFFER_END: bigint;
+  public abstract readonly FB_START: bigint;
+  public abstract readonly FB_END: bigint;
   public abstract readonly STACK_START: bigint;
   public abstract readonly STACK_END: bigint;
 

@@ -11,6 +11,7 @@ export const enum EWorkerCommand {
   CPU_RESET = 'CPU_RESET',
   SET_FREQUENCY = 'SET_FREQUENCY',
   GET_FREQUENCY = 'GET_FREQUENCY',
+  KEY_EVENT = 'KEY_EVENT',
   LOAD_PROGRAM = 'LOAD_PROGRAM',
   SET_MEMORY_SIZE = 'SET_MEMORY_SIZE',
   MEMORY_RETRIEVE = 'MEMORY_RETRIEVE',
@@ -47,7 +48,7 @@ export type WorkerMessage =
       };
     }
   | {
-      command: EWorkerCommand.SET_FREQUENCY | EWorkerCommand.SET_MEMORY_SIZE;
+      command: EWorkerCommand.SET_FREQUENCY | EWorkerCommand.SET_MEMORY_SIZE | EWorkerCommand.KEY_EVENT;
       data: number;
     }
   | {
@@ -169,8 +170,11 @@ export class WorkerService extends EventEmitter {
     this._postMessage({ command: EWorkerCommand.CPU_DUMP } as WorkerMessage);
   }
 
+  sendKey(key: number) {
+    this._postMessage({ command: EWorkerCommand.KEY_EVENT, data: key } as WorkerMessage);
+  }
+
   syncWorker(data: IProcessor<IDecodedInstruction>) {
-    console.log('SYNC', data);
     this._postMessage({
       command: EWorkerCommand.SYNC_WORKER,
       data: {

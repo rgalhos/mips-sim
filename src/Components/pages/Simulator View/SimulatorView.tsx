@@ -79,19 +79,6 @@ export default function SimulatorView() {
   const toolbarBg = useColorModeValue('gray.50', 'gray.900');
   const toolbarBorder = useColorModeValue('gray.200', 'gray.700');
 
-  function handleKeyPress(e: KeyboardEvent) {
-    simulator.handleKeyPress(e);
-  }
-
-  useEffect(
-    () => {
-      document.addEventListener('keypress', handleKeyPress, true);
-      return () => document.removeEventListener('keypress', handleKeyPress, true);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
   useEffect(() => {
     if (txtProgramtitle.current) txtProgramtitle.current.value = share.programTitle;
   }, [share.programTitle, program, currentInstruction]);
@@ -218,8 +205,7 @@ export default function SimulatorView() {
         bg={toolbarBg}
         borderBottomWidth="1px"
         borderColor={toolbarBorder}
-        py={2}
-        px={2}
+        py={4}
       >
         <Flex gap={2} flexWrap="wrap" align="center">
           <Tooltip label="Assemble">
@@ -283,7 +269,7 @@ export default function SimulatorView() {
               Terminal
             </IconButton>
           </Tooltip>
-          <Tooltip label="Reset">
+          {/* <Tooltip label="Reset">
             <IconButton
               icon={<Icon as={RiRewindFill} />}
               aria-label="Reset"
@@ -305,7 +291,7 @@ export default function SimulatorView() {
             >
               Reset
             </IconButton>
-          </Tooltip>
+          </Tooltip> */}
           <Tooltip label="Screen">
             <IconButton
               icon={<CgScreen />}

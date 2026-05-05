@@ -12,6 +12,7 @@ import { IUserManual } from '../common/manual';
 import { IAssembledInstruction, ISimulator } from '../common/simulator';
 import {
   rv_codec,
+  rv_consts,
   rv_directives,
   rv_opcode,
   RV_OPCODE_DATA,
@@ -43,20 +44,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   public readonly directives = Object.keys(rv_directives).filter((v) => Number.isNaN(+v));
 
-  public readonly consts = [
-    'PC_START',
-    'STACK_START',
-    'STACK_END',
-    'FRAMEBUFFER_START',
-    'FRAMEBUFFER_END',
-    'INPUT_BUFFER_ADDR',
-    'SYSCALL_PRINT_INT',
-    'SYSCALL_PRINT_STRING',
-    'SYSCALL_PRINT_CHAR',
-    'SYSCALL_UPDATE_SCREEN',
-    'SYSCALL_FILL_SCREEN',
-    'OPTION_EXPLICIT_SCREEN_UPDATE',
-  ];
+  public readonly consts = Object.values(rv_consts);
 
   public readonly processor: RVProcessor = new RVProcessor();
 
@@ -205,17 +193,16 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         return this.assembleLine(tokenize(`addi x${rd}, x${rs1}, 0`, lineNo), {}, 0n, true);
       }
       case 'la': {
-        console.log('la', tokens);
         const rd = this.ensureRegisterToken(tok1, constants);
         return [
           ...this.assembleLine(tokenize(`auipc x${rd}, %hi(${tok2.value})`, lineNo), constants, pc, true),
           ...this.assembleLine(tokenize(`addi x${rd}, x${rd}, %lo(${tok2.value})`, lineNo), constants, pc, true),
         ];
       }
-      // case 'j': {
-      //   const imm = this.ensureNumericImmediate(tok2, constants);
-      //   return this.assembleLine(tokenize(`jal ra, ${imm}`, lineNo), {}, 0n, true);
-      // }
+      case 'j': {
+        if (!tok1) throw throwUnexpectedToken(tokens);
+        return this.assembleLine(tokenize(`jal zero, ${tok1.value}`, lineNo), constants, pc, true);
+      }
       // case 'jump': {
       //
       // }
@@ -361,14 +348,17 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       PC_START: { type: ETokenType.NUMBER, value: Number(this.processor.PC_START), lineNumber: 0 },
       STACK_START: { type: ETokenType.NUMBER, value: Number(this.processor.STACK_START), lineNumber: 0 },
       STACK_END: { type: ETokenType.NUMBER, value: Number(this.processor.STACK_END), lineNumber: 0 },
-      FRAMEBUFFER_START: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_START), lineNumber: 0 },
-      FRAMEBUFFER_END: { type: ETokenType.NUMBER, value: Number(this.processor.FRAMEBUFFER_END), lineNumber: 0 },
-      INPUT_BUFFER_ADDR: { type: ETokenType.NUMBER, value: 0xf00f, lineNumber: 0 }, // @todo
+      FB_START: { type: ETokenType.NUMBER, value: Number(this.processor.FB_START), lineNumber: 0 },
+      FB_END: { type: ETokenType.NUMBER, value: Number(this.processor.FB_END), lineNumber: 0 },
+      KBD_STAT: { type: ETokenType.NUMBER, value: Number(this.processor.KBD_STAT), lineNumber: 0 },
+      KBD_DATA: { type: ETokenType.NUMBER, value: Number(this.processor.KBD_DATA), lineNumber: 0 },
       SYSCALL_PRINT_INT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_int, lineNumber: 0 },
       SYSCALL_PRINT_STRING: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_string, lineNumber: 0 },
       SYSCALL_PRINT_CHAR: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_char, lineNumber: 0 },
+      SYSCALL_PRINTF: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_printf, lineNumber: 0 },
       SYSCALL_UPDATE_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_update_screen, lineNumber: 0 },
       SYSCALL_FILL_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_fill_screen, lineNumber: 0 },
+      SYSCALL_RANDOM_BYTES: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_random_bytes, lineNumber: 0 },
       OPTION_EXPLICIT_SCREEN_UPDATE: { type: ETokenType.NUMBER, value: 0xf001, lineNumber: 0 },
     };
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
@@ -480,7 +470,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         } else if (directive === '.option') {
           const val = tokens[1]?.value;
 
-          if (val === 'OPTION_EXPLICIT_SCREEN_UPDATE') {
+          if (val === rv_consts.OPTION_EXPLICIT_SCREEN_UPDATE) {
             this._optExplicitScreenUpdate = true;
           } else {
             throw throwUnexpectedToken(tokens);

@@ -115,23 +115,29 @@ export const rvManual: IUserManual = {
         'End of the stack. Any write to **sp** with **sp >= STACK_END** throws.',
     },
     {
-      name: 'FRAMEBUFFER_START',
+      name: 'FB_START',
       description:
-        'First byte of the linear framebuffer (**0x8000**). Contiguous through **FRAMEBUFFER_END**.\n\n'
+        'First byte of the linear framebuffer (**0x8000**). Contiguous through **FB_END**.\n\n'
         + 'Each byte represents a pixel with a color in the **RGB332** format (3 bits for red, 3 bits for green, 2 bits for blue).\n\n'
         + '**SYSCALL_FILL_SCREEN** fills this range.',
     },
     {
-      name: 'FRAMEBUFFER_END',
+      name: 'FB_END',
       description:
         'Last address of the framebuffer region (**0xA70F**).\n\n'
         + 'Each byte represents a pixel with a color in the **RGB332** format (3 bits for red, 3 bits for green, 2 bits for blue).\n\n'
         + '**SYSCALL_FILL_SCREEN** fills this range.',
     },
     {
-      name: 'INPUT_BUFFER_ADDR',
+      name: 'KBD_STAT',
       description:
-        'Memory-mapped word (**0xF00F**) where the host injects pending keyboard input for the program to read.',
+        'Memory-mapped word (**0x6000**) indicating if there is any pending keyboard input for the program to read.\n\n'
+        + 'Will be set to zero after the program reads the pending keyboard input.',
+    },
+    {
+      name: 'KBD_DATA',
+      description:
+        'Memory-mapped word (**0x6004**) where the host injects pending keyboard input for the program to read.',
     },
     {
       name: 'SYSCALL_PRINT_INT',
@@ -166,6 +172,14 @@ export const rvManual: IUserManual = {
       description:
         '**ecall** service number in **a7** (**21**).\n'
         + 'Fills the framebuffer with the value in **a0**',
+    },
+    {
+      name: 'SYSCALL_RANDOM_BYTES',
+      description:
+        '**ecall** service number in **a7** (**30**).\n\n'
+        + '**a0** — base address in memory where bytes are written.\n\n'
+        + '**a1** — how many bytes to write (1, 2, 3 or 4). Values greater than **4** are treated as **4**; **0** is treated as **4**.\n\n'
+        + 'Writes up to four pseudo-random bytes.',
     },
     {
       name: 'OPTION_EXPLICIT_SCREEN_UPDATE',

@@ -218,7 +218,7 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
   return (
     <Editor
       onChange={props.onEditorChange}
-      height="80vh"
+      height="85vh"
       defaultLanguage="mips"
       theme={colorMode === 'dark' ? 'mipsdark' : 'mipslight'}
       defaultValue={'# MIPS Assembly Sim. by Reinaldo Assis \n# Project supervisor: prof. Bruno Costa\n\n'}
