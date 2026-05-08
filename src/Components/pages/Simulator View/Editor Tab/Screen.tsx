@@ -14,7 +14,7 @@ export default function Screen({ visible = false }: { visible?: boolean }) {
   const SCREEN_SIZE = Math.floor(Math.sqrt(FB_BYTE_LEN));
   const CANVAS_PIXELS = SCREEN_SIZE * SCREEN_SIZE;
 
-  const screenRef = useRef<HTMLDivElement>(null);
+  const screenRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const imageDataRef = useRef<ImageData | null>(null);

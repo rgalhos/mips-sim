@@ -26,7 +26,7 @@ function Example(props: { title: string; code: string; fsize?: number }) {
             readOnly: true,
           }}
         />
-        <Button style={{ marginTop: 10 }} onClick={loadExample}>
+        <Button style={{ marginTop: 10 }} onClick={() => loadExample(props.code)}>
           Load
         </Button>
       </CardBody>
