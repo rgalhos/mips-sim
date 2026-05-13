@@ -7,7 +7,7 @@ import { useSimulator } from '../../../../hooks/simulator.hook';
 export default function ConsoleTerminal() {
   const { simulator } = useSimulator();
   const [output, setOutput] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function handleClear() {
     setOutput('');

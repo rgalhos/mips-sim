@@ -120,6 +120,7 @@ export function encodeRType(_op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint
   let f3 = 0n;
   let f7 = 0n;
   switch (_op) {
+    // RV32I
     case rv_opcode.add:
       f3 = 0n;
       f7 = 0n;
@@ -159,6 +160,39 @@ export function encodeRType(_op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint
     case rv_opcode.and:
       f3 = 7n;
       f7 = 0n;
+      break;
+    // RV32M
+    case rv_opcode.mul:
+      f3 = 0n;
+      f7 = 1n;
+      break;
+    case rv_opcode.mulh:
+      f3 = 1n;
+      f7 = 1n;
+      break;
+    case rv_opcode.mulhsu:
+      f3 = 2n;
+      f7 = 1n;
+      break;
+    case rv_opcode.mulhu:
+      f3 = 3n;
+      f7 = 1n;
+      break;
+    case rv_opcode.div:
+      f3 = 4n;
+      f7 = 1n;
+      break;
+    case rv_opcode.divu:
+      f3 = 5n;
+      f7 = 1n;
+      break;
+    case rv_opcode.rem:
+      f3 = 6n;
+      f7 = 1n;
+      break;
+    case rv_opcode.remu:
+      f3 = 7n;
+      f7 = 1n;
       break;
     default:
       return 0n;

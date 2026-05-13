@@ -30,6 +30,7 @@ const RV_RELOC_OPS = new Set(['hi', 'lo', 'pcrel_hi', 'pcrel_lo']);
 type RVAssembledLine = { decoded: IDecodedRVInstruction; tokens: IToken[] };
 
 export class RVSimulator extends ISimulator<RVProcessor> {
+  // @ts-expect-error Function.name
   static name = 'RISC-V (RV32I)';
 
   public readonly name = RVSimulator.name;
@@ -197,6 +198,17 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         return [
           ...this.assembleLine(tokenize(`auipc x${rd}, %hi(${tok2.value})`, lineNo), constants, pc, true),
           ...this.assembleLine(tokenize(`addi x${rd}, x${rd}, %lo(${tok2.value})`, lineNo), constants, pc, true),
+        ];
+      }
+      case 'li': {
+        const rd = this.ensureRegisterToken(tok1, constants);
+        const imm = this.ensureNumericImmediate(tok2, constants);
+        if (imm >= -2048n && imm <= 2047n) {
+          return this.assembleLine(tokenize(`addi x${rd}, zero, ${imm}`, lineNo), constants, pc, true);
+        }
+        return [
+          ...this.assembleLine(tokenize(`lui x${rd}, %hi(${imm})`, lineNo), constants, pc, true),
+          ...this.assembleLine(tokenize(`addi x${rd}, x${rd}, %lo(${imm})`, lineNo), constants, pc, true),
         ];
       }
       case 'j': {

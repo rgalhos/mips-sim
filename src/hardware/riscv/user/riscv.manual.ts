@@ -2,6 +2,7 @@ import { IUserManual } from '../../common/manual';
 
 export const rvManual: IUserManual = {
   instructions: [
+    // RV32I
     { name: 'lui', operation: 'rd = imm << 12', description: 'Loads the upper 20 bits of rd with imm and clears the low 12 bits.' },
     { name: 'auipc', operation: 'rd = pc + (imm << 12)', description: 'Adds the PC-aligned upper immediate to the program counter and stores the result in rd.' },
     { name: 'jal', operation: 'rd = pc + 4; pc = pc + offset', description: 'Jumps to pc + offset and stores the return address (pc + 4) in rd.' },
@@ -39,10 +40,21 @@ export const rvManual: IUserManual = {
     { name: 'sra', operation: 'rd = rs1 >> rs2[4:0]', description: 'Arithmetic right shift of rs1 by the low 5 bits of rs2 into rd.' },
     { name: 'or', operation: 'rd = rs1 | rs2', description: 'Bitwise OR of rs1 and rs2 into rd.' },
     { name: 'and', operation: 'rd = rs1 & rs2', description: 'Bitwise AND of rs1 and rs2 into rd.' },
-    { name: 'fence', operation: 'fence pred, succ', description: 'Orders memory accesses; predecessor and successor sets control visible ordering among loads and stores.' },
+    // { name: 'fence', operation: 'fence pred, succ', description: 'Orders memory accesses; predecessor and successor sets control visible ordering among loads and stores.' },
     { name: 'ecall', operation: 'syscall / env call', description: 'Raises an environment-call exception to invoke the execution environment.' },
     { name: 'ebreak', operation: 'breakpoint', description: 'Raises a breakpoint exception for debuggers.' },
 
+    // RV32M
+    { name: 'mul', operation: 'rd = low32(s32(rs1) * s32(rs2))', description: 'Low 32 bits of the two\'s-complement product of rs1 and rs2 (signed times signed).' },
+    { name: 'mulh', operation: 'rd = high32(s32(rs1) * s32(rs2))', description: 'High 32 bits of the 64-bit two\'s-complement product of rs1 and rs2 (signed times signed).' },
+    { name: 'mulhsu', operation: 'rd = high32(s32(rs1) * u32(rs2))', description: 'High 32 bits of the 64-bit product: rs1 signed, rs2 unsigned.' },
+    { name: 'mulhu', operation: 'rd = high32(u32(rs1) * u32(rs2))', description: 'High 32 bits of the 64-bit product of rs1 and rs2 as unsigned values.' },
+    { name: 'div', operation: 'rd = s32(rs1) / s32(rs2)', description: 'Signed division of rs1 by rs2, rounding toward zero. If rs2 is 0, rd is all ones; if rs1 is INT_MIN and rs2 is -1, rd is INT_MIN (per RISC-V M extension).' },
+    { name: 'divu', operation: 'rd = u32(rs1) / u32(rs2)', description: 'Unsigned division of rs1 by rs2. If rs2 is 0, rd is all ones (per RISC-V M extension).' },
+    { name: 'rem', operation: 'rd = s32(rs1) % s32(rs2)', description: 'Signed remainder of rs1 divided by rs2 (same sign convention as div). If rs2 is 0, rd is rs1; if rs1 is INT_MIN and rs2 is -1, rd is 0.' },
+    { name: 'remu', operation: 'rd = u32(rs1) % u32(rs2)', description: 'Unsigned remainder of rs1 divided by rs2. If rs2 is 0, rd is rs1 (per RISC-V M extension).' },
+
+    // Pseudo-instructions
     { name: 'nop', operation: '—', description: '**(pseudoinstruction)** No operation; expands to addi with zero effect.' },
     { name: 'la', operation: 'rd = symbol address', description: '**(pseudoinstruction)** Loads the absolute address of a symbol into rd (typically auipc + addi).' },
     { name: 'li', operation: 'rd = immediate', description: '**(pseudoinstruction)** Loads a constant immediate into rd using the shortest instruction sequence.' },

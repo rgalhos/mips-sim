@@ -1,6 +1,14 @@
 import { IProcessor } from '../common/processor';
 import { IAssembledInstruction } from '../common/simulator';
-import { rv_codec, rv_opcode, RV_OPCODE_DATA, rv_reg, rv_syscalls, rv_worker_commands } from './riscv.const';
+import {
+  rv_codec,
+  rv_extension,
+  rv_opcode,
+  RV_OPCODE_DATA,
+  rv_reg,
+  rv_syscalls,
+  rv_worker_commands,
+} from './riscv.const';
 import { IDecodedRVInstruction, IRVCPU } from './riscv.types';
 import {
   encodeBType,
@@ -20,8 +28,6 @@ import {
   operand_rs1,
   operand_rs2,
   operand_simm12,
-  pack_i_imm12,
-  reg5,
   s32,
   u32,
 } from './riscv.utils';
@@ -58,6 +64,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly INSTRUCTION_LENGTH = 4;
 
   public program: IAssembledInstruction[] = [];
+
+  private readonly extensions = rv_extension.RV32I | rv_extension.RV32M;
 
   private readonly initialCpuState: IRVCPU = {
     register: {
@@ -118,9 +126,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     const codec = RV_OPCODE_DATA[op].codec;
 
-    if (op === rv_opcode.fence) {
-      return u32(0b0001111n | (reg5(rd) << 7n) | (reg5(rs1) << 15n) | (pack_i_imm12(imm) << 20n));
-    }
+    // if (op === rv_opcode.fence) {
+    //   return u32(0b0001111n | (reg5(rd) << 7n) | (reg5(rs1) << 15n) | (pack_i_imm12(imm) << 20n));
+    // }
 
     switch (codec) {
       case rv_codec.r:
@@ -146,45 +154,76 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     switch (operand_opcode(bytecode)) {
       case 0b0110011: {
-        switch (operand_funct3(bytecode)) {
-          case 0x0:
-            switch (operand_funct7(bytecode)) {
-              case 0x00:
-                op = rv_opcode.add;
-                break;
-              case 0x20:
-                op = rv_opcode.sub;
-                break;
-            }
-            break;
-          case 0x1:
-            op = rv_opcode.sll;
-            break;
-          case 0x2:
-            op = rv_opcode.slt;
-            break;
-          case 0x3:
-            op = rv_opcode.sltu;
-            break;
-          case 0x4:
-            op = rv_opcode.xor;
-            break;
-          case 0x5:
-            switch (operand_funct7(bytecode)) {
-              case 0x00:
-                op = rv_opcode.srl;
-                break;
-              case 0x20:
-                op = rv_opcode.sra;
-                break;
-            }
-            break;
-          case 0x6:
-            op = rv_opcode.or;
-            break;
-          case 0x7:
-            op = rv_opcode.and;
-            break;
+        // RV32M
+        if (!!(this.extensions & rv_extension.RV32M) && operand_funct7(bytecode) === 0x1) {
+          switch (operand_funct3(bytecode)) {
+            case 0b000:
+              op = rv_opcode.mul;
+              break;
+            case 0b001:
+              op = rv_opcode.mulh;
+              break;
+            case 0b010:
+              op = rv_opcode.mulhsu;
+              break;
+            case 0b011:
+              op = rv_opcode.mulhu;
+              break;
+            case 0b100:
+              op = rv_opcode.div;
+              break;
+            case 0b101:
+              op = rv_opcode.divu;
+              break;
+            case 0b110:
+              op = rv_opcode.rem;
+              break;
+            case 0b111:
+              op = rv_opcode.remu;
+              break;
+          }
+        } else {
+          // else: RV32I
+          switch (operand_funct3(bytecode)) {
+            case 0x0:
+              switch (operand_funct7(bytecode)) {
+                case 0x00:
+                  op = rv_opcode.add;
+                  break;
+                case 0x20:
+                  op = rv_opcode.sub;
+                  break;
+              }
+              break;
+            case 0x1:
+              op = rv_opcode.sll;
+              break;
+            case 0x2:
+              op = rv_opcode.slt;
+              break;
+            case 0x3:
+              op = rv_opcode.sltu;
+              break;
+            case 0x4:
+              op = rv_opcode.xor;
+              break;
+            case 0x5:
+              switch (operand_funct7(bytecode)) {
+                case 0x00:
+                  op = rv_opcode.srl;
+                  break;
+                case 0x20:
+                  op = rv_opcode.sra;
+                  break;
+              }
+              break;
+            case 0x6:
+              op = rv_opcode.or;
+              break;
+            case 0x7:
+              op = rv_opcode.and;
+              break;
+          }
         }
         break;
       }
@@ -402,6 +441,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     const v2 = this.registerRead(d.rs2);
 
     switch (d._op) {
+      // RV32I
       case rv_opcode.lui:
         this.registerWrite(d.rd, u32(d.imm << 12n));
         break;
@@ -626,6 +666,64 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       case rv_opcode.ebreak:
         this.setHalted(true);
         break;
+
+      // RV32M
+      case rv_opcode.mul:
+        this.registerWrite(d.rd, v1 * v2);
+        break;
+      case rv_opcode.mulh:
+        this.registerWrite(d.rd, (BigInt.asIntN(32, v1) * BigInt.asIntN(32, v2)) >> 32n);
+        break;
+      case rv_opcode.mulhsu:
+        this.registerWrite(d.rd, (BigInt.asIntN(32, v1) * v2) >> 32n);
+        break;
+      case rv_opcode.mulhu:
+        this.registerWrite(d.rd, (v1 * v2) >> 32n);
+        break;
+      case rv_opcode.div: {
+        let xd;
+        if (v2 === 0n) {
+          xd = BigInt.asUintN(32, -1n);
+        } else if (v1 === 0x80000000n && v2 === 0xffffffffn) {
+          xd = -2147483648n;
+        } else {
+          xd = (v1 / v2) & 0xffffffffn;
+        }
+        this.registerWrite(d.rd, xd);
+        break;
+      }
+      case rv_opcode.divu: {
+        let xd;
+        if (v2 === 0n) {
+          xd = 0xffffffffn;
+        } else {
+          xd = BigInt(v1 / v2);
+        }
+        this.registerWrite(d.rd, xd);
+        break;
+      }
+      case rv_opcode.rem: {
+        let xd;
+        if (v2 === 0n) {
+          xd = v1;
+        } else if (v1 === 0x80000000n && v2 === 0xffffffffn) {
+          xd = 0n;
+        } else {
+          xd = v1 % v2;
+        }
+        this.registerWrite(d.rd, xd);
+        break;
+      }
+      case rv_opcode.remu: {
+        let xd;
+        if (v2 === 0n) {
+          xd = v1;
+        } else {
+          xd = v1 % v2;
+        }
+        this.registerWrite(d.rd, xd);
+        break;
+      }
     }
   }
 
