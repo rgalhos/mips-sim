@@ -43,11 +43,11 @@ export const stringifyTokenizerError = (e: Error) => {
   if (!e.message.startsWith('ASSEMBLER_')) return e.toString();
 
   const lineNumber = ((e.cause as IToken[]) || []).find((v) => v.lineNumber !== 0)?.lineNumber || 0;
-  const invalid = ((e.cause as IToken[]) || []).find((v) => v.type === ETokenType.INVALID);
   const fullLine = ((e.cause as IToken[]) || []).map((v) => v.value).join(' ');
   let msg = '';
 
   if (e.message === 'ASSEMBLER_UNEXPECTED_TOKEN') {
+    const invalid = ((e.cause as IToken[]) || []).find((v) => v.type === ETokenType.INVALID);
     if (invalid) {
       msg = `Found invalid token (${invalid.value}) at line ${lineNumber}: ${fullLine}`;
     } else {

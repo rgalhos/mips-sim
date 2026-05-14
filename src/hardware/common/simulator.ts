@@ -50,6 +50,11 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
     return (this._memorySize = size);
   }
 
+  public setFrequency(freq: number) {
+    this.workerService.setFrequency(freq);
+    return this.processor.setFrequency(freq);
+  }
+
   get cpuWorker() {
     return this.workerService.worker;
   }

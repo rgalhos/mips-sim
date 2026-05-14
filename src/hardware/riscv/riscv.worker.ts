@@ -4,8 +4,6 @@ import { EWorkerCommand } from '../common/worker-service';
 import { rv_worker_commands } from './riscv.const';
 import { RVProcessor } from './riscv.processor';
 
-const CPU_DUMP_EVERY_N_CYCLES = 100;
-
 const cpu = new RVProcessor();
 
 const postMessage = (message: WorkerMessageResponse) => {
@@ -32,10 +30,10 @@ const postCpuDump = (fullDump = false) => {
   });
 };
 
-const shouldPostDumpAfterStep = () => cpu.halted || (cpu.cycle > 0 && cpu.cycle % CPU_DUMP_EVERY_N_CYCLES === 0);
+const shouldPostDumpAfterStep = () =>
+  cpu.halted || (cpu.cycle > 0 && cpu.cycle % Math.min(100, Math.ceil(cpu.frequency / 10)) === 0);
 
 const cancelRunLoop = () => {
-  console.log('cancel');
   cpu.setHalted(true);
 };
 
@@ -57,6 +55,8 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const startRunLoop = async () => {
   let nextDeadline = performance.now();
+
+  console.log(cpu.frequency);
 
   while (!cpu.halted) {
     const freq = Math.max(1, cpu.frequency);

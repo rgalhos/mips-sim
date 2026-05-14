@@ -1,4 +1,7 @@
 import {
+  Button,
+  Flex,
+  Input,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -8,68 +11,27 @@ import {
   ModalOverlay,
   Stack,
   Text,
-  Button,
-  Flex,
-  Input,
-  Switch,
   useColorMode,
-  useToast,
-} from "@chakra-ui/react";
-import SISMIPS from "../../../../Hardware/SIS Mips/SIS";
-import SharedData from "../../../../Service/SharedData";
-import React from "react";
-import MonoMIPS from "../../../../Hardware/Mono Mips/MonoMIPS";
+} from '@chakra-ui/react';
+import React from 'react';
+import { useSimulator } from '../../../../hooks/simulator.hook';
+import SharedData from '../../../../Service/SharedData';
 
-export default function ConfigModal(props: {
-  isOpen: boolean;
-  close: Function;
-}) {
+export default function ConfigModal(props: { isOpen: boolean; close: Function }) {
+  const { simulator } = useSimulator();
   const share: SharedData = SharedData.instance;
-  const [clockSpeed, setClockSpeed] = React.useState<number>(0);
-  const toast = useToast();
-  
-  // controls whether the simulator should run in debug mode
-  const [ useDebug, setUseDebug ] = React.useState<boolean>(false);
+  const [clockSpeed, setClockSpeed] = React.useState<number>(simulator.processor.frequency);
+  const { colorMode, toggleColorMode } = useColorMode();
 
-  const simModelSelector = React.useRef<HTMLSelectElement>(null);
+  function clockSpeedChange(e: any) {
+    let speed = Number(e.target.value);
+    if (isNaN(speed)) return;
 
-  const [model, setModel] = React.useState<string>("mono");
+    if (speed > 10000) speed = 10000;
+    else if (speed <= 0) speed = 1;
 
-  const { colorMode, toggleColorMode } = useColorMode()
-
-  React.useEffect(() => {
-    setClockSpeed(share.processorFrequency);
-    setUseDebug(share.debugInstructions);
-    setModel(share.currentProcessor?.refname ?? "mono");
-  }, []);
-
-  function handleSelectChange(e: any) {
-    let simModelValue: string = e.target.value;
-    if (simModelValue == "sis") share.currentProcessor = new SISMIPS();
-    else if (simModelValue == "mono") share.currentProcessor = new MonoMIPS();
-
-    setModel(simModelValue);
-
-    console.log("changed model to ", simModelValue);
-  }
-
-  function clockSpeedChange(e: any)
-  {
-    setClockSpeed( e.target.value)
-    share.processorFrequency = e.target.value;
-    if(share.currentProcessor) share.currentProcessor.frequency = e.target.value;
-    console.log(`Share set at ${share.processorFrequency}`)
-
-    if (e.target.value > 100){
-      toast({
-        title: "Warning",
-        description: "The maximum step allowed is 100, any value higher the processor will run without stepping.",
-        status: "warning",
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-
+    setClockSpeed(speed);
+    simulator.setFrequency(speed);
   }
 
   return (
@@ -80,21 +42,28 @@ export default function ConfigModal(props: {
         <ModalCloseButton />
         <ModalBody>
           <Stack direction="column" spacing={2}>
-            <Flex >
-            <Text>Step speed</Text>
-            <Input onChange={clockSpeedChange} value={clockSpeed} style={{width:"80px", marginLeft:10, alignSelf:"center"}} placeholder="10" size="xs"/>
+            <Flex>
+              <Text>Clock speed (Hz)</Text>
+              <Input
+                onChange={clockSpeedChange}
+                value={clockSpeed}
+                style={{ width: '80px', marginLeft: 10, alignSelf: 'center' }}
+                max="10000"
+                min="1"
+                placeholder="10"
+                size="xs"
+              />
             </Flex>
 
-            <Text style={{ marginTop: 30 }}>Debug instructions</Text>
-            <Switch isChecked={share.debugInstructions} onChange={(e) => {
-              setUseDebug(e.target.checked)
-              share.debugInstructions = e.target.checked;
-            }}/>
-
-<Button onClick={() => {toggleColorMode(); share.updateCached("theme-data",colorMode == "dark" ? "light" : "dark"); console.log(`THEM DATA ${share.getCached("theme-data")}`)}}>
-        Toggle {colorMode === 'light' ? 'Dark Mode' : 'Light Mode'} 
-      </Button>
-
+            <Button
+              style={{ marginTop: '24px' }}
+              onClick={() => {
+                toggleColorMode();
+                share.updateCached('theme-data', colorMode == 'dark' ? 'light' : 'dark');
+              }}
+            >
+              Toggle {colorMode === 'light' ? 'Dark Mode' : 'Light Mode'}
+            </Button>
           </Stack>
         </ModalBody>
 
