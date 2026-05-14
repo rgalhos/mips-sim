@@ -26,7 +26,7 @@ export interface IWorkerCPUDump {
   memory: Uint8Array;
   memoryDiff: Record<number, number>;
   cpu: ICPU;
-  cycle: bigint;
+  cycle: number;
   halted: boolean;
   lastExecutedInstruction: any;
 }

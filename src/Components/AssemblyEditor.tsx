@@ -149,8 +149,6 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
 
     const manualMap = Object.fromEntries(manualEntries);
 
-    console.log({ manualMap });
-
     monaco.languages.registerHoverProvider('mips', {
       provideHover: (model, position) => {
         const word = model.getWordAtPosition(position);

@@ -61,11 +61,16 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly KBD_STAT = 0x6000n;
   public readonly KBD_DATA = 0x6004n;
 
-  public readonly INSTRUCTION_LENGTH = 4;
-
   public program: IAssembledInstruction[] = [];
 
+  /**
+   * Architecture config
+   * @todo mainly unused in the codebase. future support for RV64
+   */
   private readonly extensions = rv_extension.RV32I | rv_extension.RV32M;
+  public readonly ILEN = 32;
+  public readonly XLEN: 32 /* | 64 */ = 32;
+  public readonly REG_MASK = 0xffffffffn; // 2**32-1 for RV32, 2**64-1 for RV64
 
   private readonly initialCpuState: IRVCPU = {
     register: {
@@ -414,8 +419,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   }
 
   public decode(inst: bigint) {
-    const intInst = Number(inst);
-    const cached = this.instructionCache[intInst];
+    // @ts-expect-error bigint as index
+    const cached = this.instructionCache[inst];
 
     if (cached) {
       return cached;
@@ -424,7 +429,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     const dec = this.fromBytecode(inst);
 
     if (dec.codec !== rv_codec.illegal) {
-      this.instructionCache[intInst] = dec;
+      // @ts-expect-error bigint as index
+      this.instructionCache[inst] = dec;
     }
 
     return dec;
@@ -809,7 +815,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     }
 
     if (reg !== rv_reg.zero) {
-      return super.registerWrite(reg, value & 0xffffffffn);
+      return super.registerWrite(reg, value & this.REG_MASK);
     }
   }
 
@@ -817,8 +823,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     this.memory = new Uint8Array(); // force gc
     this.memory = new Uint8Array(this.memorySize); // @todo
 
-    this.cycle = 0n;
-    this.cpu.pc = program[0]?.address || 0x0n; //|| this.PC_START;
+    this.cycle = 0;
+    this.cpu.pc = program[0]?.address ?? this.PC_START;
     this.cpu.register[rv_reg.sp] = this.STACK_START;
 
     for (const v of program) {

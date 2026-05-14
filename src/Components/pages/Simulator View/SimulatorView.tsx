@@ -136,7 +136,12 @@ export default function SimulatorView() {
         simulator.createCpuWorker();
       }
 
+      const t0 = performance.now();
       const assembled = simulator.assembleCode(share.code);
+      const t1 = performance.now();
+
+      console.log(`perf: Code assemble took ${t1 - t0}ms`);
+
       simulator.syncWorker();
 
       share.program = assembled;

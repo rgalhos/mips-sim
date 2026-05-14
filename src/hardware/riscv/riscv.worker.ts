@@ -4,9 +4,9 @@ import { EWorkerCommand } from '../common/worker-service';
 import { rv_worker_commands } from './riscv.const';
 import { RVProcessor } from './riscv.processor';
 
-const cpu = new RVProcessor();
+const CPU_DUMP_EVERY_N_CYCLES = 100;
 
-const CPU_DUMP_EVERY_N_CYCLES = 10n;
+const cpu = new RVProcessor();
 
 const postMessage = (message: WorkerMessageResponse) => {
   self.postMessage(message);
@@ -32,15 +32,11 @@ const postCpuDump = (fullDump = false) => {
   });
 };
 
-const shouldPostDumpAfterStep = () => cpu.halted || (cpu.cycle > 0n && cpu.cycle % CPU_DUMP_EVERY_N_CYCLES === 0n);
-
-let runTimer: ReturnType<typeof setTimeout> | null = null;
+const shouldPostDumpAfterStep = () => cpu.halted || (cpu.cycle > 0 && cpu.cycle % CPU_DUMP_EVERY_N_CYCLES === 0);
 
 const cancelRunLoop = () => {
-  if (runTimer !== null) {
-    clearTimeout(runTimer);
-    runTimer = null;
-  }
+  console.log('cancel');
+  cpu.setHalted(true);
 };
 
 const handleCpuStep = () => {
@@ -57,26 +53,32 @@ const handleCpuStep = () => {
   }
 };
 
-const runLoopTick = () => {
-  runTimer = null;
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-  if (cpu.halted) {
-    return;
+const startRunLoop = async () => {
+  let nextDeadline = performance.now();
+
+  while (!cpu.halted) {
+    const freq = Math.max(1, cpu.frequency);
+    const periodMs = Math.max(1, 1000 / freq);
+    const cyclesPerWake = Math.ceil(1 / periodMs);
+    const sliceMs = cyclesPerWake * periodMs;
+
+    for (let i = 0; i < cyclesPerWake && !cpu.halted; i++) {
+      handleCpuStep();
+    }
+
+    if (cpu.halted) {
+      break;
+    }
+
+    nextDeadline += sliceMs;
+    let delay = nextDeadline - performance.now();
+
+    if (delay > 0) {
+      await sleep(delay);
+    }
   }
-
-  handleCpuStep();
-
-  if (cpu.halted) {
-    return;
-  }
-
-  const hz = Math.max(1, cpu.frequency);
-  runTimer = setTimeout(runLoopTick, 1000 / hz);
-};
-
-const startRunLoop = () => {
-  cancelRunLoop();
-  runLoopTick();
 };
 
 self.onmessage = (event: MessageEvent<WorkerMessage>) => {

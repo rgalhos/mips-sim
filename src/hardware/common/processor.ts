@@ -38,7 +38,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
    */
   public defaultMemorySize = 0xc000; // @todo - deixar coisado....
 
-  public cycle = 0n;
+  public cycle = 0;
 
   public lastExecutedInstruction: TDecodedInstruction | null = null;
 
@@ -82,16 +82,12 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   public abstract readonly STACK_END: bigint;
 
   /**
-   * Architecture instruction length
-   */
-  public readonly INSTRUCTION_LENGTH: number = 4;
-
-  /**
    * CPU
    */
   public abstract cpu: ICPU;
 
-  protected instructionCache: Record<number, TDecodedInstruction> = {};
+  // @ts-expect-error ts(1268) - bigint as literal
+  protected instructionCache: { [bytecode: bigint]: TDecodedInstruction } = {};
 
   private _halted = true;
 
@@ -121,7 +117,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
    */
   public resetState() {
     this.memory = new Uint8Array();
-    this.cycle = 0n;
+    this.cycle = 0;
     this.lastExecutedInstruction = null;
 
     this.setHalted(true);
@@ -169,7 +165,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
     this.cpu.register[reg] = value;
   }
 
-  public memoryWrite(address: number | bigint, value: bigint, bits: 8 | 16 | 32 = 8): void {
+  public _memoryWrite(address: number | bigint, value: bigint, bits: 8 | 16 | 32 = 8): void {
     address = Number(address);
     switch (bits) {
       // case 64:
@@ -193,6 +189,26 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
         this.memory[address + 0] = Number(value & 0xffn);
         this._memoryOperationDiff[address + 0] = Number(value & 0xffn);
       }
+    }
+  }
+
+  public memoryWrite(address: bigint, value: bigint, bits: 8 | 16 | 32 = 8): void {
+    const v = Number(value);
+    switch (bits) {
+      // @ts-expect-error // eslint-disable-next-line no-fallthrough
+      case 32:
+        // @ts-expect-error bigint as index
+        this._memoryOperationDiff[address + 3n] = this.memory[address + 3n] = (v >>> 24) & 0xff;
+        // @ts-expect-error bigint as index
+        this._memoryOperationDiff[address + 2n] = this.memory[address + 2n] = (v >>> 16) & 0xff;
+      // @ts-expect-error // eslint-disable-next-line no-fallthrough
+      case 16:
+        // @ts-expect-error bigint as index
+        this._memoryOperationDiff[address + 1n] = this.memory[address + 1n] = (v >>> 8) & 0xff;
+      // eslint-disable-next-line no-fallthrough
+      default:
+        // @ts-expect-error bigint as index
+        this._memoryOperationDiff[address] = this.memory[address] = v & 0xff;
     }
   }
 

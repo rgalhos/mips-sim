@@ -58,24 +58,29 @@ function registerMapsEqual(a: Record<string, bigint>, b: Record<string, bigint>)
   return true;
 }
 
-const RegistersBlock = memo(function RegistersBlock({ registerValues }: { registerValues: Record<string, bigint> }) {
-  return (
-    <Box h="100%" display="flex" flexDirection="column" minH={0}>
-      <Text color={accent.regName} fontWeight="bold" fontSize="sm" mb={2}>
-        Registers
-      </Text>
-      <Box flex="1" minH={0} overflowY="auto" pr={1} sx={monoStyles}>
-        <div style={{ fontSize: '12px', lineHeight: 1.65, whiteSpace: 'pre', color: 'var(--chakra-colors-gray-300)' }}>
-          {Object.entries(registerValues).map(([reg, val]) => (
-            <Fragment key={reg}>
-              {reg.padEnd(5, ' ')} 0x{val.toString(16).toUpperCase().padStart(8, '0')} ({val.toString(10)}) {'\n'}
-            </Fragment>
-          ))}
-        </div>
+const RegistersBlock = memo(
+  function RegistersBlock({ registerValues }: { registerValues: Record<string, bigint> }) {
+    return (
+      <Box h="100%" display="flex" flexDirection="column" minH={0}>
+        <Text color={accent.regName} fontWeight="bold" fontSize="sm" mb={2}>
+          Registers
+        </Text>
+        <Box flex="1" minH={0} overflowY="auto" pr={1} sx={monoStyles}>
+          <div
+            style={{ fontSize: '12px', lineHeight: 1.65, whiteSpace: 'pre', color: 'var(--chakra-colors-gray-300)' }}
+          >
+            {Object.entries(registerValues).map(([reg, val]) => (
+              <Fragment key={reg}>
+                {reg.padEnd(5, ' ')} 0x{val.toString(16).toUpperCase().padStart(8, '0')} ({val.toString(10)}) {'\n'}
+              </Fragment>
+            ))}
+          </div>
+        </Box>
       </Box>
-    </Box>
-  );
-}, (prev, next) => registerMapsEqual(prev.registerValues, next.registerValues));
+    );
+  },
+  (prev, next) => registerMapsEqual(prev.registerValues, next.registerValues),
+);
 
 function HexRow({ memory, offset }: { memory: Uint8Array; offset: number }) {
   const cells: ReactElement[] = [];
@@ -121,7 +126,15 @@ const memoryHexBlockRowSx = {
   },
 } as const;
 
-function MemoryHexBlock({ dump, start, end }: { dump: { memory: Uint8Array; cycle: bigint }; start: number; end: number }) {
+function MemoryHexBlock({
+  dump,
+  start,
+  end,
+}: {
+  dump: { memory: Uint8Array; cycle: number };
+  start: number;
+  end: number;
+}) {
   const memory = dump.memory;
   const totalRows = Math.ceil((end - start) / MEM_ROW_BYTES);
   const viewportPx = MEM_VISIBLE_ROWS * MEM_ROW_HEIGHT_PX;
