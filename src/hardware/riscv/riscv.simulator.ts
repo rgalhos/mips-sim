@@ -352,7 +352,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
    * reinicia a memória, faz o assembler, popula os dados na memória, gera as representações
    * intermediárias e as salva no cache de instruções.
    */
-  public assembleCode(code: 'string'): Array<IAssembledInstruction<IDecodedRVInstruction>> {
+  public assembleCode(code: string) {
     // label->address translation table
     const labels: Record<string, bigint> = {};
     // constant->value translation table
@@ -402,6 +402,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
         if (sLabel[0] === '.') {
           sLabel = currentLabel + sLabel;
+        } else {
+          currentLabel = sLabel;
         }
 
         if (!!labels[sLabel]) {
@@ -542,9 +544,10 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         if (!operand) throw throwUnexpectedToken(tokens);
         if (operand.type === ETokenType.NUMBER) continue;
         if (operand.type !== ETokenType.IDENTIFIER) throw throwUnexpectedToken(tokens);
-        if (this.resolveConstantName(operand.value, constants) !== undefined) continue;
 
-        const labelName = scope + operand.value;
+        const labelName = operand.value[0] === '.' ? scope + operand.value : operand.value;
+        if (this.resolveConstantName(labelName, constants) !== undefined) continue;
+
         const labelAddr = labels[labelName];
         if (typeof labelAddr === 'undefined') {
           throw throwUndeclaredLabel(tokens);
@@ -558,9 +561,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
       if (!immTok || immTok.type !== ETokenType.IDENTIFIER) continue;
 
-      if (this.resolveConstantName(immTok.value, constants) !== undefined) continue;
+      const labelName = immTok.value[0] === '.' ? scope + immTok.value : immTok.value;
+      if (this.resolveConstantName(labelName, constants) !== undefined) continue;
 
-      const labelName = scope + immTok.value;
       const labelAddr = labels[labelName];
       if (typeof labelAddr === 'undefined') {
         throw throwUndeclaredLabel(tokens);
@@ -581,7 +584,10 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       this.processor.memoryWrite(inst.address, inst.decoded.bytecode, 32);
     }
 
-    return assembledInstructions;
+    return {
+      assembledInstructions,
+      labels,
+    };
   }
 
   public linkToManual(instruction: string) {

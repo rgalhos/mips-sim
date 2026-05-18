@@ -56,6 +56,7 @@ export default function SimulatorView() {
   const { simulator } = useSimulator();
   const [code, setCode] = useState<string>('');
   const [program, setProgram] = useState<null | Array<IAssembledInstruction>>(null);
+  const [labels, setLabels] = useState<null | Record<string, bigint>>(null);
   const [currentInstruction] = useState<Instruction>();
 
   const toast = useToast();
@@ -144,9 +145,10 @@ export default function SimulatorView() {
 
       simulator.syncWorker();
 
-      share.program = assembled;
+      share.program = assembled.assembledInstructions;
 
-      setProgram(assembled);
+      setProgram(assembled.assembledInstructions);
+      setLabels(assembled.labels);
 
       toast({
         title: 'Code assembled',
@@ -497,7 +499,7 @@ export default function SimulatorView() {
         </TabPanel>
 
         <TabPanel>
-          <HexView program={program ?? []} />
+          <HexView program={program ?? []} labels={labels ?? {}} />
         </TabPanel>
 
         {/* <TabPanel>

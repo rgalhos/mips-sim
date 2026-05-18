@@ -1,5 +1,5 @@
-import { Box, Button, Flex, Icon, Link, Text } from '@chakra-ui/react';
-import { memo } from 'react';
+import { Box, Button, Flex, Icon, Text } from '@chakra-ui/react';
+import { memo, useMemo } from 'react';
 import { FaBook } from 'react-icons/fa';
 import { IoIosDownload } from 'react-icons/io';
 import { IAssembledInstruction, ISimulator } from '../../../hardware/common/simulator';
@@ -51,7 +51,17 @@ const HexDisplay = memo(({ inst, simulator }: { inst: IAssembledInstruction; sim
   );
 });
 
-function HexView({ program }: { program: Array<IAssembledInstruction> }) {
+const LabelDisplay = memo(({ label, address }: { label: string; address: bigint }) => (
+  <Box backgroundColor="blackAlpha.400" sx={{ gridColumn: '1/-1' }}>
+    <Box py={1} px={2} minH="10">
+      <Text color="blue.500" fontWeight="bold" lineHeight="2.5rem">
+        {`<${label}>`}:
+      </Text>
+    </Box>
+  </Box>
+));
+
+function HexView({ program, labels }: { program: Array<IAssembledInstruction>; labels: Record<string, bigint> }) {
   const { simulator } = useSimulator();
 
   function downloadHex() {
@@ -66,6 +76,20 @@ function HexView({ program }: { program: Array<IAssembledInstruction> }) {
     document.body.appendChild(element); // Required for this to work in FireFox
     element.click();
   }
+
+  const labelsByAddr = useMemo(() => {
+    const kv: Record<string, string[]> = {};
+    for (const [lab, _addr] of Object.entries(labels)) {
+      let addr = _addr.toString();
+
+      if (Array.isArray(kv[addr])) {
+        kv[addr].push(lab);
+      } else {
+        kv[addr] = [lab];
+      }
+    }
+    return kv;
+  }, [labels]);
 
   return (
     <>
@@ -112,9 +136,19 @@ function HexView({ program }: { program: Array<IAssembledInstruction> }) {
           </Text>
         </Box>
 
-        {program.map((inst, idx) => (
-          <HexDisplay key={idx} inst={inst} simulator={simulator} />
-        ))}
+        {program.map((inst, idx) => {
+          const curLabels = labelsByAddr[inst.address.toString()];
+
+          return (
+            <>
+              {curLabels
+                ? curLabels.map((l) => <LabelDisplay key={l + inst.address} address={inst.address} label={l} />)
+                : null}
+
+              <HexDisplay key={idx} inst={inst} simulator={simulator} />
+            </>
+          );
+        })}
       </Box>
     </>
   );

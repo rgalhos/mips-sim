@@ -56,8 +56,6 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const startRunLoop = async () => {
   let nextDeadline = performance.now();
 
-  console.log(cpu.frequency);
-
   while (!cpu.halted) {
     const freq = Math.max(1, cpu.frequency);
     const periodMs = Math.max(1, 1000 / freq);
@@ -66,10 +64,6 @@ const startRunLoop = async () => {
 
     for (let i = 0; i < cyclesPerWake && !cpu.halted; i++) {
       handleCpuStep();
-    }
-
-    if (cpu.halted) {
-      break;
     }
 
     nextDeadline += sliceMs;

@@ -65,7 +65,10 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
 
   protected abstract createCpuWorkerInstance(workerOptions?: WorkerOptions): Worker;
 
-  public abstract assembleCode(code: string): Array<IAssembledInstruction>;
+  public abstract assembleCode(code: string): {
+    assembledInstructions: Array<IAssembledInstruction>;
+    labels: Record<string, bigint>;
+  };
 
   public createCpuWorker(workerOptions?: WorkerOptions) {
     this.workerService.createCpuWorker(() => this.createCpuWorkerInstance(workerOptions));
