@@ -30,8 +30,7 @@ const postCpuDump = (fullDump = false) => {
   });
 };
 
-const shouldPostDumpAfterStep = () =>
-  cpu.halted || (cpu.cycle > 0 && cpu.cycle % Math.min(100, Math.ceil(cpu.frequency / 10)) === 0);
+const shouldPostDumpAfterStep = () => cpu.halted || cpu.cycle % Math.min(111, Math.ceil(cpu.frequency / 11)) === 0;
 
 const cancelRunLoop = () => {
   cpu.setHalted(true);
@@ -54,25 +53,29 @@ const handleCpuStep = () => {
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const startRunLoop = async () => {
+  const t0 = performance.now();
+  const freq = Math.max(1, cpu.frequency);
+  const cyclesPerWake = Math.max(1, Math.ceil(freq / 1000));
+  const sliceMs = (cyclesPerWake * 1000) / freq;
   let nextDeadline = performance.now();
 
   while (!cpu.halted) {
-    const freq = Math.max(1, cpu.frequency);
-    const periodMs = Math.max(1, 1000 / freq);
-    const cyclesPerWake = Math.ceil(1 / periodMs);
-    const sliceMs = cyclesPerWake * periodMs;
-
     for (let i = 0; i < cyclesPerWake && !cpu.halted; i++) {
       handleCpuStep();
     }
-
+  
     nextDeadline += sliceMs;
-    let delay = nextDeadline - performance.now();
+    const delay = nextDeadline - performance.now();
 
     if (delay > 0) {
       await sleep(delay);
     }
   }
+
+  const t1 = performance.now();
+
+  const tDelta = t1 - t0;
+  console.log(`perf: Program execution took ${tDelta}ms and ${cpu.cycle} cycles. (${cpu.cycle / (tDelta / 1000)}Hz)`);
 };
 
 self.onmessage = (event: MessageEvent<WorkerMessage>) => {
@@ -137,6 +140,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
 
     cpu.cpu = data.cpu;
     cpu.memory = data.memory;
+    cpu.setFrequency(data.frequency);
 
     postCpuDump(true);
     //@ts-expect-error data: never

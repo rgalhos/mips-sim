@@ -27,7 +27,7 @@ export default function ConfigModal(props: { isOpen: boolean; close: Function })
     let speed = Number(e.target.value);
     if (isNaN(speed)) return;
 
-    if (speed > 10000) speed = 10000;
+    if (speed > 200000) speed = 200000;
     else if (speed <= 0) speed = 1;
 
     setClockSpeed(speed);
@@ -48,9 +48,9 @@ export default function ConfigModal(props: { isOpen: boolean; close: Function })
                 onChange={clockSpeedChange}
                 value={clockSpeed}
                 style={{ width: '80px', marginLeft: 10, alignSelf: 'center' }}
-                max="10000"
-                min="1"
-                placeholder="10"
+                max="200000"
+                min="0"
+                placeholder="1000"
                 size="xs"
               />
             </Flex>

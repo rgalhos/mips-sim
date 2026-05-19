@@ -45,6 +45,7 @@ export type WorkerMessage =
       data: {
         cpu: ICPU;
         memory: Uint8Array;
+        frequency: number;
       };
     }
   | {
@@ -180,6 +181,7 @@ export class WorkerService extends EventEmitter {
       data: {
         cpu: data.cpu,
         memory: data.memory,
+        frequency: data.frequency,
       },
     });
   }

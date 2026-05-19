@@ -66,9 +66,7 @@ const RegistersBlock = memo(
           Registers
         </Text>
         <Box flex="1" minH={0} overflowY="auto" pr={1} sx={monoStyles}>
-          <div
-            style={{ fontSize: '12px', lineHeight: 1.65, whiteSpace: 'pre', color: 'var(--chakra-colors-gray-300)' }}
-          >
+          <div style={{ fontSize: '12px', lineHeight: 1.65, whiteSpace: 'pre' }}>
             {Object.entries(registerValues).map(([reg, val]) => (
               <Fragment key={reg}>
                 {reg.padEnd(5, ' ')} 0x{val.toString(16).toUpperCase().padStart(8, '0')} ({val.toString(10)}) {'\n'}
@@ -242,12 +240,14 @@ function MemoryView({ visible = true }: { visible?: boolean }) {
       const merged = mergeCpuDump(mergedDumpRef.current, newDump);
       mergedDumpRef.current = merged;
 
+      simulator.processor.cpu = newDump.cpu;
+
       setLoading(false);
       if (visible) {
         setDump(merged);
       }
     },
-    [visible],
+    [visible, simulator.processor],
   );
 
   useEffect(() => {

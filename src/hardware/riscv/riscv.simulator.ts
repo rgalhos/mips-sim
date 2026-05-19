@@ -375,6 +375,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     };
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
 
+    this.processor.resetState();
     this.processor.memory = new Uint8Array(this.processor.memorySize);
 
     let currentAddr = 0x0n;

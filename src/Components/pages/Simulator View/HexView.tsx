@@ -1,8 +1,9 @@
 import { Box, Button, Flex, Icon, Text } from '@chakra-ui/react';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaBook } from 'react-icons/fa';
 import { IoIosDownload } from 'react-icons/io';
 import { IAssembledInstruction, ISimulator } from '../../../hardware/common/simulator';
+import { EWorkerCommand, WorkerMessageResponse } from '../../../hardware/common/worker-service';
 import { useSimulator } from '../../../hooks/simulator.hook';
 
 function bytecodeBytesHex(bytecode: bigint | number) {
@@ -10,49 +11,57 @@ function bytecodeBytesHex(bytecode: bigint | number) {
   return [(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff].map((b) => b.toString(16).padStart(2, '0'));
 }
 
-const HexDisplay = memo(({ inst, simulator }: { inst: IAssembledInstruction; simulator: ISimulator }) => {
-  const bytes = bytecodeBytesHex(inst.decoded.bytecode);
-  const code = simulator.processor.stringifyInstruction(inst.decoded);
-  const instruction = code.split(' ')[0];
-  const manualUrl = simulator.linkToManual(instruction);
+const HexDisplay = memo(
+  ({ inst, simulator, isCurrent }: { inst: IAssembledInstruction; simulator: ISimulator; isCurrent: boolean }) => {
+    const bytes = bytecodeBytesHex(inst.decoded.bytecode);
+    const code = simulator.processor.stringifyInstruction(inst.decoded);
+    const instruction = code.split(' ')[0];
+    const manualUrl = simulator.linkToManual(instruction);
 
-  return (
-    <div style={{ display: 'contents' }}>
-      <Box py={1} minH="10">
-        <Text color="blue.500" fontWeight="bold" lineHeight="2.5rem">
-          0x{inst.address.toString(16).toUpperCase().padStart(8, '0')}
-        </Text>
-      </Box>
-      <Box py={1} minH="10">
-        <Flex flexWrap="wrap" alignItems="center" columnGap={3} rowGap={1} minH="2.5rem">
-          <Text color="pink.400" fontWeight="bold" whiteSpace="nowrap">
-            0x{inst.decoded.bytecode.toString(16).toUpperCase().padStart(8, '0')}
+    return (
+      <Box
+        display="grid"
+        gridTemplateColumns="minmax(8rem, 10rem) minmax(12rem, 1.1fr) 1fr minmax(2.75rem, 3.25rem)"
+        columnGap={4}
+        className={isCurrent ? 'current-instruction' : ''}
+        data-inst-addr={inst.address}
+      >
+        <Box py={1} px={2} minH="10">
+          <Text color="blue.500" fontWeight="bold" lineHeight="2.5rem">
+            0x{inst.address.toString(16).toUpperCase().padStart(8, '0')}
           </Text>
-          {bytes.map((b, i) => (
-            <Text key={i} color="gray.600" fontWeight="bold" whiteSpace="nowrap">
-              0x{b}
+        </Box>
+        <Box py={1} px={2} minH="10">
+          <Flex flexWrap="wrap" alignItems="center" columnGap={3} rowGap={1} minH="2.5rem">
+            <Text color="pink.400" fontWeight="bold" whiteSpace="nowrap">
+              0x{inst.decoded.bytecode.toString(16).toUpperCase().padStart(8, '0')}
             </Text>
-          ))}
-        </Flex>
+            {bytes.map((b, i) => (
+              <Text key={i} color="gray.600" fontWeight="bold" whiteSpace="nowrap">
+                0x{b}
+              </Text>
+            ))}
+          </Flex>
+        </Box>
+        <Box py={1} px={2} minH="10">
+          <Text color="purple.500" fontWeight="bold" wordBreak="break-word" lineHeight="2.5rem">
+            {code}
+          </Text>
+        </Box>
+        <Box py={1} minH="10" display="flex" alignItems="center" justifyContent="center">
+          {instruction !== 'ILLEGAL' && (
+            <a href={manualUrl} target="__blank" aria-label={'Abrir documentação da instrução ' + instruction}>
+              <Icon as={FaBook} boxSize="1.15em" />
+            </a>
+          )}
+        </Box>
       </Box>
-      <Box py={1} minH="10">
-        <Text color="purple.500" fontWeight="bold" wordBreak="break-word" lineHeight="2.5rem">
-          {code}
-        </Text>
-      </Box>
-      <Box py={1} minH="10" display="flex" alignItems="center" justifyContent="center">
-        {instruction !== 'ILLEGAL' && (
-          <a href={manualUrl} target="__blank" aria-label={'Abrir documentação da instrução ' + instruction}>
-            <Icon as={FaBook} boxSize="1.15em" />
-          </a>
-        )}
-      </Box>
-    </div>
-  );
-});
+    );
+  },
+);
 
 const LabelDisplay = memo(({ label, address }: { label: string; address: bigint }) => (
-  <Box backgroundColor="blackAlpha.400" sx={{ gridColumn: '1/-1' }}>
+  <Box backgroundColor="blackAlpha.400">
     <Box py={1} px={2} minH="10">
       <Text color="blue.500" fontWeight="bold" lineHeight="2.5rem">
         {`<${label}>`}:
@@ -91,6 +100,31 @@ function HexView({ program, labels }: { program: Array<IAssembledInstruction>; l
     return kv;
   }, [labels]);
 
+  const [currentPc, setCurrentPc] = useState<bigint | null>(null);
+
+  const onDump = useCallback((response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
+    const pc = response.data.cpu.pc;
+    setCurrentPc(pc);
+
+    //const lineNumber = program.find((inst) => inst.address === pc)?.lineNumber;
+    //if (typeof lineNumber !== 'undefined') {
+    //  const line = Number(lineNumber);
+
+    //  SharedData.instance.monacoEditor.setPosition({ lineNumber: line, column: 1 });
+    //  SharedData.instance.monacoEditor.revealLineInCenter(line);
+    //}
+  }, []);
+
+  useEffect(() => {
+    const ws = simulator.workerService;
+    ws.on(EWorkerCommand.CPU_DUMP, onDump);
+    ws.requestCpuDump();
+
+    return () => {
+      ws.off(EWorkerCommand.CPU_DUMP, onDump);
+    };
+  }, [simulator.workerService, onDump]);
+
   return (
     <>
       <Button onClick={downloadHex} leftIcon={<Icon as={IoIosDownload} />}>
@@ -98,42 +132,52 @@ function HexView({ program, labels }: { program: Array<IAssembledInstruction>; l
       </Button>
 
       <Box
-        display="grid"
-        gridTemplateColumns="minmax(8rem, 10rem) minmax(12rem, 1.1fr) 1fr minmax(2.75rem, 3.25rem)"
-        columnGap={4}
+        display="flex"
+        flexDirection="column"
         marginTop={4}
         w="100%"
         alignItems="stretch"
         fontFamily="mono"
         letterSpacing="tight"
-        sx={{ fontVariantNumeric: 'tabular-nums' }}
+        sx={{
+          fontVariantNumeric: 'tabular-nums',
+          '.current-instruction': {
+            background: 'rgba(243, 139, 168, .1)',
+          },
+        }}
       >
-        <Box display="flex" alignItems="flex-end" pb={2} borderBottomWidth="1px" borderColor="gray.200">
-          <Text color="blue.500" fontWeight="bold" fontSize="sm">
-            Address
-          </Text>
-        </Box>
-        <Box display="flex" alignItems="flex-end" pb={2} borderBottomWidth="1px" borderColor="gray.200">
-          <Text color="pink.400" fontWeight="bold" fontSize="sm">
-            Bytecode
-          </Text>
-        </Box>
-        <Box display="flex" alignItems="flex-end" pb={2} borderBottomWidth="1px" borderColor="gray.200">
-          <Text color="purple.500" fontWeight="bold" fontSize="sm">
-            Instruction
-          </Text>
-        </Box>
         <Box
-          display="flex"
-          alignItems="flex-end"
-          justifyContent="center"
-          pb={2}
-          borderBottomWidth="1px"
-          borderColor="gray.200"
+          display="grid"
+          gridTemplateColumns="minmax(8rem, 10rem) minmax(12rem, 1.1fr) 1fr minmax(2.75rem, 3.25rem)"
+          columnGap={4}
         >
-          <Text color="gray.200" fontWeight="bold" fontSize="xs" textAlign="center">
-            Manual
-          </Text>
+          <Box display="flex" alignItems="flex-end" pb={2} px={2} borderBottomWidth="1px" borderColor="gray.200">
+            <Text color="blue.500" fontWeight="bold" fontSize="sm">
+              Address
+            </Text>
+          </Box>
+          <Box display="flex" alignItems="flex-end" pb={2} px={2} borderBottomWidth="1px" borderColor="gray.200">
+            <Text color="pink.400" fontWeight="bold" fontSize="sm">
+              Bytecode
+            </Text>
+          </Box>
+          <Box display="flex" alignItems="flex-end" pb={2} px={2} borderBottomWidth="1px" borderColor="gray.200">
+            <Text color="purple.500" fontWeight="bold" fontSize="sm">
+              Instruction
+            </Text>
+          </Box>
+          <Box
+            display="flex"
+            alignItems="flex-end"
+            justifyContent="center"
+            pb={2}
+            borderBottomWidth="1px"
+            borderColor="gray.200"
+          >
+            <Text color="gray.200" fontWeight="bold" fontSize="xs" textAlign="center">
+              Manual
+            </Text>
+          </Box>
         </Box>
 
         {program.map((inst, idx) => {
@@ -145,7 +189,12 @@ function HexView({ program, labels }: { program: Array<IAssembledInstruction>; l
                 ? curLabels.map((l) => <LabelDisplay key={l + inst.address} address={inst.address} label={l} />)
                 : null}
 
-              <HexDisplay key={idx} inst={inst} simulator={simulator} />
+              <HexDisplay
+                key={idx}
+                inst={inst}
+                simulator={simulator}
+                isCurrent={currentPc !== null && inst.address === currentPc}
+              />
             </>
           );
         })}
