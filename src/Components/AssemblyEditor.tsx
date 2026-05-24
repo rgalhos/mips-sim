@@ -32,7 +32,7 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
           [/^\s*\.?[a-zA-Z0-9_]+:/, { token: 'annotation' }], // label
 
           [/[\.%][a-zA-Z_]+/, 'keyword'], // directives
-          [/[A-Z][A-Z_+]+/, 'type.identifier'], // consts
+          [/[A-Z][0-9A-Z_]+/, 'type.identifier'], // consts
 
           [
             /[a-z_$][\w$]*/,

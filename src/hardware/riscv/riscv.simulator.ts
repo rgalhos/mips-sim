@@ -181,6 +181,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
     const tok1 = tokens[1];
     const tok2 = tokens[2];
+    const tok3 = tokens[3];
     const pseudo = tkFirst.value?.toString().toLowerCase() as keyof typeof rv_opcode_pseudo;
     const lineNo = tkFirst.lineNumber;
 
@@ -247,6 +248,47 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         const rd = this.ensureRegisterToken(tok1, constants);
         const rs1 = this.ensureRegisterToken(tok2, constants);
         return this.assembleLine(tokenize(`slt x${rd}, x${rs1}, zero`, lineNo), {}, 0n, true);
+      }
+      case 'beqz': {
+        return this.assembleLine(tokenize(`beq ${tok1.value}, zero, ${tok2.value}`, lineNo), constants, pc, true);
+      }
+      case 'bnez': {
+        return this.assembleLine(tokenize(`bne ${tok1.value}, zero, ${tok2.value}`, lineNo), constants, pc, true);
+      }
+      case 'blez': {
+        return this.assembleLine(tokenize(`bge zero, ${tok1.value}, ${tok2.value}`, lineNo), constants, pc, true);
+      }
+      case 'bgt': {
+        return this.assembleLine(
+          tokenize(`blt ${tok2.value}, ${tok1.value}, ${tok3.value}`, lineNo),
+          constants,
+          pc,
+          true,
+        );
+      }
+      case 'ble': {
+        return this.assembleLine(
+          tokenize(`bge ${tok2.value}, ${tok1.value}, ${tok3.value}`, lineNo),
+          constants,
+          pc,
+          true,
+        );
+      }
+      case 'bgtu': {
+        return this.assembleLine(
+          tokenize(`bltu ${tok2.value}, ${tok1.value}, ${tok3.value}`, lineNo),
+          constants,
+          pc,
+          true,
+        );
+      }
+      case 'bleu': {
+        return this.assembleLine(
+          tokenize(`bgeu ${tok2.value}, ${tok1.value}, ${tok3.value}`, lineNo),
+          constants,
+          pc,
+          true,
+        );
       }
       // BLA BLA BLA @todo resto das instruções
       case 'call': {
@@ -330,6 +372,10 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
         break;
       case rv_codec.s:
+        dec.rs2 = this.ensureRegisterToken(tok1, constants);
+        dec.rs1 = this.ensureRegisterToken(tok2, constants);
+        dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
+        break;
       case rv_codec.b:
         dec.rs1 = this.ensureRegisterToken(tok1, constants);
         dec.rs2 = this.ensureRegisterToken(tok2, constants);

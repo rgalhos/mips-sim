@@ -810,8 +810,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   }
 
   protected registerWrite(reg: number, value: bigint) {
-    if (reg === rv_reg.sp && value >= this.STACK_END) {
-      throw new Error('stack overflow; register[sp] < STACK_END');
+    if (reg === rv_reg.sp && value > this.STACK_START) {
+      throw new Error(`stack overflow; register[sp] (${value}) > STACK_START (${value})`);
     }
 
     if (reg !== rv_reg.zero) {

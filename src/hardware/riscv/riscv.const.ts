@@ -151,7 +151,10 @@ export enum rv_opcode_pseudo {
   bgez, // bge rs1, zero, offset
   bltz, // blt zero, rs1, offset
   bgtz, // blt zero, rs1, offset
-  bgt, // blt rs1, zero, offset
+  bgt, // blt rs2, rs1, offset
+  ble, // bge rs2, rs1, offset
+  bgtu, // bltu  rs2, rs1, offset
+  bleu, // bgeu  rs2, rs1, offset
   call, // call offset -> auipc ra, %hi(offset) + jalr %lo(offset)(ra) // call rt, offset -> auipc rt, %hi(offset) + jalr %lo(offset)(rt)
   ret, // jalr zero, ra, 0
 }
