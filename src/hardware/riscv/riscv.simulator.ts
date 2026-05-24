@@ -508,7 +508,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
           assembledInstructions.push({
             code: line,
-            lineNumber: idx,
+            lineNumber: +idx + 1,
             tokens: instTokens,
             decoded,
             address: currentAddr,

@@ -6,7 +6,7 @@ import { WorkerService } from './worker-service';
 
 export interface IAssembledInstruction<TDecoded extends IDecodedInstruction = IDecodedInstruction> {
   code: string;
-  lineNumber: string;
+  lineNumber: number;
   tokens: IToken[];
   decoded: TDecoded;
   address: bigint;
