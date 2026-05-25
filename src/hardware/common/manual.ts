@@ -14,6 +14,7 @@ export interface IManualRegister {
 export interface IManualInstruction {
   name: string;
   operation: string;
+  usage: string;
   description: string;
 }
 

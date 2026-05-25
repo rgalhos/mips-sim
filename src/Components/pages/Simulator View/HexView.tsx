@@ -90,7 +90,7 @@ const InstructionDecRV = memo(({ inst }: { inst: IDecodedRVInstruction }) => {
     );
   } else if (inst.codec === rv_codec.i) {
     el.push(
-      <Bits label="imm[11:0]" value={pad(rvUtils.operand_funct7(inst.bytecode), 12)} start={0} class="rs2" />,
+      <Bits label="imm[11:0]" value={pad(rvUtils.operand_funct7(inst.bytecode), 12)} start={0} class="imm" />,
       <Bits label="rs1" value={pad(inst.rs1, 5)} start={12} class="rs1" />,
       <Bits label="funct3" value={pad(rvUtils.operand_funct3(inst.bytecode), 3)} start={17} class="funct3" />,
       <Bits label="rd" value={pad(inst.rd, 5)} start={20} class="rd" />,

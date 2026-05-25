@@ -94,40 +94,6 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       ],
     });
 
-    monaco.languages.registerCompletionItemProvider('mips', {
-      // @ts-expect-error bleeeeeeh
-      provideCompletionItems: () => {
-        return {
-          suggestions: [
-            ...keywords.map((keyword) => ({
-              insertText: keyword,
-              label: keyword,
-              kind: monaco.languages.CompletionItemKind.Keyword,
-              range: 0,
-            })),
-            ...consts.map((c) => ({
-              insertText: c,
-              label: c,
-              kind: monaco.languages.CompletionItemKind.Constant,
-              range: 0,
-            })),
-            ...directives.map((directive) => ({
-              insertText: directive,
-              label: directive,
-              kind: monaco.languages.CompletionItemKind.EnumMember, // uuuh....
-              range: 0,
-            })),
-            ...registers.map((register) => ({
-              insertText: register,
-              label: register,
-              kind: monaco.languages.CompletionItemKind.EnumMember, // uuuh....
-              range: 0,
-            })),
-          ],
-        };
-      },
-    });
-
     let manualEntries = simulator.manual.instructions.map((inst) => [
       inst.name,
       [{ value: inst.operation }, { value: inst.description }],
@@ -161,6 +127,43 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
             return { contents: entry };
           }
         }
+      },
+    });
+
+    const instuctionsManual = Object.fromEntries(simulator.manual.instructions.map((inst) => [inst.name, inst]));
+
+    monaco.languages.registerCompletionItemProvider('mips', {
+      // @ts-expect-error bleeeeeeh
+      provideCompletionItems: () => {
+        return {
+          suggestions: [
+            ...simulator.instructionKeywords.map((keyword) => ({
+              insertText: keyword,
+              label: { label: keyword, detail: ' ' + (instuctionsManual[keyword]?.usage || '') },
+              kind: monaco.languages.CompletionItemKind.Keyword,
+              range: 0,
+            })),
+            ...consts.map((c) => ({
+              insertText: c,
+              label: c,
+              kind: monaco.languages.CompletionItemKind.Constant,
+              range: 0,
+            })),
+            ...directives.map((directive) => ({
+              insertText: directive,
+              label: directive,
+              kind: monaco.languages.CompletionItemKind.EnumMember, // uuuh....
+              range: 0,
+            })),
+            ...registers.map((register, i) => ({
+              insertText: register,
+              label: register,
+              kind: monaco.languages.CompletionItemKind.EnumMember, // uuuh....
+              detail: simulator.manual.registers?.[i]?.alias || '',
+              range: 0,
+            })),
+          ],
+        };
       },
     });
   }
