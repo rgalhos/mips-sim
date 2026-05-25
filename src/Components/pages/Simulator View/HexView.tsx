@@ -1,5 +1,5 @@
 import { Box, Button, chakra, Flex, Icon, Text, Tooltip } from '@chakra-ui/react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaBook } from 'react-icons/fa';
 import { IoIosDownload } from 'react-icons/io';
 import { IAssembledInstruction, ISimulator } from '../../../hardware/common/simulator';
@@ -64,7 +64,10 @@ const Bits = (props: { label: string; value: string; start: number; class?: stri
   <Tooltip label={props.label}>
     <span className={props.class || ''}>
       {props.value.split('').map((bit, bitIdx) => (
-        <span className={`bit-idx-${props.start + bitIdx} ${props.class || ''}`} key={props.label + bitIdx + bit}>
+        <span
+          className={`bit-idx-${props.start + bitIdx} ${props.class || ''}`}
+          key={`bits-${props.label}-${bitIdx}-${bit}-${props.start}-${props.class}`}
+        >
           {bit}
         </span>
       ))}
@@ -300,18 +303,19 @@ function HexView({ program, labels }: { program: Array<IAssembledInstruction>; l
           const curLabels = labelsByAddr[inst.address.toString()];
 
           return (
-            <>
+            <Fragment key={'hex-view-' + idx}>
               {curLabels
-                ? curLabels.map((l) => <LabelDisplay key={l + inst.address} address={inst.address} label={l} />)
+                ? curLabels.map((l) => (
+                    <LabelDisplay key={'label' + l + inst.address} address={inst.address} label={l} />
+                  ))
                 : null}
 
               <HexDisplay
-                key={idx}
                 inst={inst}
                 simulator={simulator}
                 isCurrent={currentPc !== null && inst.address === currentPc}
               />
-            </>
+            </Fragment>
           );
         })}
       </Box>

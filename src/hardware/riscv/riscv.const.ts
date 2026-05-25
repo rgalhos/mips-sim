@@ -173,6 +173,8 @@ export enum rv_directives {
   '.text',
   '.bss',
   '.rodata',
+  '.macro',
+  '.endmacro',
   '%hi',
   '%lo',
   '%pcrel_hi',

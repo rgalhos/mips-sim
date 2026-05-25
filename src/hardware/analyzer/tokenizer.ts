@@ -39,6 +39,26 @@ export const throwConflictingDeclaration = (tokens: IToken[]) => {
   return new Error('ASSEMBLER_CONFLICTING_DECLARATION', { cause: tokens });
 };
 
+export const throwMacroRedefined = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_MACRO_REDEFINED', { cause: tokens });
+};
+
+export const throwMacroUnclosed = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_MACRO_UNCLOSED', { cause: tokens });
+};
+
+export const throwMacroBadArity = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_MACRO_BAD_ARITY', { cause: tokens });
+};
+
+export const throwMacroRecursion = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_MACRO_RECURSION', { cause: tokens });
+};
+
+export const throwMacroBadDefinition = (tokens: IToken[]) => {
+  return new Error('ASSEMBLER_MACRO_BAD_DEFINITION', { cause: tokens });
+};
+
 export const stringifyTokenizerError = (e: Error) => {
   if (!e.message.startsWith('ASSEMBLER_')) return e.toString();
 
@@ -61,6 +81,16 @@ export const stringifyTokenizerError = (e: Error) => {
     msg = `Circular declaration detected at line ${lineNumber}: ${fullLine}`;
   } else if (e.message === 'ASSEMBLER_CONFLICTING_DECLARATION') {
     msg = `Label or constant declared twice at line ${lineNumber}: ${fullLine}`;
+  } else if (e.message === 'ASSEMBLER_MACRO_REDEFINED') {
+    msg = `Macro redefined at line ${lineNumber}: ${fullLine}`;
+  } else if (e.message === 'ASSEMBLER_MACRO_UNCLOSED') {
+    msg = `Unclosed .macro block starting at line ${lineNumber}: ${fullLine}`;
+  } else if (e.message === 'ASSEMBLER_MACRO_BAD_ARITY') {
+    msg = `Macro invoked with wrong number of arguments at line ${lineNumber}: ${fullLine}`;
+  } else if (e.message === 'ASSEMBLER_MACRO_RECURSION') {
+    msg = `Macro expansion exceeded maximum recursion depth at line ${lineNumber}: ${fullLine}`;
+  } else if (e.message === 'ASSEMBLER_MACRO_BAD_DEFINITION') {
+    msg = `Invalid macro definition at line ${lineNumber}: ${fullLine}`;
   }
 
   return msg;

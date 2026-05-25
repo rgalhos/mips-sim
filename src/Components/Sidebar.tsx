@@ -90,7 +90,7 @@ export default function SidebarWithHeader({
       <MobileNav onOpen={onOpen} />
       <Box ml={{ base: 0, md: 60 }} p="4">
         {React.Children.map(children, (child, index) => (
-          <Box key={index} display={index === page ? "block" : "none"}>
+          <Box key={'sidebaritem' + index} display={index === page ? "block" : "none"}>
             {child}
           </Box>
         ))}

@@ -1,3 +1,4 @@
+import { preprocessor } from '../analyzer/preprocessor';
 import {
   ETokenType,
   IToken,
@@ -427,16 +428,13 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     let currentAddr = 0x0n;
     let currentLabel = '';
 
-    const codeSplit = code.split(/\n/g);
-    for (const idx in codeSplit) {
-      const line = codeSplit[idx];
-
+    const sourceLines = preprocessor(code);
+    for (const { line, lineNumber } of sourceLines) {
       if (!line) {
         continue;
       }
 
-      // sempre soma 1 no idx já que a linha começa em 1, não em 0. isso vai dar um trickle down para todos os outros tokens
-      const tokens = tokenize(line, +idx + 1);
+      const tokens = tokenize(line, lineNumber);
 
       if (tokens.length === 0) {
         continue;
@@ -554,7 +552,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
           assembledInstructions.push({
             code: line,
-            lineNumber: +idx + 1,
+            lineNumber,
             tokens: instTokens,
             decoded,
             address: currentAddr,

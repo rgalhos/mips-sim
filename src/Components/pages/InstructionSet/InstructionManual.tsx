@@ -20,7 +20,9 @@ export default function InstructionManual() {
         <Heading size="sm">Registers:</Heading>
 
         {simulator.manual.registers.map((reg) => (
-          <Badge colorScheme={calcRegColor(reg.kind)}>{reg.alias || reg.name}</Badge>
+          <Badge key={reg.name} colorScheme={calcRegColor(reg.kind)}>
+            {reg.alias || reg.name}
+          </Badge>
         ))}
       </Flex>
 
@@ -43,7 +45,7 @@ export default function InstructionManual() {
           <Tbody>
             {simulator.manual.instructions.map((inst) => {
               return (
-                <Tr>
+                <Tr key={inst.name}>
                   <Td>{inst.name}</Td>
                   <Td>{inst.operation}</Td>
                   <Td>
@@ -73,7 +75,7 @@ export default function InstructionManual() {
           </Thead>
           <Tbody>
             {simulator.manual.consts.map((c) => (
-              <Tr>
+              <Tr key={c.name}>
                 <Td>{c.name}</Td>
                 <Td>
                   <Markdown>{c.description}</Markdown>
