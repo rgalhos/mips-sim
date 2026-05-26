@@ -2,6 +2,7 @@ import { IProcessor } from '../common/processor';
 import { IAssembledInstruction } from '../common/simulator';
 import {
   rv_codec,
+  RV_CODEC_FORMAT,
   rv_extension,
   rv_opcode,
   RV_OPCODE_DATA,
@@ -767,11 +768,13 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     const imm = instruction.imm || 0n;
 
     const op_info = RV_OPCODE_DATA[opcode];
-    const fmt = op_info.format;
+    let fmt = op_info.format;
     let str = '';
 
     if (instruction._op === rv_opcode.ebreak || instruction._op === rv_opcode.ecall) {
       return op_info.name;
+    } else if ([rv_opcode.lb, rv_opcode.lh, rv_opcode.lw, rv_opcode.lbu, rv_opcode.lhu].includes(opcode)) {
+      fmt = RV_CODEC_FORMAT[rv_codec.s];
     }
 
     for (const c of fmt) {

@@ -30,7 +30,8 @@ const postCpuDump = (fullDump = false) => {
   });
 };
 
-const shouldPostDumpAfterStep = () => cpu.halted || cpu.cycle % Math.min(111, Math.ceil(cpu.frequency / 11)) === 0;
+const shouldPostDumpAfterStep = () =>
+  cpu.halted || cpu.cycle % (Math.min(111, Math.ceil(cpu.frequency / 11)) | 1) === 0;
 
 const cancelRunLoop = () => {
   cpu.setHalted(true);
@@ -63,7 +64,7 @@ const startRunLoop = async () => {
     for (let i = 0; i < cyclesPerWake && !cpu.halted; i++) {
       handleCpuStep();
     }
-  
+
     nextDeadline += sliceMs;
     const delay = nextDeadline - performance.now();
 
