@@ -122,14 +122,21 @@ export function encodeRType(op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint)
   if (!opcode) return 0n;
 
   const funct3 = BigInt(op_data.funct3 || 0) << 12n;
-  let funct7 = BigInt(op_data.funct7 || 0) << 25n;
-
-  // RV32F is funct5, next 2 bits are fmt
-  if (op_data.extension === rv_ext.RV32F) {
-    funct7 <<= 2n;
-  }
+  const funct7 = BigInt(op_data.funct7 || 0) << 25n;
 
   return funct7 | (reg5(rs2) << 20n) | (reg5(rs1) << 15n) | funct3 | (reg5(rd) << 7n) | opcode;
+}
+
+export function encodeRType_RV32F(op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint): bigint {
+  const op_data = RV_OPCODE_DATA[op];
+  const opcode = BigInt(op_data.opcode || 0);
+  if (!opcode) return 0n;
+
+  const funct3 = BigInt(op_data.funct3 || 0) << 12n;
+  const funct5 = BigInt(op_data.funct7 || 0) << 27n;
+  const fmt = 0b00n << 25n;
+
+  return funct5 | fmt | (reg5(rs2) << 20n) | (reg5(rs1) << 15n) | funct3 | (reg5(rd) << 7n) | opcode;
 }
 
 export function encodeIType(op: rv_opcode, rd: bigint, rs1: bigint, imm: bigint): bigint {

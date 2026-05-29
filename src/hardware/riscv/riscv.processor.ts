@@ -17,6 +17,7 @@ import {
   encodeJType,
   encodeR4Type,
   encodeRType,
+  encodeRType_RV32F,
   encodeSType,
   encodeUType,
   is_sp_nan,
@@ -176,6 +177,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     if (op === rv_opcode.ebreak && imm === 0n) imm = 1n;
 
     const codec = RV_OPCODE_DATA[op].codec;
+    const ext = RV_OPCODE_DATA[op].extension;
 
     // if (op === rv_opcode.fence) {
     //   return u32(0b0001111n | (reg5(rd) << 7n) | (reg5(rs1) << 15n) | (pack_i_imm12(imm) << 20n));
@@ -183,6 +185,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     switch (codec) {
       case rv_codec.r:
+        if (ext === rv_ext.RV32F) {
+          return u32(encodeRType_RV32F(op, rd, rs1, rs2));
+        }
         return u32(encodeRType(op, rd, rs1, rs2));
       case rv_codec.i:
         return u32(encodeIType(op, rd, rs1, imm));
@@ -1141,7 +1146,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
   protected registerReadFloat32(reg: number) {
     if (reg > rv_reg_f.f31) {
-      throw new Error('RVSIM: inexistent rv32f register: ' + reg);
+      throw new Error('RVSIM: inexistent RV32F register: ' + reg);
     }
 
     return this.cpu.registerF[reg];
@@ -1159,7 +1164,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
   protected registerWriteFloat32(reg: number, value: bigint) {
     if (reg > rv_reg_f.f31) {
-      throw new Error('RVSIM: inexistent rv32f register: ' + reg);
+      throw new Error('RVSIM: inexistent RV32F register: ' + reg);
     }
 
     this.cpu.registerF[reg] = u32(value);
