@@ -19,6 +19,16 @@ import {
   encodeRType,
   encodeSType,
   encodeUType,
+  is_sp_nan,
+  is_sp_neg_inf,
+  is_sp_neg_norm,
+  is_sp_neg_subnorm,
+  is_sp_neg_zero,
+  is_sp_pos_inf,
+  is_sp_pos_norm,
+  is_sp_pos_subnorm,
+  is_sp_pos_zero,
+  is_sp_signaling_nan,
   operand_bimm,
   operand_funct3,
   operand_funct7,
@@ -393,6 +403,96 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       case 0b0100111:
         op = rv_opcode.fsw;
         break;
+      case 0b1000011:
+        op = rv_opcode['fmadd.s'];
+        break;
+      case 0b1000111:
+        op = rv_opcode['fmsub.s'];
+        break;
+      case 0b1001011:
+        op = rv_opcode['fnmsub.s'];
+        break;
+      case 0b1001111:
+        op = rv_opcode['fnmadd.s'];
+        break;
+      case 0b1010011: {
+        const funct5 = operand_funct7(bytecode) >> 2;
+
+        switch (operand_funct3(bytecode)) {
+          case 0b000: {
+            switch (funct5) {
+              case 0b00000:
+                op = rv_opcode['fadd.s'];
+                break;
+              case 0b00001:
+                op = rv_opcode['fsub.s'];
+                break;
+              case 0b00010:
+                op = rv_opcode['fmul.s'];
+                break;
+              case 0b00011:
+                op = rv_opcode['fdiv.s'];
+                break;
+              case 0b01011:
+                op = rv_opcode['fsqrt.s'];
+                break;
+              case 0b00100:
+                op = rv_opcode['fsgnj.s'];
+                break;
+              case 0b00101:
+                op = rv_opcode['fmin.s'];
+                break;
+              case 0b11000:
+                op = rv_opcode['fcvt.w.s'];
+                break;
+              case 0b11100:
+                op = rv_opcode['fmv.x.w'];
+                break;
+              case 0b10100:
+                op = rv_opcode['fle.s'];
+                break;
+              case 0b11010: {
+                // edge case: bit 20 is set for fcvt.s.wu
+                if (bytecode & (1n << 20n)) {
+                  op = rv_opcode['fcvt.s.wu'];
+                } else {
+                  op = rv_opcode['fcvt.s.w'];
+                }
+                break;
+              }
+            }
+            break;
+          }
+          case 0b001: {
+            switch (funct5) {
+              case 0b00100:
+                op = rv_opcode['fsgnjn.s'];
+                break;
+              case 0b00101:
+                op = rv_opcode['fmax.s'];
+                break;
+              case 0b10100:
+                op = rv_opcode['flt.s'];
+                break;
+              case 0b11100:
+                op = rv_opcode['fclass.s'];
+                break;
+            }
+            break;
+          }
+          case 0b010: {
+            switch (funct5) {
+              case 0b00100:
+                op = rv_opcode['fsgnjx.s'];
+                break;
+              case 0b10100:
+                op = rv_opcode['feq.s'];
+                break;
+            }
+            break;
+          }
+        }
+      }
     }
 
     if (op === rv_opcode.illegal) {
@@ -506,133 +606,133 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       // RV32I
       case rv_opcode.lui:
         this.registerWrite(d.rd, u32(d.imm << 12n));
-        break;
+        return;
       case rv_opcode.auipc:
         this.registerWrite(d.rd, u32(pc + u32(d.imm << 12n)));
-        break;
+        return;
       case rv_opcode.jal:
         this.registerWrite(d.rd, pc + 4n);
         this.cpu.pc = u32(pc + d.imm);
-        break;
+        return;
       case rv_opcode.jalr: {
         const t = u32(v1 + d.imm) & ~1n;
         this.registerWrite(d.rd, pc + 4n);
         this.cpu.pc = t;
-        break;
+        return;
       }
       case rv_opcode.beq:
         if (v1 === v2) this.cpu.pc = u32(pc + d.imm);
-        break;
+        return;
       case rv_opcode.bne:
         if (v1 !== v2) this.cpu.pc = u32(pc + d.imm);
-        break;
+        return;
       case rv_opcode.blt:
         if (s32(v1) < s32(v2)) this.cpu.pc = u32(pc + d.imm);
-        break;
+        return;
       case rv_opcode.bge:
         if (s32(v1) >= s32(v2)) this.cpu.pc = u32(pc + d.imm);
-        break;
+        return;
       case rv_opcode.bltu:
         if (u32(v1) < u32(v2)) this.cpu.pc = u32(pc + d.imm);
-        break;
+        return;
       case rv_opcode.bgeu:
         if (u32(v1) >= u32(v2)) this.cpu.pc = u32(pc + d.imm);
-        break;
+        return;
       case rv_opcode.lb: {
         const addr = u32(v1 + d.imm);
         let b = this.memoryRead(addr, 8) & 0xffn;
         if (b & 0x80n) b |= ~0xffn;
         this.registerWrite(d.rd, u32(b));
-        break;
+        return;
       }
       case rv_opcode.lh: {
         const addr = u32(v1 + d.imm);
         let h = this.memoryRead(addr, 16) & 0xffffn;
         if (h & 0x8000n) h |= ~0xffffn;
         this.registerWrite(d.rd, u32(h));
-        break;
+        return;
       }
       case rv_opcode.lw: {
         const addr = u32(v1 + d.imm);
         this.registerWrite(d.rd, u32(this.memoryRead(addr, 32)));
-        break;
+        return;
       }
       case rv_opcode.lbu: {
         const addr = u32(v1 + d.imm);
         this.registerWrite(d.rd, this.memoryRead(addr, 8) & 0xffn);
-        break;
+        return;
       }
       case rv_opcode.lhu: {
         const addr = u32(v1 + d.imm);
         this.registerWrite(d.rd, this.memoryRead(addr, 16) & 0xffffn);
-        break;
+        return;
       }
       case rv_opcode.sb:
         this.memoryWrite(u32(v1 + d.imm), v2 & 0xffn, 8);
-        break;
+        return;
       case rv_opcode.sh:
         this.memoryWrite(u32(v1 + d.imm), v2 & 0xffffn, 16);
-        break;
+        return;
       case rv_opcode.sw:
         this.memoryWrite(u32(v1 + d.imm), v2, 32);
-        break;
+        return;
       case rv_opcode.addi:
         this.registerWrite(d.rd, u32(v1 + d.imm));
-        break;
+        return;
       case rv_opcode.slti:
         this.registerWrite(d.rd, s32(v1) < s32(d.imm) ? 1n : 0n);
-        break;
+        return;
       case rv_opcode.sltiu:
         this.registerWrite(d.rd, u32(v1) < u32(d.imm) ? 1n : 0n);
-        break;
+        return;
       case rv_opcode.xori:
         this.registerWrite(d.rd, u32(v1 ^ d.imm));
-        break;
+        return;
       case rv_opcode.ori:
         this.registerWrite(d.rd, u32(v1 | d.imm));
-        break;
+        return;
       case rv_opcode.andi:
         this.registerWrite(d.rd, u32(v1 & d.imm));
-        break;
+        return;
       case rv_opcode.slli:
         this.registerWrite(d.rd, u32(u32(v1) << (d.imm & 0x1fn)));
-        break;
+        return;
       case rv_opcode.srli:
         this.registerWrite(d.rd, u32(v1) >> (d.imm & 0x1fn));
-        break;
+        return;
       case rv_opcode.srai:
         this.registerWrite(d.rd, u32(s32(v1) >> (d.imm & 0x1fn)));
-        break;
+        return;
       case rv_opcode.add:
         this.registerWrite(d.rd, u32(v1 + v2));
-        break;
+        return;
       case rv_opcode.sub:
         this.registerWrite(d.rd, u32(v1 - v2));
-        break;
+        return;
       case rv_opcode.sll:
         this.registerWrite(d.rd, u32(u32(v1) << (v2 & 0x1fn)));
-        break;
+        return;
       case rv_opcode.slt:
         this.registerWrite(d.rd, s32(v1) < s32(v2) ? 1n : 0n);
-        break;
+        return;
       case rv_opcode.sltu:
         this.registerWrite(d.rd, u32(v1) < u32(v2) ? 1n : 0n);
-        break;
+        return;
       case rv_opcode.xor:
         this.registerWrite(d.rd, u32(v1 ^ v2));
-        break;
+        return;
       case rv_opcode.srl:
         this.registerWrite(d.rd, u32(u32(v1) >> (v2 & 0x1fn)));
-        break;
+        return;
       case rv_opcode.sra:
         this.registerWrite(d.rd, u32(s32(v1) >> (v2 & 0x1fn)));
-        break;
+        return;
       case rv_opcode.or:
         this.registerWrite(d.rd, u32(v1 | v2));
-        break;
+        return;
       case rv_opcode.and:
         this.registerWrite(d.rd, u32(v1 & v2));
-        break;
+        return;
       case rv_opcode.ecall: {
         const syscall = Number(this.registerRead(rv_reg.a7));
         let ret = rv_worker_commands.NONE;
@@ -727,21 +827,21 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       }
       case rv_opcode.ebreak:
         this.setHalted(true);
-        break;
+        return;
 
       // RV32M
       case rv_opcode.mul:
         this.registerWrite(d.rd, v1 * v2);
-        break;
+        return;
       case rv_opcode.mulh:
         this.registerWrite(d.rd, (BigInt.asIntN(32, v1) * BigInt.asIntN(32, v2)) >> 32n);
-        break;
+        return;
       case rv_opcode.mulhsu:
         this.registerWrite(d.rd, (BigInt.asIntN(32, v1) * v2) >> 32n);
-        break;
+        return;
       case rv_opcode.mulhu:
         this.registerWrite(d.rd, (v1 * v2) >> 32n);
-        break;
+        return;
       case rv_opcode.div: {
         let xd;
         if (v2 === 0n) {
@@ -752,7 +852,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           xd = (v1 / v2) & 0xffffffffn;
         }
         this.registerWrite(d.rd, xd);
-        break;
+        return;
       }
       case rv_opcode.divu: {
         let xd;
@@ -762,7 +862,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           xd = BigInt(v1 / v2);
         }
         this.registerWrite(d.rd, xd);
-        break;
+        return;
       }
       case rv_opcode.rem: {
         let xd;
@@ -774,7 +874,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           xd = v1 % v2;
         }
         this.registerWrite(d.rd, xd);
-        break;
+        return;
       }
       case rv_opcode.remu: {
         let xd;
@@ -784,8 +884,153 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           xd = v1 % v2;
         }
         this.registerWrite(d.rd, xd);
-        break;
+        return;
       }
+    }
+
+    if (d._op !== rv_opcode.illegal && !(this.extensions & rv_ext.RV32F)) {
+      return;
+    }
+
+    const vf1 = this.registerReadFloat32(d.rs1);
+    const vf2 = this.registerReadFloat32(d.rs2);
+    const vf3 = this.registerReadFloat32(d.rs3);
+
+    // RV32F
+    switch (d._op) {
+      case rv_opcode.flw:
+        const addr = u32(v1 + d.imm);
+        this.registerWriteFloat32(d.rd, u32(this.memoryRead(addr, 32)));
+        return;
+      case rv_opcode.fsw:
+        this.memoryWrite(u32(v1 + d.imm), v2, 32);
+        return;
+      case rv_opcode['fmadd.s']:
+        return;
+      case rv_opcode['fmsub.s']:
+        return;
+      case rv_opcode['fnmsub.s']:
+        return;
+      case rv_opcode['fnmadd.s']:
+        return;
+      case rv_opcode['fadd.s']:
+        return;
+      case rv_opcode['fsub.s']:
+        return;
+      case rv_opcode['fmul.s']:
+        return;
+      case rv_opcode['fdiv.s']:
+        return;
+      case rv_opcode['fsqrt.s']:
+        return;
+      case rv_opcode['fsgnj.s']:
+        return;
+      case rv_opcode['fsgnjn.s']:
+        return;
+      case rv_opcode['fsgnjx.s']:
+        return;
+      case rv_opcode['fmin.s']:
+        return;
+      case rv_opcode['fmax.s']:
+        return;
+      case rv_opcode['fcvt.w.s']:
+        return;
+      case rv_opcode['fcvt.wu.s']:
+        return;
+      case rv_opcode['fmv.x.w']:
+        this.registerWrite(d.rd, vf1);
+        return;
+      case rv_opcode['feq.s']:
+        if (is_sp_nan(vf1) || is_sp_nan(vf2)) {
+          // @todo: handle signaling NaN
+          this.registerWrite(d.rd, 0n);
+        } else {
+          const eq = vf1 === vf2 || ((vf1 & 0x7fffffffn) === 0n && (vf2 & 0x7fffffffn) === 0n);
+          this.registerWrite(d.rd, eq ? 1n : 0n);
+        }
+        return;
+      case rv_opcode['flt.s']:
+        if (is_sp_nan(vf1) || is_sp_nan(vf2)) {
+          // @todo: set invalid
+          this.registerWrite(d.rd, 0n);
+        } else {
+          const signA = vf1 >> 31n;
+          const signB = vf2 >> 31n;
+          const magA = vf1 & 0x7fffffffn;
+          const magB = vf2 & 0x7fffffffn;
+          let lt = false;
+
+          if (signA !== signB) {
+            lt = !!signA && !(magA === 0n && magB === 0n);
+          } else if (vf1 === vf2) {
+            lt = false;
+          } else if (signA === 0n) {
+            lt = vf1 < vf2;
+          } else {
+            lt = vf1 > vf2;
+          }
+
+          this.registerWrite(d.rd, lt ? 1n : 0n);
+        }
+        return;
+      case rv_opcode['fle.s']:
+        if (is_sp_nan(vf1) || is_sp_nan(vf2)) {
+          // @todo: set invalid
+          this.registerWrite(d.rd, 0n);
+        } else {
+          const signA = vf1 >> 31n;
+          const signB = vf2 >> 31n;
+          const magA = vf1 & 0x7fffffffn;
+          const magB = vf2 & 0x7fffffffn;
+          const eq = vf1 === vf2 || (magA === 0n && magB === 0n);
+          if (eq) {
+            this.registerWrite(d.rd, eq ? 1n : 0n);
+            return;
+          }
+
+          let lt = false;
+          if (signA !== signB) {
+            lt = !!signA && !(magA === 0n && magB === 0n);
+          } else if (signA === 0n) {
+            lt = vf1 < vf2;
+          } else {
+            lt = vf1 > vf2;
+          }
+
+          this.registerWrite(d.rd, lt ? 1n : 0n);
+        }
+        return;
+      case rv_opcode['fclass.s']:
+        if (is_sp_neg_inf(vf1)) {
+          this.registerWrite(d.rd, 1n << 0n);
+        } else if (is_sp_neg_norm(vf1)) {
+          this.registerWrite(d.rd, 1n << 1n);
+        } else if (is_sp_neg_subnorm(vf1)) {
+          this.registerWrite(d.rd, 1n << 2n);
+        } else if (is_sp_neg_zero(vf1)) {
+          this.registerWrite(d.rd, 1n << 3n);
+        } else if (is_sp_pos_zero(vf1)) {
+          this.registerWrite(d.rd, 1n << 4n);
+        } else if (is_sp_pos_subnorm(vf1)) {
+          this.registerWrite(d.rd, 1n << 5n);
+        } else if (is_sp_pos_norm(vf1)) {
+          this.registerWrite(d.rd, 1n << 6n);
+        } else if (is_sp_pos_inf(vf1)) {
+          this.registerWrite(d.rd, 1n << 7n);
+        } else if (is_sp_signaling_nan(vf1)) {
+          this.registerWrite(d.rd, 1n << 8n);
+        } else {
+          // assert(is_sp_quiet_nan(vf1), "Unexpected SP value");
+          this.registerWrite(d.rd, 1n << 9n);
+        }
+        return;
+      case rv_opcode['fcvt.s.w']:
+        return;
+      case rv_opcode['fcvt.s.wu']:
+        return;
+      case rv_opcode['fmv.w.x']:
+        this.registerWriteFloat32(d.rd, v1);
+        return;
     }
   }
 
@@ -836,7 +1081,18 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       if (c === 'O') {
         str += op_info.name;
       } else if (c === 'd') {
-        if (rv32im || [rv_opcode['fmv.w.x'], rv_opcode['fcvt.w.s'], rv_opcode['fcvt.wu.s']].includes(opcode)) {
+        if (
+          rv32im ||
+          [
+            rv_opcode['fmv.w.x'],
+            rv_opcode['fcvt.w.s'],
+            rv_opcode['fcvt.wu.s'],
+            rv_opcode['feq.s'],
+            rv_opcode['flt.s'],
+            rv_opcode['fle.s'],
+            rv_opcode['fclass.s'],
+          ].includes(opcode)
+        ) {
           str += rv_reg[rd];
         } else if (rv32f) {
           str += rv_reg_f[rd];
@@ -883,6 +1139,14 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     return super.registerRead(reg);
   }
 
+  protected registerReadFloat32(reg: number) {
+    if (reg > rv_reg_f.f31) {
+      throw new Error('RVSIM: inexistent rv32f register: ' + reg);
+    }
+
+    return this.cpu.registerF[reg];
+  }
+
   protected registerWrite(reg: number, value: bigint) {
     if (reg === rv_reg.sp && value > this.STACK_START) {
       throw new Error(`stack overflow; register[sp] (${value}) > STACK_START (${value})`);
@@ -898,7 +1162,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       throw new Error('RVSIM: inexistent rv32f register: ' + reg);
     }
 
-    this.cpu.registerF[reg] = value;
+    this.cpu.registerF[reg] = u32(value);
   }
 
   public loadProgram(program: Array<IAssembledInstruction<IDecodedRVInstruction>>) {

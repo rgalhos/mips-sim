@@ -1,4 +1,4 @@
-import { rv_opcode, RV_OPCODE_DATA } from './riscv.const';
+import { rv_ext, rv_opcode, RV_OPCODE_DATA } from './riscv.const';
 
 export function u32(n: bigint): bigint {
   return n & 0xffffffffn;
@@ -117,11 +117,17 @@ export function reg5(x: bigint): bigint {
 }
 
 export function encodeRType(op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint): bigint {
-  const opcode = BigInt(RV_OPCODE_DATA[op].opcode || 0);
+  const op_data = RV_OPCODE_DATA[op];
+  const opcode = BigInt(op_data.opcode || 0);
   if (!opcode) return 0n;
 
-  const funct3 = BigInt(RV_OPCODE_DATA[op].funct3 || 0) << 12n;
-  const funct7 = BigInt(RV_OPCODE_DATA[op].funct7 || 0) << 25n;
+  const funct3 = BigInt(op_data.funct3 || 0) << 12n;
+  let funct7 = BigInt(op_data.funct7 || 0) << 25n;
+
+  // RV32F is funct5, next 2 bits are fmt
+  if (op_data.extension === rv_ext.RV32F) {
+    funct7 <<= 2n;
+  }
 
   return funct7 | (reg5(rs2) << 20n) | (reg5(rs1) << 15n) | funct3 | (reg5(rd) << 7n) | opcode;
 }
@@ -212,4 +218,55 @@ export function splitHiLoS32(value: bigint): { hi: bigint; lo: bigint } {
   const lo = raw12 >= 0x800n ? raw12 - 0x1000n : raw12;
   const hi = ((s32 - lo) >> 12n) & 0xfffffn;
   return { hi, lo };
+}
+
+export function is_sp_neg_inf(val: bigint) {
+  return val === 0xff800000n;
+}
+
+export function is_sp_neg_norm(val: bigint) {
+  return !!(
+    (val >> 31n) & 1n &&
+    ((val >> 23n) & 0xffn) !== 0xffn &&
+    !(((val >> 23n) & 0xffn) === 0n && (val & 0x7fffffn) !== 0n)
+  );
+}
+
+export function is_sp_neg_subnorm(val: bigint) {
+  return ((val >> 31n) & 1n) === 1n && ((val >> 23n) & 0xffn) === 0n && (val & 0x7fffffn) !== 0n;
+}
+
+export function is_sp_neg_zero(val: bigint) {
+  return val === 0x80000000n;
+}
+
+export function is_sp_pos_zero(val: bigint) {
+  return val === 0n;
+}
+
+export function is_sp_pos_subnorm(val: bigint) {
+  return !!(((val >> 31n) & 1n) === 0n && ((val >> 23n) & 0xffn) === 0n && (val & 0x7fffffn) !== 0n);
+}
+
+export function is_sp_pos_norm(val: bigint) {
+  const exp = (val >> 23n) & 0xffn;
+  const frac = val & 0x7fffffn;
+
+  return ((val >> 31n) & 1n) === 0n && exp !== 0xffn && !(exp === 0n && frac !== 0n);
+}
+
+export function is_sp_pos_inf(val: bigint) {
+  return val === 0x7f800000n;
+}
+
+export function is_sp_nan(val: bigint) {
+  return !!((val & 0x7f800000n) === 0x7f800000n && val & 0x7fffffn);
+}
+
+export function is_sp_signaling_nan(val: bigint) {
+  return !!((val & 0x7f800000n) === 0x7f800000n && val & 0x400000n && val & 0x3fffffn);
+}
+
+export function is_sp_quiet_nan(val: bigint) {
+  return !!((val & 0x7f800000n) === 0x7f800000n && val & 0x400000n);
 }

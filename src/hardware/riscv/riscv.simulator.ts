@@ -368,7 +368,22 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       case rv_codec.r:
         dec.rd = this.ensureRegisterToken(tok1, constants);
         dec.rs1 = this.ensureRegisterToken(tok2, constants);
-        dec.rs2 = this.ensureRegisterToken(tok3, constants);
+        // RV32F instructions that are R-type but rs2 is always zeroed
+        if (
+          [
+            rv_opcode['fcvt.w.s'],
+            rv_opcode['fcvt.wu.s'],
+            rv_opcode['fmv.x.w'],
+            rv_opcode['fclass.s'],
+            rv_opcode['fcvt.s.w'],
+            rv_opcode['fcvt.s.wu'],
+            rv_opcode['fmv.w.x'],
+          ].includes(dec._op)
+        ) {
+          dec.rs2 = 0;
+        } else {
+          dec.rs2 = this.ensureRegisterToken(tok3, constants);
+        }
         break;
       case rv_codec.i:
         if (dec._op === rv_opcode.ebreak || dec._op === rv_opcode.ecall) break;

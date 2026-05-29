@@ -1,5 +1,5 @@
 import type { ICPU, IDecodedInstruction } from '../common/processor';
-import type { rv_codec, rv_opcode } from './riscv.const';
+import type { rv_codec, rv_f_rm, rv_opcode } from './riscv.const';
 
 export interface IDecodedRVInstruction extends IDecodedInstruction {
   // Instruction bytecode
