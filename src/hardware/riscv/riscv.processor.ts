@@ -2,7 +2,7 @@ import { IProcessor } from '../common/processor';
 import { IAssembledInstruction } from '../common/simulator';
 import {
   rv_codec,
-  rv_extension,
+  rv_ext,
   rv_opcode,
   RV_OPCODE_DATA,
   rv_reg,
@@ -69,7 +69,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
    * Architecture config
    * @todo mainly unused in the codebase. future support for RV64
    */
-  private readonly extensions = rv_extension.RV32I | rv_extension.RV32M | rv_extension.RV32F;
+  private readonly extensions = rv_ext.RV32I | rv_ext.RV32M | rv_ext.RV32F;
   public readonly ILEN = 32;
   public readonly XLEN: 32 /* | 64 */ = 32;
   public readonly REG_MASK = 0xffffffffn; // 2**32-1 for RV32, 2**64-1 for RV64
@@ -201,7 +201,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     switch (operand_opcode(bytecode)) {
       case 0b0110011: {
         // RV32M
-        if (!!(this.extensions & rv_extension.RV32M) && operand_funct7(bytecode) === 0x1) {
+        if (!!(this.extensions & rv_ext.RV32M) && operand_funct7(bytecode) === 0x1) {
           switch (operand_funct3(bytecode)) {
             case 0b000:
               op = rv_opcode.mul;
@@ -823,8 +823,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     const imm = instruction.imm || 0n;
 
     const op_info = RV_OPCODE_DATA[opcode];
-    const rv32im = op_info.extension === rv_extension.RV32I || op_info.extension === rv_extension.RV32M;
-    const rv32f = op_info.extension === rv_extension.RV32F;
+    const rv32im = op_info.extension === rv_ext.RV32I || op_info.extension === rv_ext.RV32M;
+    const rv32f = op_info.extension === rv_ext.RV32F;
     let fmt = op_info.format;
     let str = '';
 
@@ -922,7 +922,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       reg[rv_reg[r as unknown as number]] = v;
     }
 
-    if (this.extensions & rv_extension.RV32F) {
+    if (this.extensions & rv_ext.RV32F) {
       for (const [r, v] of Object.entries(cpu.registerF)) {
         reg[rv_reg_f[r as unknown as number]] = v;
       }
