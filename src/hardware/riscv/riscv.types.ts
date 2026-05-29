@@ -33,5 +33,5 @@ export interface IDecodedRVInstruction extends IDecodedInstruction {
 }
 
 export interface IRVCPU extends ICPU {
-  registerFloat32: Record<number, bigint>;
+  registerF: Record<number, bigint>;
 }

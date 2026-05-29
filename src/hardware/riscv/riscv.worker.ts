@@ -22,7 +22,8 @@ const postCpuDump = (fullDump = false) => {
       memoryDiff: memoryDiff,
       cpu: {
         pc: cpu.cpu.pc,
-        register: { ...cpu.cpu.register },
+        register: cpu.cpu.register,
+        registerF: cpu.cpu.registerF,
       },
       halted: cpu.halted,
       cycle: cpu.cycle,

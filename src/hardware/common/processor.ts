@@ -250,4 +250,6 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   }
 
   public abstract loadProgram(program: Array<IAssembledInstruction>): void;
+
+  public abstract getRegistersFriendly(cpu: ICPU): Record<string, bigint>;
 }

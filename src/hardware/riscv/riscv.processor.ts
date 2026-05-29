@@ -69,7 +69,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
    * Architecture config
    * @todo mainly unused in the codebase. future support for RV64
    */
-  private readonly extensions = rv_extension.RV32I | rv_extension.RV32M;
+  private readonly extensions = rv_extension.RV32I | rv_extension.RV32M | rv_extension.RV32F;
   public readonly ILEN = 32;
   public readonly XLEN: 32 /* | 64 */ = 32;
   public readonly REG_MASK = 0xffffffffn; // 2**32-1 for RV32, 2**64-1 for RV64
@@ -109,7 +109,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       [rv_reg.t5]: 0n,
       [rv_reg.t6]: 0n,
     },
-    registerFloat32: {
+    registerF: {
       [rv_reg_f.ft0]: 0n,
       [rv_reg_f.ft1]: 0n,
       [rv_reg_f.ft2]: 0n,
@@ -862,9 +862,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       } else if (c === 'i') {
         str += imm;
       } else if (c === 'x') {
-        str += '0x' + (imm & 0xffffffffn).toString(16).toUpperCase();
+        str += '0x' + BigInt.asUintN(this.XLEN, imm).toString(16).toUpperCase();
       } else if (c === 'X') {
-        str += '0x' + (imm & 0xffffffffn).toString(16).toUpperCase().padStart(8, '0');
+        str += '0x' + BigInt.asUintN(this.XLEN, imm).toString(16).toUpperCase().padStart(8, '0');
       } else if (c === 'j') {
         str += imm;
       } else {
@@ -898,7 +898,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       throw new Error('RVSIM: inexistent rv32f register: ' + reg);
     }
 
-    this.cpu.registerFloat32[reg] = value;
+    this.cpu.registerF[reg] = value;
   }
 
   public loadProgram(program: Array<IAssembledInstruction<IDecodedRVInstruction>>) {
@@ -913,6 +913,22 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       // @todo aceitar bytes
       this.memoryWrite(v.address, v.decoded.bytecode, 32);
     }
+  }
+
+  public getRegistersFriendly(cpu: IRVCPU) {
+    const reg: Record<string, bigint> = { pc: cpu.pc };
+
+    for (const [r, v] of Object.entries(cpu.register)) {
+      reg[rv_reg[r as unknown as number]] = v;
+    }
+
+    if (this.extensions & rv_extension.RV32F) {
+      for (const [r, v] of Object.entries(cpu.registerF)) {
+        reg[rv_reg_f[r as unknown as number]] = v;
+      }
+    }
+
+    return reg;
   }
 }
 

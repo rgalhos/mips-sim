@@ -1,5 +1,5 @@
 import { Box, Flex, Text } from '@chakra-ui/react';
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { EWorkerCommand, IWorkerCPUDump, WorkerMessageResponse } from '../../../hardware/common/worker-service';
 import { useSimulator } from '../../../hooks/simulator.hook';
 
@@ -65,12 +65,23 @@ const RegistersBlock = memo(
         <Text color={accent.regName} fontWeight="bold" fontSize="sm" mb={2}>
           Registers
         </Text>
-        <Box flex="1" minH={0} overflowY="auto" pr={1} sx={monoStyles}>
+        <Box
+          flex="1"
+          minH={0}
+          overflowY="auto"
+          pr={1}
+          sx={{
+            ...monoStyles,
+            '.reg:nth-of-type(32n+2)': {
+              marginTop: '16px',
+            },
+          }}
+        >
           <div style={{ fontSize: '12px', lineHeight: 1.65, whiteSpace: 'pre' }}>
             {Object.entries(registerValues).map(([reg, val]) => (
-              <Fragment key={reg}>
+              <div key={reg} className={`reg reg-${reg}`}>
                 {reg.padEnd(5, ' ')} 0x{val.toString(16).toUpperCase().padStart(8, '0')} ({val.toString(10)}) {'\n'}
-              </Fragment>
+              </div>
             ))}
           </div>
         </Box>
@@ -270,13 +281,7 @@ function MemoryView({ visible = true }: { visible?: boolean }) {
   const registerValues = useMemo(() => {
     if (!dump) return {};
 
-    const reg: Record<string, bigint> = { pc: dump.cpu.pc };
-
-    for (const [r, val] of Object.entries(dump.cpu.register)) {
-      reg[simulator.processor.registers[r]] = val;
-    }
-
-    return reg;
+    return simulator.processor.getRegistersFriendly(dump.cpu);
   }, [dump, simulator.processor.registers]);
 
   return (
