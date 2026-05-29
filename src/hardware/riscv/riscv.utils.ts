@@ -1,4 +1,4 @@
-import { rv_opcode } from './riscv.const';
+import { rv_opcode, RV_OPCODE_DATA } from './riscv.const';
 
 export function u32(n: bigint): bigint {
   return n & 0xffffffffn;
@@ -116,201 +116,74 @@ export function reg5(x: bigint): bigint {
   return x & 0x1fn;
 }
 
-export function encodeRType(_op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint): bigint {
-  let f3 = 0n;
-  let f7 = 0n;
-  switch (_op) {
-    // RV32I
-    case rv_opcode.add:
-      f3 = 0n;
-      f7 = 0n;
-      break;
-    case rv_opcode.sub:
-      f3 = 0n;
-      f7 = 0x20n;
-      break;
-    case rv_opcode.sll:
-      f3 = 1n;
-      f7 = 0n;
-      break;
-    case rv_opcode.slt:
-      f3 = 2n;
-      f7 = 0n;
-      break;
-    case rv_opcode.sltu:
-      f3 = 3n;
-      f7 = 0n;
-      break;
-    case rv_opcode.xor:
-      f3 = 4n;
-      f7 = 0n;
-      break;
-    case rv_opcode.srl:
-      f3 = 5n;
-      f7 = 0n;
-      break;
-    case rv_opcode.sra:
-      f3 = 5n;
-      f7 = 0x20n;
-      break;
-    case rv_opcode.or:
-      f3 = 6n;
-      f7 = 0n;
-      break;
-    case rv_opcode.and:
-      f3 = 7n;
-      f7 = 0n;
-      break;
-    // RV32M
-    case rv_opcode.mul:
-      f3 = 0n;
-      f7 = 1n;
-      break;
-    case rv_opcode.mulh:
-      f3 = 1n;
-      f7 = 1n;
-      break;
-    case rv_opcode.mulhsu:
-      f3 = 2n;
-      f7 = 1n;
-      break;
-    case rv_opcode.mulhu:
-      f3 = 3n;
-      f7 = 1n;
-      break;
-    case rv_opcode.div:
-      f3 = 4n;
-      f7 = 1n;
-      break;
-    case rv_opcode.divu:
-      f3 = 5n;
-      f7 = 1n;
-      break;
-    case rv_opcode.rem:
-      f3 = 6n;
-      f7 = 1n;
-      break;
-    case rv_opcode.remu:
-      f3 = 7n;
-      f7 = 1n;
-      break;
-    default:
-      return 0n;
-  }
-  return 0b0110011n | (reg5(rd) << 7n) | (f3 << 12n) | (reg5(rs1) << 15n) | (reg5(rs2) << 20n) | (f7 << 25n);
+export function encodeRType(op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint): bigint {
+  const opcode = BigInt(RV_OPCODE_DATA[op].opcode || 0);
+  if (!opcode) return 0n;
+
+  const funct3 = BigInt(RV_OPCODE_DATA[op].funct3 || 0) << 12n;
+  const funct7 = BigInt(RV_OPCODE_DATA[op].funct7 || 0) << 25n;
+
+  return funct7 | (reg5(rs2) << 20n) | (reg5(rs1) << 15n) | funct3 | (reg5(rd) << 7n) | opcode;
 }
 
 export function encodeIType(op: rv_opcode, rd: bigint, rs1: bigint, imm: bigint): bigint {
-  const r = reg5(rd);
-  const s1 = reg5(rs1);
   const imm12 = pack_i_imm12(imm) << 20n;
+  const opcode = BigInt(RV_OPCODE_DATA[op].opcode || 0);
+  if (!opcode) return 0n;
 
-  switch (op) {
-    case rv_opcode.jalr:
-      return 0b1100111n | (r << 7n) | (s1 << 15n) | imm12;
-    case rv_opcode.lb:
-      return 0b0000011n | (r << 7n) | (0n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.lh:
-      return 0b0000011n | (r << 7n) | (1n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.lw:
-      return 0b0000011n | (r << 7n) | (2n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.lbu:
-      return 0b0000011n | (r << 7n) | (4n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.lhu:
-      return 0b0000011n | (r << 7n) | (5n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.addi:
-      return 0b0010011n | (r << 7n) | (0n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.slti:
-      return 0b0010011n | (r << 7n) | (2n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.sltiu:
-      return 0b0010011n | (r << 7n) | (3n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.xori:
-      return 0b0010011n | (r << 7n) | (4n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.ori:
-      return 0b0010011n | (r << 7n) | (6n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.andi:
-      return 0b0010011n | (r << 7n) | (7n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.slli:
-      return 0b0010011n | (r << 7n) | (1n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.srli:
-      return 0b0010011n | (r << 7n) | (5n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.srai:
-      return 0b0010011n | (r << 7n) | (5n << 12n) | (s1 << 15n) | imm12;
-    case rv_opcode.ecall:
-      return 0b1110011n | (r << 7n) | (s1 << 15n) | imm12;
-    case rv_opcode.ebreak:
-      return 0b1110011n | (r << 7n) | (s1 << 15n) | imm12;
-    default:
-      return 0n;
-  }
+  const funct3 = BigInt(RV_OPCODE_DATA[op].funct3 || 0) << 12n;
+
+  return opcode | (reg5(rd) << 7n) | funct3 | (reg5(rs1) << 15n) | imm12;
 }
 
 export function encodeSType(op: rv_opcode, rs1: bigint, rs2: bigint, imm: bigint): bigint {
+  const opcode = BigInt(RV_OPCODE_DATA[op].opcode || 0);
+  if (!opcode) return 0n;
+
   const s1 = reg5(rs1);
   const s2 = reg5(rs2);
   const bits = pack_s_imm(imm);
-  let f3 = 0n;
-  switch (op) {
-    case rv_opcode.sb:
-      f3 = 0n;
-      break;
-    case rv_opcode.sh:
-      f3 = 1n;
-      break;
-    case rv_opcode.sw:
-      f3 = 2n;
-      break;
-    default:
-      return 0n;
-  }
-  return 0b0100011n | bits | (f3 << 12n) | (s1 << 15n) | (s2 << 20n);
+  const funct3 = BigInt(RV_OPCODE_DATA[op].funct3 || 0);
+
+  return opcode | bits | (funct3 << 12n) | (s1 << 15n) | (s2 << 20n);
 }
 
 export function encodeBType(op: rv_opcode, rs1: bigint, rs2: bigint, imm: bigint): bigint {
+  const opcode = BigInt(RV_OPCODE_DATA[op].opcode || 0);
+  if (!opcode) return 0n;
+
   const s1 = reg5(rs1);
   const s2 = reg5(rs2);
-  let f3 = 0n;
-  switch (op) {
-    case rv_opcode.beq:
-      f3 = 0n;
-      break;
-    case rv_opcode.bne:
-      f3 = 1n;
-      break;
-    case rv_opcode.blt:
-      f3 = 4n;
-      break;
-    case rv_opcode.bge:
-      f3 = 5n;
-      break;
-    case rv_opcode.bltu:
-      f3 = 6n;
-      break;
-    case rv_opcode.bgeu:
-      f3 = 7n;
-      break;
-    default:
-      return 0n;
-  }
-  return 0b1100011n | pack_b_imm(imm) | (f3 << 12n) | (s1 << 15n) | (s2 << 20n);
+  const funct3 = BigInt(RV_OPCODE_DATA[op].funct3 || 0);
+
+  return opcode | pack_b_imm(imm) | (funct3 << 12n) | (s1 << 15n) | (s2 << 20n);
 }
 
 export function encodeUType(op: rv_opcode, rd: bigint, imm: bigint): bigint {
   const r = reg5(rd);
   const hi = u32((imm & 0xfffffn) << 12n);
-  switch (op) {
-    case rv_opcode.lui:
-      return 0b0110111n | (r << 7n) | hi;
-    case rv_opcode.auipc:
-      return 0b0010111n | (r << 7n) | hi;
-    default:
-      return 0n;
-  }
+
+  return BigInt(RV_OPCODE_DATA[op].opcode || 0) | (r << 7n) | hi;
 }
 
 export function encodeJType(op: rv_opcode, rd: bigint, imm: bigint): bigint {
   if (op !== rv_opcode.jal) return 0n;
   return 0b1101111n | (reg5(rd) << 7n) | pack_j_imm(imm);
+}
+
+export function encodeR4Type(op: rv_opcode, rd: bigint, rs1: bigint, rs2: bigint, rs3: bigint, rm: bigint) {
+  const opcode = BigInt(RV_OPCODE_DATA[op].opcode || 0);
+  if (!opcode) return 0n;
+
+  return (
+    (reg5(rs3) << 27n) |
+    (0b00n << 25n) |
+    (reg5(rs2) << 20n) |
+    (reg5(rs1) << 15n) |
+    (rm << 12n) |
+    (reg5(rd) << 7n) |
+    opcode
+  );
 }
 
 export function toS32(n: bigint): bigint {

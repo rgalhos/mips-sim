@@ -19,6 +19,7 @@ import {
   RV_OPCODE_DATA,
   rv_opcode_pseudo,
   rv_reg,
+  rv_reg_f,
   rv_syscalls,
 } from './riscv.const';
 import { RVProcessor } from './riscv.processor';
@@ -42,7 +43,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     .filter((v) => Number.isNaN(+v))
     .slice(1) /* rv_opcode.illegal */;
 
-  public readonly registerKeywords = Object.keys(rv_reg).filter((v) => Number.isNaN(+v));
+  public readonly registerKeywords = Object.keys(rv_reg)
+    .concat(Object.keys(rv_reg_f))
+    .filter((v) => Number.isNaN(+v));
 
   public readonly directives = Object.keys(rv_directives).filter((v) => Number.isNaN(+v));
 
@@ -97,7 +100,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     if (!t) throw throwUnexpectedToken([]);
     const cur = this.followConstSubst(t, constants);
     const v = String(cur.value).toLowerCase();
-    const r = rv_reg[v as keyof typeof rv_reg];
+    const r = rv_reg[v as keyof typeof rv_reg] ?? rv_reg_f[v as keyof typeof rv_reg_f];
     if (typeof r === 'undefined') throw throwUnexpectedToken([t]);
     return r;
   }
@@ -175,6 +178,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       rs1: rv_reg.zero,
       rs2: rv_reg.zero,
       rs3: rv_reg.zero,
+      rm: 0,
     };
 
     const tkFirst = tokens[0];
@@ -339,6 +343,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       rs1: rv_reg.zero,
       rs2: rv_reg.zero,
       rs3: rv_reg.zero,
+      rm: 0,
     };
 
     const op = tkFirst.value.toLowerCase() as keyof typeof rv_opcode;

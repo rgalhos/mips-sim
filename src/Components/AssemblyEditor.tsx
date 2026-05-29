@@ -35,13 +35,13 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
           [/[A-Z][0-9A-Z_]+/, 'type.identifier'], // consts
 
           [
-            /[a-z_$][\w$]*/,
+            /[a-z_$][.\w$]*/,
             { cases: { '@typeKeywords': 'keyword', '@keywords': 'keyword', '@default': 'identifier' } },
           ],
 
           [/\b0[xX][0-9a-fA-F]+\b/, 'number.hex'],
           [/\b0[bB][01]+\b/, 'number.binary'],
-          [/\d+\b/, 'number'],
+          [/(\d+?\.)?\d+\b/, 'number'],
 
           [/#.*$/, 'comment'],
 

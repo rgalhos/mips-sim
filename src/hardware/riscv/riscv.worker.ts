@@ -3,6 +3,7 @@ import type { WorkerMessage, WorkerMessageResponse } from '../common/worker-serv
 import { EWorkerCommand } from '../common/worker-service';
 import { rv_worker_commands } from './riscv.const';
 import { RVProcessor } from './riscv.processor';
+import { IRVCPU } from './riscv.types';
 
 const cpu = new RVProcessor();
 
@@ -139,7 +140,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     cancelRunLoop();
     cpu.resetState();
 
-    cpu.cpu = data.cpu;
+    cpu.cpu = data.cpu as IRVCPU;
     cpu.memory = data.memory;
     cpu.setFrequency(data.frequency);
 

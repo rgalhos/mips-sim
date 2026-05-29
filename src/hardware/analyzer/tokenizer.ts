@@ -196,7 +196,7 @@ export function tokenize(line: string, lineNumber: number) {
     else if (/[a-zA-Z_.]/.test(c)) {
       let j = i + 1;
       let value = c;
-      while (j < line.length && /[a-zA-Z0-9_]/.test(line[j])) {
+      while (j < line.length && /[a-zA-Z0-9_.]/.test(line[j])) {
         value += line[j];
         j++;
       }

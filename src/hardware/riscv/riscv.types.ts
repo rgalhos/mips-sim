@@ -26,6 +26,12 @@ export interface IDecodedRVInstruction extends IDecodedInstruction {
   rs3: number;
   // Immediate value
   imm: bigint;
+  // Rounding mode; 000 = RNE; 001 = RTZ; 010 = RDN; 011 = RUP; 100 = RMM; 101/110 = res; 111 = DYN
+  rm: number;
+  // Format; 00 = .s/F; 01 = .d/D; 10 = .h/Zfh/Zshmin; 11 = .q/Q
+  // fmt: number;
 }
 
-export interface IRVCPU extends ICPU {}
+export interface IRVCPU extends ICPU {
+  registerFloat32: Record<number, bigint>;
+}

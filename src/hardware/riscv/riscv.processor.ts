@@ -2,11 +2,11 @@ import { IProcessor } from '../common/processor';
 import { IAssembledInstruction } from '../common/simulator';
 import {
   rv_codec,
-  RV_CODEC_FORMAT,
   rv_extension,
   rv_opcode,
   RV_OPCODE_DATA,
   rv_reg,
+  rv_reg_f,
   rv_syscalls,
   rv_worker_commands,
 } from './riscv.const';
@@ -15,6 +15,7 @@ import {
   encodeBType,
   encodeIType,
   encodeJType,
+  encodeR4Type,
   encodeRType,
   encodeSType,
   encodeUType,
@@ -108,6 +109,40 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       [rv_reg.t5]: 0n,
       [rv_reg.t6]: 0n,
     },
+    registerFloat32: {
+      [rv_reg_f.ft0]: 0n,
+      [rv_reg_f.ft1]: 0n,
+      [rv_reg_f.ft2]: 0n,
+      [rv_reg_f.ft3]: 0n,
+      [rv_reg_f.ft4]: 0n,
+      [rv_reg_f.ft5]: 0n,
+      [rv_reg_f.ft6]: 0n,
+      [rv_reg_f.ft7]: 0n,
+      [rv_reg_f.fs0]: 0n,
+      [rv_reg_f.fs1]: 0n,
+      [rv_reg_f.fa0]: 0n,
+      [rv_reg_f.fa1]: 0n,
+      [rv_reg_f.fa2]: 0n,
+      [rv_reg_f.fa3]: 0n,
+      [rv_reg_f.fa4]: 0n,
+      [rv_reg_f.fa5]: 0n,
+      [rv_reg_f.fa6]: 0n,
+      [rv_reg_f.fa7]: 0n,
+      [rv_reg_f.fs2]: 0n,
+      [rv_reg_f.fs3]: 0n,
+      [rv_reg_f.fs4]: 0n,
+      [rv_reg_f.fs5]: 0n,
+      [rv_reg_f.fs6]: 0n,
+      [rv_reg_f.fs7]: 0n,
+      [rv_reg_f.fs8]: 0n,
+      [rv_reg_f.fs9]: 0n,
+      [rv_reg_f.fs10]: 0n,
+      [rv_reg_f.fs11]: 0n,
+      [rv_reg_f.ft8]: 0n,
+      [rv_reg_f.ft9]: 0n,
+      [rv_reg_f.ft10]: 0n,
+      [rv_reg_f.ft11]: 0n,
+    },
     pc: this.PC_START,
   };
 
@@ -149,6 +184,11 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         return u32(encodeUType(op, rd, imm));
       case rv_codec.j:
         return u32(encodeJType(op, rd, imm));
+      case rv_codec.r4: {
+        const rs3 = BigInt(instruction.rs3 ?? rv_reg.zero);
+        const rm = BigInt(instruction.rm ?? rv_reg.zero);
+        return u32(encodeR4Type(op, rd, rs1, rs2, rs3, rm));
+      }
       default:
         return 0n;
     }
@@ -345,6 +385,14 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         else if (sysImm === 1) op = rv_opcode.ebreak;
         break;
       }
+
+      // RV32F
+      case 0b0000111:
+        op = rv_opcode.flw;
+        break;
+      case 0b0100111:
+        op = rv_opcode.fsw;
+        break;
     }
 
     if (op === rv_opcode.illegal) {
@@ -358,6 +406,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         rs2: rv_reg.zero,
         rs3: rv_reg.zero,
         imm: 0n,
+        rm: 0,
       };
     }
 
@@ -372,36 +421,42 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       rs2: rv_reg.zero,
       rs3: rv_reg.zero,
       imm: 0n,
+      rm: 0,
     };
 
     switch (op_info.codec) {
       case rv_codec.r:
-        dec.rd = operand_rd(bytecode) as rv_reg;
-        dec.rs1 = operand_rs1(bytecode) as rv_reg;
-        dec.rs2 = operand_rs2(bytecode) as rv_reg;
+        dec.rd = operand_rd(bytecode);
+        dec.rs1 = operand_rs1(bytecode);
+        dec.rs2 = operand_rs2(bytecode);
         break;
       case rv_codec.i:
-        dec.rd = operand_rd(bytecode) as rv_reg;
-        dec.rs1 = operand_rs1(bytecode) as rv_reg;
+        dec.rd = operand_rd(bytecode);
+        dec.rs1 = operand_rs1(bytecode);
         dec.imm = operand_iimm12(bytecode);
         break;
       case rv_codec.s:
-        dec.rs1 = operand_rs1(bytecode) as rv_reg;
-        dec.rs2 = operand_rs2(bytecode) as rv_reg;
+        dec.rs1 = operand_rs1(bytecode);
+        dec.rs2 = operand_rs2(bytecode);
         dec.imm = operand_simm12(bytecode);
         break;
       case rv_codec.b:
-        dec.rs1 = operand_rs1(bytecode) as rv_reg;
-        dec.rs2 = operand_rs2(bytecode) as rv_reg;
+        dec.rs1 = operand_rs1(bytecode);
+        dec.rs2 = operand_rs2(bytecode);
         dec.imm = operand_bimm(bytecode);
         break;
       case rv_codec.u:
-        dec.rd = operand_rd(bytecode) as rv_reg;
+        dec.rd = operand_rd(bytecode);
         dec.imm = operand_imm_u(bytecode);
         break;
       case rv_codec.j:
-        dec.rd = operand_rd(bytecode) as rv_reg;
+        dec.rd = operand_rd(bytecode);
         dec.imm = operand_imm_j(bytecode);
+        break;
+      case rv_codec.r4:
+        dec.rs3 = operand_funct7(bytecode) >> 2;
+        // dec.fmt = operand_funct7(bytecode) & 0b11;
+        dec.rm = operand_funct3(bytecode);
         break;
       default:
         dec.imm = 0n;
@@ -761,33 +816,49 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
   public stringifyInstruction(instruction: Partial<IDecodedRVInstruction>): string {
     const opcode = instruction._op || rv_opcode.illegal;
-    const rd = rv_reg[instruction.rd || rv_reg.zero];
-    const rs1 = rv_reg[instruction.rs1 || rv_reg.zero];
-    const rs2 = rv_reg[instruction.rs2 || rv_reg.zero];
-    const rs3 = rv_reg[instruction.rs3 || rv_reg.zero];
+    const rd = instruction.rd ?? 0;
+    const rs1 = instruction.rs1 ?? 0;
+    const rs2 = instruction.rs2 ?? 0;
+    const rs3 = instruction.rs3 ?? 0;
     const imm = instruction.imm || 0n;
 
     const op_info = RV_OPCODE_DATA[opcode];
+    const rv32im = op_info.extension === rv_extension.RV32I || op_info.extension === rv_extension.RV32M;
+    const rv32f = op_info.extension === rv_extension.RV32F;
     let fmt = op_info.format;
     let str = '';
 
     if (instruction._op === rv_opcode.ebreak || instruction._op === rv_opcode.ecall) {
       return op_info.name;
-    } else if ([rv_opcode.lb, rv_opcode.lh, rv_opcode.lw, rv_opcode.lbu, rv_opcode.lhu].includes(opcode)) {
-      fmt = RV_CODEC_FORMAT[rv_codec.s];
     }
 
     for (const c of fmt) {
       if (c === 'O') {
         str += op_info.name;
       } else if (c === 'd') {
-        str += rd;
+        if (rv32im || [rv_opcode['fmv.w.x'], rv_opcode['fcvt.w.s'], rv_opcode['fcvt.wu.s']].includes(opcode)) {
+          str += rv_reg[rd];
+        } else if (rv32f) {
+          str += rv_reg_f[rd];
+        }
       } else if (c === '1') {
-        str += rs1;
+        if (rv32im || [rv_opcode['fmv.x.w'], rv_opcode['fcvt.s.w'], rv_opcode['fcvt.s.wu']].includes(opcode)) {
+          str += rv_reg[rs1];
+        } else if (rv32f) {
+          str += rv_reg_f[rs1];
+        }
       } else if (c === '2') {
-        str += rs2;
+        if (rv32im || rv_opcode.flw === opcode) {
+          str += rv_reg[rs2];
+        } else if (rv32f) {
+          str += rv_reg_f[rs2];
+        }
       } else if (c === '3') {
-        str += rs3;
+        if (rv32im) {
+          str += rv_reg[rs3];
+        } else if (rv32f) {
+          str += rv_reg_f[rs3];
+        }
       } else if (c === 'i') {
         str += imm;
       } else if (c === 'x') {
@@ -820,6 +891,14 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     if (reg !== rv_reg.zero) {
       return super.registerWrite(reg, value & this.REG_MASK);
     }
+  }
+
+  protected registerWriteFloat32(reg: number, value: bigint) {
+    if (reg > rv_reg_f.f31) {
+      throw new Error('RVSIM: inexistent rv32f register: ' + reg);
+    }
+
+    this.cpu.registerFloat32[reg] = value;
   }
 
   public loadProgram(program: Array<IAssembledInstruction<IDecodedRVInstruction>>) {

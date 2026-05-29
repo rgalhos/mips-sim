@@ -1,5 +1,5 @@
 export enum rv_reg {
-  // Aliases:
+  // ABI
   x0 = 0,
   x1 = 1,
   x2 = 2,
@@ -67,14 +67,88 @@ export enum rv_reg {
   t6 = 31,
 }
 
+export enum rv_reg_f {
+  // ABI
+  f0 = 0,
+  f1 = 1,
+  f2 = 2,
+  f3 = 3,
+  f4 = 4,
+  f5 = 5,
+  f6 = 6,
+  f7 = 7,
+  f8 = 8,
+  f9 = 9,
+  f10 = 10,
+  f11 = 11,
+  f12 = 12,
+  f13 = 13,
+  f14 = 14,
+  f15 = 15,
+  f16 = 16,
+  f17 = 17,
+  f18 = 18,
+  f19 = 19,
+  f20 = 20,
+  f21 = 21,
+  f22 = 22,
+  f23 = 23,
+  f24 = 24,
+  f25 = 25,
+  f26 = 26,
+  f27 = 27,
+  f28 = 28,
+  f29 = 29,
+  f30 = 30,
+  f31 = 31,
+
+  ft0 = 0,
+  ft1 = 1,
+  ft2 = 2,
+  ft3 = 3,
+  ft4 = 4,
+  ft5 = 5,
+  ft6 = 6,
+  ft7 = 7,
+  fs0 = 8,
+  fs1 = 9,
+  fa0 = 10,
+  fa1 = 11,
+  fa2 = 12,
+  fa3 = 13,
+  fa4 = 14,
+  fa5 = 15,
+  fa6 = 16,
+  fa7 = 17,
+  fs2 = 18,
+  fs3 = 19,
+  fs4 = 20,
+  fs5 = 21,
+  fs6 = 22,
+  fs7 = 23,
+  fs8 = 24,
+  fs9 = 25,
+  fs10 = 26,
+  fs11 = 27,
+  ft8 = 28,
+  ft9 = 29,
+  ft10 = 30,
+  ft11 = 31,
+}
+
 export enum rv_codec {
   illegal,
+
+  // RV32I
   r,
   i,
   s,
   b,
   j,
   u,
+
+  // RV32F
+  r4,
 }
 
 export enum rv_opcode {
@@ -120,6 +194,7 @@ export enum rv_opcode {
   // fence,
   ecall,
   ebreak,
+
   // RV32M
   mul,
   mulh,
@@ -129,6 +204,34 @@ export enum rv_opcode {
   divu,
   rem,
   remu,
+
+  // RV32F
+  flw,
+  fsw,
+  'fmadd.s',
+  'fmsub.s',
+  'fnmsub.s',
+  'fnmadd.s',
+  'fadd.s',
+  'fsub.s',
+  'fmul.s',
+  'fdiv.s',
+  'fsqrt.s',
+  'fsgnj.s',
+  'fsgnjn.s',
+  'fsgnjx.s',
+  'fmin.s',
+  'fmax.s',
+  'fcvt.w.s',
+  'fcvt.wu.s',
+  'fmv.x.w',
+  'feq.s',
+  'flt.s',
+  'fle.s',
+  'fclass.s',
+  'fcvt.s.w',
+  'fcvt.s.wu',
+  'fmv.w.x',
 }
 
 // https://www.scribd.com/document/854447210/RISC-V-Pseudo-Instructions
@@ -222,6 +325,7 @@ export enum rv_consts {
 export const enum rv_extension {
   RV32I = 1 << 0,
   RV32M = 1 << 1,
+  RV32F = 1 << 2,
 }
 
 export const RV_CODEC_FORMAT = {
@@ -231,6 +335,7 @@ export const RV_CODEC_FORMAT = {
   [rv_codec.b]: 'O 1, 2, X',
   [rv_codec.j]: 'O d, x',
   [rv_codec.u]: 'O d, j',
+  [rv_codec.r4]: 'O d, 1, 2, 3',
 } as const;
 
 // É imprescindível que os elementos de RV_OPCODE_DATA estejam na mesma ordem que os do enum rv_opcode
@@ -247,11 +352,11 @@ export const RV_OPCODE_DATA = [
   { name: 'bge',     codec: rv_codec.b, format: RV_CODEC_FORMAT[rv_codec.b], opcode: 0b1100011, funct3: 0b101, funct7: null, extension: rv_extension.RV32I },
   { name: 'bltu',    codec: rv_codec.b, format: RV_CODEC_FORMAT[rv_codec.b], opcode: 0b1100011, funct3: 0b110, funct7: null, extension: rv_extension.RV32I },
   { name: 'bgeu',    codec: rv_codec.b, format: RV_CODEC_FORMAT[rv_codec.b], opcode: 0b1100011, funct3: 0b111, funct7: null, extension: rv_extension.RV32I },
-  { name: 'lb',      codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.i], opcode: 0b0000011, funct3: 0b000, funct7: null, extension: rv_extension.RV32I },
-  { name: 'lh',      codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.i], opcode: 0b0000011, funct3: 0b001, funct7: null, extension: rv_extension.RV32I },
-  { name: 'lw',      codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.i], opcode: 0b0000011, funct3: 0b010, funct7: null, extension: rv_extension.RV32I },
-  { name: 'lbu',     codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.i], opcode: 0b0000011, funct3: 0b100, funct7: null, extension: rv_extension.RV32I },
-  { name: 'lhu',     codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.i], opcode: 0b0000011, funct3: 0b101, funct7: null, extension: rv_extension.RV32I },
+  { name: 'lb',      codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.s], opcode: 0b0000011, funct3: 0b000, funct7: null, extension: rv_extension.RV32I },
+  { name: 'lh',      codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.s], opcode: 0b0000011, funct3: 0b001, funct7: null, extension: rv_extension.RV32I },
+  { name: 'lw',      codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.s], opcode: 0b0000011, funct3: 0b010, funct7: null, extension: rv_extension.RV32I },
+  { name: 'lbu',     codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.s], opcode: 0b0000011, funct3: 0b100, funct7: null, extension: rv_extension.RV32I },
+  { name: 'lhu',     codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.s], opcode: 0b0000011, funct3: 0b101, funct7: null, extension: rv_extension.RV32I },
   { name: 'sb',      codec: rv_codec.s, format: RV_CODEC_FORMAT[rv_codec.s], opcode: 0b0100011, funct3: 0b000, funct7: null, extension: rv_extension.RV32I },
   { name: 'sh',      codec: rv_codec.s, format: RV_CODEC_FORMAT[rv_codec.s], opcode: 0b0100011, funct3: 0b001, funct7: null, extension: rv_extension.RV32I },
   { name: 'sw',      codec: rv_codec.s, format: RV_CODEC_FORMAT[rv_codec.s], opcode: 0b0100011, funct3: 0b010, funct7: null, extension: rv_extension.RV32I },
@@ -277,6 +382,7 @@ export const RV_OPCODE_DATA = [
   // { name: 'fence',   codec: rv_codec.u, format: 'todo', opcode: 0b0001111, funct3: 0b000, funct7: null, extension: rv_extension.RV32I },
   { name: 'ecall',   codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.i], opcode: 0b1110011, funct3: 0b000, funct7: null, extension: rv_extension.RV32I },
   { name: 'ebreak',  codec: rv_codec.i, format: RV_CODEC_FORMAT[rv_codec.i], opcode: 0b1110011, funct3: 0b000, funct7: null, extension: rv_extension.RV32I },
+
   // RV32M
   { name: 'mul',     codec: rv_codec.r, format: RV_CODEC_FORMAT[rv_codec.r], opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, extension: rv_extension.RV32M },
   { name: 'mulh',    codec: rv_codec.r, format: RV_CODEC_FORMAT[rv_codec.r], opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, extension: rv_extension.RV32M },
@@ -286,4 +392,32 @@ export const RV_OPCODE_DATA = [
   { name: 'divu',    codec: rv_codec.r, format: RV_CODEC_FORMAT[rv_codec.r], opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, extension: rv_extension.RV32M },
   { name: 'rem',     codec: rv_codec.r, format: RV_CODEC_FORMAT[rv_codec.r], opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, extension: rv_extension.RV32M },
   { name: 'remu',    codec: rv_codec.r, format: RV_CODEC_FORMAT[rv_codec.r], opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, extension: rv_extension.RV32M },
+
+  // RV32
+  { name: 'flw',       codec: rv_codec.i,  format: RV_CODEC_FORMAT[rv_codec.s],  opcode: 0b0000111, funct3: 0b010, funct7: 0b0000000, extension: rv_extension.RV32F },
+  { name: 'fsw',       codec: rv_codec.s,  format: RV_CODEC_FORMAT[rv_codec.s],  opcode: 0b0100111, funct3: 0b010, funct7: 0b0000000, extension: rv_extension.RV32F },
+  { name: 'fmadd.s',   codec: rv_codec.r4, format: RV_CODEC_FORMAT[rv_codec.r4], opcode: 0b1000011, funct3: 0b000, funct7: 0b0000000, extension: rv_extension.RV32F },
+  { name: 'fmsub.s',   codec: rv_codec.r4, format: RV_CODEC_FORMAT[rv_codec.r4], opcode: 0b1000111, funct3: 0b000, funct7: 0b0000000, extension: rv_extension.RV32F },
+  { name: 'fnmsub.s',  codec: rv_codec.r4, format: RV_CODEC_FORMAT[rv_codec.r4], opcode: 0b1001011, funct3: 0b000, funct7: 0b0000000, extension: rv_extension.RV32F },
+  { name: 'fnmadd.s',  codec: rv_codec.r4, format: RV_CODEC_FORMAT[rv_codec.r4], opcode: 0b1001111, funct3: 0b000, funct7: 0b0000000, extension: rv_extension.RV32F },
+  { name: 'fadd.s',    codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b0000000, extension: rv_extension.RV32F },
+  { name: 'fsub.s',    codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b00001, extension: rv_extension.RV32F },
+  { name: 'fmul.s',    codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b00010, extension: rv_extension.RV32F },
+  { name: 'fdiv.s',    codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b00011, extension: rv_extension.RV32F },
+  { name: 'fsqrt.s',   codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b01011, extension: rv_extension.RV32F },
+  { name: 'fsgnj.s',   codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b00100, extension: rv_extension.RV32F },
+  { name: 'fsgnjn.s',  codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b001, funct7: 0b00100, extension: rv_extension.RV32F },
+  { name: 'fsgnjx.s',  codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b010, funct7: 0b00100, extension: rv_extension.RV32F },
+  { name: 'fmin.s',    codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b00101, extension: rv_extension.RV32F },
+  { name: 'fmax.s',    codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b001, funct7: 0b00101, extension: rv_extension.RV32F },
+  { name: 'fcvt.w.s',  codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b11000, extension: rv_extension.RV32F },
+  { name: 'fcvt.wu.s', codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b11000, extension: rv_extension.RV32F },
+  { name: 'fmv.x.w',   codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b11100, extension: rv_extension.RV32F },
+  { name: 'feq.s',     codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b010, funct7: 0b10100, extension: rv_extension.RV32F },
+  { name: 'flt.s',     codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b001, funct7: 0b10100, extension: rv_extension.RV32F },
+  { name: 'fle.s',     codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b10100, extension: rv_extension.RV32F },
+  { name: 'fclass.s',  codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b001, funct7: 0b11100, extension: rv_extension.RV32F },
+  { name: 'fcvt.s.w',  codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b11010, extension: rv_extension.RV32F },
+  { name: 'fcvt.s.wu', codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b11010, extension: rv_extension.RV32F },
+  { name: 'fmv.w.x',   codec: rv_codec.r,  format: RV_CODEC_FORMAT[rv_codec.r],  opcode: 0b1010011, funct3: 0b000, funct7: 0b11110, extension: rv_extension.RV32F },
 ];
