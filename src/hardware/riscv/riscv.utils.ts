@@ -1,4 +1,11 @@
-import { rv_ext, rv_opcode, RV_OPCODE_DATA } from './riscv.const';
+import { rv_opcode, RV_OPCODE_DATA } from './riscv.const';
+
+// Data view helper used for converting float/double <-> unit32/uint64
+const dv = new DataView(new ArrayBuffer(8));
+
+export const SP_POS_INF = 0x7f800000n;
+export const SP_NEG_INF = 0xff800000n;
+export const SP_CANONICAL_NAN = 0x7fc00000n;
 
 export function u32(n: bigint): bigint {
   return n & 0xffffffffn;
@@ -227,8 +234,26 @@ export function splitHiLoS32(value: bigint): { hi: bigint; lo: bigint } {
   return { hi, lo };
 }
 
+export function biguint32_to_f(val: bigint) {
+  dv.setBigUint64(0, val);
+  return dv.getFloat32(4);
+}
+
+export function cvt_u32_to_f(val: bigint) {
+  dv.setFloat32(0, Number(val));
+}
+
+export function f_to_biguint(val: number) {
+  dv.setFloat32(4, val);
+  return dv.getBigUint64(0) >> 32n;
+}
+
+export function is_sp_inf(val: bigint) {
+  return val === SP_POS_INF || val === SP_NEG_INF;
+}
+
 export function is_sp_neg_inf(val: bigint) {
-  return val === 0xff800000n;
+  return val === SP_NEG_INF;
 }
 
 export function is_sp_neg_norm(val: bigint) {
@@ -251,6 +276,10 @@ export function is_sp_pos_zero(val: bigint) {
   return val === 0n;
 }
 
+export function is_sp_zero(val: bigint) {
+  return is_sp_pos_zero(val) || is_sp_neg_zero(val);
+}
+
 export function is_sp_pos_subnorm(val: bigint) {
   return !!(((val >> 31n) & 1n) === 0n && ((val >> 23n) & 0xffn) === 0n && (val & 0x7fffffn) !== 0n);
 }
@@ -263,7 +292,7 @@ export function is_sp_pos_norm(val: bigint) {
 }
 
 export function is_sp_pos_inf(val: bigint) {
-  return val === 0x7f800000n;
+  return val === SP_POS_INF;
 }
 
 export function is_sp_nan(val: bigint) {
@@ -276,4 +305,63 @@ export function is_sp_signaling_nan(val: bigint) {
 
 export function is_sp_quiet_nan(val: bigint) {
   return !!((val & 0x7f800000n) === 0x7f800000n && val & 0x400000n);
+}
+
+// @todo Write tests for this because i'm not 100% sure it's correct
+//       this is so confusing i'm gonna kms
+export function ieee754_evaluate_fma_cases(
+  vf1: bigint,
+  vf2: bigint,
+  vf3: bigint,
+  negateProduct: boolean,
+  subtractC: boolean,
+): bigint | null {
+  if (is_sp_nan(vf1) || is_sp_nan(vf2) || is_sp_nan(vf3)) {
+    // @todo: signaling NaN -> NV
+    return SP_CANONICAL_NAN;
+  }
+
+  // INF * 0  or  0 * INF
+  if ((is_sp_inf(vf1) && is_sp_zero(vf2)) || (is_sp_zero(vf1) && is_sp_inf(vf2))) {
+    // @todo: set NV
+    return SP_CANONICAL_NAN;
+  }
+
+  const productInf = is_sp_inf(vf1) || is_sp_inf(vf2);
+
+  // sign of (a * b)
+  let productSign = (vf1 >> 31n) ^ (vf2 >> 31n);
+
+  // apply FNM* negation
+  if (negateProduct) {
+    productSign ^= 1n;
+  }
+
+  const product = productSign ? SP_NEG_INF : SP_POS_INF;
+
+  // effective value of c after applying +/- operation
+  let effectiveC = vf3;
+
+  if (subtractC) {
+    effectiveC ^= 0x80000000n;
+  }
+
+  // INF product +/- INF
+  if (productInf) {
+    if (is_sp_inf(effectiveC) && effectiveC !== product) {
+      // (+INF) + (-INF)
+      // (-INF) + (+INF)
+      // @todo: set NV
+      return SP_CANONICAL_NAN;
+    }
+
+    return product;
+  }
+
+  // finite +/- INF
+  if (is_sp_inf(effectiveC)) {
+    return effectiveC;
+  }
+
+  return null;
 }

@@ -59,6 +59,8 @@ export const throwMacroBadDefinition = (tokens: IToken[]) => {
   return new Error('ASSEMBLER_MACRO_BAD_DEFINITION', { cause: tokens });
 };
 
+const dataViewHelper = new DataView(new ArrayBuffer(8));
+
 export const stringifyTokenizerError = (e: Error) => {
   if (!e.message.startsWith('ASSEMBLER_')) return e.toString();
 
@@ -243,6 +245,7 @@ export function tokenize(line: string, lineNumber: number) {
       }
       let j = i + 1;
       let isNegative = 1;
+      let isFloat = false;
 
       if (c === '-') {
         isNegative = -1;
@@ -278,6 +281,18 @@ export function tokenize(line: string, lineNumber: number) {
         break;
       }
 
+      if (line[j] === '.') {
+        console.log('dot');
+        isFloat = true;
+        j++;
+        value += '.';
+        while (j < line.length && /[0-9]/.test(line[j])) {
+          value += line[j];
+          j++;
+        }
+        console.log(value);
+      }
+
       const v = Number(value) * isNegative;
       if (isNaN(v)) {
         // @todo tratar melhor aí em cima
@@ -285,8 +300,17 @@ export function tokenize(line: string, lineNumber: number) {
         break;
       }
 
-      tokens.push({ type: ETokenType.NUMBER, value: v, lineNumber });
+      if (isFloat) {
+        dataViewHelper.setFloat32(0, v);
+        const f = dataViewHelper.getUint32(0);
+        console.log({ type: ETokenType.NUMBER, value: f, lineNumber });
+        tokens.push({ type: ETokenType.NUMBER, value: f, lineNumber });
+      } else {
+        tokens.push({ type: ETokenType.NUMBER, value: v, lineNumber });
+      }
+
       i = j;
+
       if (readingReloc) {
         relocSawArg = true;
       }

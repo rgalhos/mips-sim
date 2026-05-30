@@ -12,6 +12,7 @@ import {
 } from './riscv.const';
 import { IDecodedRVInstruction, IRVCPU } from './riscv.types';
 import {
+  biguint32_to_f,
   encodeBType,
   encodeIType,
   encodeJType,
@@ -20,6 +21,9 @@ import {
   encodeRType_RV32F,
   encodeSType,
   encodeUType,
+  f_to_biguint,
+  ieee754_evaluate_fma_cases,
+  is_sp_inf,
   is_sp_nan,
   is_sp_neg_inf,
   is_sp_neg_norm,
@@ -30,6 +34,7 @@ import {
   is_sp_pos_subnorm,
   is_sp_pos_zero,
   is_sp_signaling_nan,
+  is_sp_zero,
   operand_bimm,
   operand_funct3,
   operand_funct7,
@@ -42,6 +47,9 @@ import {
   operand_rs2,
   operand_simm12,
   s32,
+  SP_CANONICAL_NAN,
+  SP_NEG_INF,
+  SP_POS_INF,
   u32,
 } from './riscv.utils';
 
@@ -83,6 +91,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   private readonly extensions = rv_ext.RV32I | rv_ext.RV32M | rv_ext.RV32F;
   public readonly ILEN = 32;
   public readonly XLEN: 32 /* | 64 */ = 32;
+  public readonly FLEN: 32 /* | 64 */ = 32;
   public readonly REG_MASK = 0xffffffffn; // 2**32-1 for RV32, 2**64-1 for RV64
 
   private readonly initialCpuState: IRVCPU = {
@@ -910,34 +919,210 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       case rv_opcode.fsw:
         this.memoryWrite(u32(v1 + d.imm), v2, 32);
         return;
-      case rv_opcode['fmadd.s']:
+      case rv_opcode['fmadd.s']: {
+        // @todo rounding mode
+        const ev = ieee754_evaluate_fma_cases(vf1, vf2, vf3, false, false);
+        if (ev !== null) {
+          return this.registerWriteFloat32(d.rd, ev);
+        }
+
+        const a = biguint32_to_f(vf1);
+        const b = biguint32_to_f(vf2);
+        const c = biguint32_to_f(vf3);
+        this.registerWriteFloat32(d.rd, f_to_biguint(Math.fround(a * b + c)));
         return;
-      case rv_opcode['fmsub.s']:
+      }
+      case rv_opcode['fmsub.s']: {
+        // @todo rounding mode
+        const ev = ieee754_evaluate_fma_cases(vf1, vf2, vf3, false, true);
+        if (ev !== null) {
+          return this.registerWriteFloat32(d.rd, ev);
+        }
+
+        const a = biguint32_to_f(vf1);
+        const b = biguint32_to_f(vf2);
+        const c = biguint32_to_f(vf3);
+        this.registerWriteFloat32(d.rd, f_to_biguint(Math.fround(a * b - c)));
         return;
-      case rv_opcode['fnmsub.s']:
+      }
+      case rv_opcode['fnmsub.s']: {
+        // @todo rounding mode
+        const ev = ieee754_evaluate_fma_cases(vf1, vf2, vf3, true, false);
+        if (ev !== null) {
+          return this.registerWriteFloat32(d.rd, ev);
+        }
+
+        const a = biguint32_to_f(vf1);
+        const b = biguint32_to_f(vf2);
+        const c = biguint32_to_f(vf3);
+        this.registerWriteFloat32(d.rd, f_to_biguint(Math.fround(-(a * b) + c)));
         return;
-      case rv_opcode['fnmadd.s']:
+      }
+      case rv_opcode['fnmadd.s']: {
+        // @todo rounding mode
+        const ev = ieee754_evaluate_fma_cases(vf1, vf2, vf3, true, true);
+        if (ev !== null) {
+          return this.registerWriteFloat32(d.rd, ev);
+        }
+
+        const a = biguint32_to_f(vf1);
+        const b = biguint32_to_f(vf2);
+        const c = biguint32_to_f(vf3);
+        this.registerWriteFloat32(d.rd, f_to_biguint(Math.fround(-(a * b) - c)));
         return;
-      case rv_opcode['fadd.s']:
+      }
+      case rv_opcode['fadd.s']: {
+        // @todo rounding mode
+        if (is_sp_nan(vf1) || is_sp_nan(vf2)) {
+          // @todo check signaling NaN and set NV bit
+          return this.registerWriteFloat32(d.rd, SP_CANONICAL_NAN);
+        } else if (is_sp_inf(vf1) && is_sp_inf(vf2)) {
+          // different signals = NaN
+          return this.registerWriteFloat32(d.rd, vf1 !== vf2 ? SP_CANONICAL_NAN : vf1);
+        } else if (is_sp_inf(vf1)) {
+          return this.registerWriteFloat32(d.rd, vf1);
+        } else if (is_sp_inf(vf2)) {
+          return this.registerWriteFloat32(d.rd, vf2);
+        }
+
+        const a = biguint32_to_f(vf1);
+        const b = biguint32_to_f(vf2);
+        this.registerWriteFloat32(d.rd, f_to_biguint(Math.fround(a + b)));
         return;
-      case rv_opcode['fsub.s']:
+      }
+      case rv_opcode['fsub.s']: {
+        // @todo rounding mode
+        if (is_sp_nan(vf1) || is_sp_nan(vf2)) {
+          // @todo check signaling NaN and set NV bit
+          return this.registerWriteFloat32(d.rd, SP_CANONICAL_NAN);
+        } else if (is_sp_inf(vf1) && is_sp_inf(vf2)) {
+          // in subtraction, same signal = NaN
+          return this.registerWriteFloat32(d.rd, vf1 === vf2 ? SP_CANONICAL_NAN : vf1);
+        } else if (is_sp_inf(vf1)) {
+          return this.registerWriteFloat32(d.rd, vf1);
+        } else if (is_sp_inf(vf2)) {
+          return this.registerWriteFloat32(d.rd, vf2);
+        }
+
+        const a = biguint32_to_f(vf1);
+        const b = biguint32_to_f(vf2);
+        this.registerWriteFloat32(d.rd, f_to_biguint(Math.fround(a - b)));
         return;
-      case rv_opcode['fmul.s']:
+      }
+      case rv_opcode['fmul.s']: {
+        // @todo rounding mode
+        if (is_sp_nan(vf1) || is_sp_nan(vf2)) {
+          // @todo check signaling NaN and set NV bit
+          return this.registerWriteFloat32(d.rd, SP_CANONICAL_NAN);
+        } else if (is_sp_inf(vf1) && is_sp_inf(vf2)) {
+          // different signal = pos infinity
+          return this.registerWriteFloat32(d.rd, vf1 === vf2 ? SP_POS_INF : SP_NEG_INF);
+        } else if (is_sp_inf(vf1) || is_sp_inf(vf2)) {
+          const zero = is_sp_zero(vf1) || is_sp_zero(vf2);
+          if (zero) return this.registerWriteFloat32(d.rd, SP_CANONICAL_NAN);
+
+          const signal = ((vf1 >> 31n) ^ (vf2 >> 31n)) & 1n;
+          return this.registerWriteFloat32(d.rd, signal ? SP_NEG_INF : SP_POS_INF);
+        }
+
+        const a = biguint32_to_f(vf1);
+        const b = biguint32_to_f(vf2);
+        this.registerWriteFloat32(d.rd, f_to_biguint(Math.fround(a * b)));
         return;
-      case rv_opcode['fdiv.s']:
+      }
+      case rv_opcode['fdiv.s']: {
+        // @todo rounding mode
+        // @todo set DZ flag
+        if (
+          is_sp_nan(vf1) ||
+          is_sp_nan(vf2) ||
+          (is_sp_zero(vf1) && is_sp_zero(vf2)) ||
+          (is_sp_inf(vf1) && is_sp_inf(vf2))
+        ) {
+          // 0 / 0 = NaN
+          return this.registerWriteFloat32(d.rd, SP_CANONICAL_NAN);
+        } else if (is_sp_zero(vf2)) {
+          // x/0 = INF for x > 0, -INF for x < 0
+          return this.registerWriteFloat32(d.rd, vf1 >> 31n ? SP_NEG_INF : SP_POS_INF);
+        } else if (is_sp_inf(vf1)) {
+          // INF/x = INF for x > 0, -INF for x < 0
+          return this.registerWriteFloat32(d.rd, vf2 >> 31n ? SP_NEG_INF : SP_POS_INF);
+        }
+
+        if (is_sp_pos_zero(vf2)) {
+          this.registerWriteFloat32(d.rd, SP_POS_INF);
+        } else if (is_sp_neg_zero(vf2)) {
+          this.registerWriteFloat32(d.rd, SP_NEG_INF);
+        } else {
+          const a = biguint32_to_f(vf1);
+          const b = biguint32_to_f(vf2);
+          this.registerWriteFloat32(d.rd, f_to_biguint(Math.fround(a / b)));
+        }
         return;
-      case rv_opcode['fsqrt.s']:
+      }
+      case rv_opcode['fsqrt.s']: {
+        // @todo rounding mode
+        if (is_sp_nan(vf1) || is_sp_neg_inf(vf1)) {
+          // @todo handle signaling NaN
+          return this.registerWriteFloat32(d.rd, SP_CANONICAL_NAN);
+        } else if (is_sp_pos_inf(vf1)) {
+          return this.registerWriteFloat32(d.rd, SP_POS_INF);
+        }
+
+        const a = biguint32_to_f(vf1);
+        this.registerWriteFloat32(d.rd, f_to_biguint(Math.fround(Math.sqrt(a))));
         return;
+      }
       case rv_opcode['fsgnj.s']:
         return;
       case rv_opcode['fsgnjn.s']:
         return;
       case rv_opcode['fsgnjx.s']:
         return;
-      case rv_opcode['fmin.s']:
+      case rv_opcode['fmin.s']: {
+        // both NaN = NaN
+        if (is_sp_nan(vf1) && is_sp_nan(vf2)) {
+          // @todo handle signaling NaN
+          return this.registerWriteFloat32(d.rd, SP_CANONICAL_NAN);
+        }
+        // if one operand is NaN = the other operand
+        else if (is_sp_nan(vf1)) {
+          return this.registerWriteFloat32(d.rd, vf2);
+        } else if (is_sp_nan(vf2)) {
+          return this.registerWriteFloat32(d.rd, vf1);
+        }
+        // -0.0 is lower than +0.0
+        else if (is_sp_zero(vf1) && is_sp_zero(vf2)) {
+          return this.registerWriteFloat32(d.rd, is_sp_neg_zero(vf1) ? vf1 : vf2);
+        }
+
+        const a = biguint32_to_f(vf1);
+        const b = biguint32_to_f(vf2);
+        this.registerWriteFloat32(d.rd, a > b ? vf2 : vf1);
         return;
-      case rv_opcode['fmax.s']:
+      }
+      case rv_opcode['fmax.s']: {
+        // both NaN = NaN
+        if (is_sp_nan(vf1) && is_sp_nan(vf2)) {
+          // @todo handle signaling NaN
+          return this.registerWriteFloat32(d.rd, SP_CANONICAL_NAN);
+        }
+        // if one operand is NaN = the other operand
+        else if (is_sp_nan(vf1)) {
+          return this.registerWriteFloat32(d.rd, vf2);
+        } else if (is_sp_nan(vf2)) {
+          return this.registerWriteFloat32(d.rd, vf1);
+        }
+        // -0.0 is lower than +0.0
+        else if (is_sp_zero(vf1) && is_sp_zero(vf2)) {
+          return this.registerWriteFloat32(d.rd, is_sp_neg_zero(vf1) ? vf2 : vf1);
+        }
+
+        const a = biguint32_to_f(vf1);
+        const b = biguint32_to_f(vf2);
+        this.registerWriteFloat32(d.rd, a > b ? vf1 : vf2);
         return;
+      }
       case rv_opcode['fcvt.w.s']:
         return;
       case rv_opcode['fcvt.wu.s']:
@@ -955,6 +1140,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         }
         return;
       case rv_opcode['flt.s']:
+        // @todo handle INF
         if (is_sp_nan(vf1) || is_sp_nan(vf2)) {
           // @todo: set invalid
           this.registerWrite(d.rd, 0n);
@@ -979,6 +1165,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         }
         return;
       case rv_opcode['fle.s']:
+        // @todo handle INF
         if (is_sp_nan(vf1) || is_sp_nan(vf2)) {
           // @todo: set invalid
           this.registerWrite(d.rd, 0n);
@@ -1029,10 +1216,18 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           this.registerWrite(d.rd, 1n << 9n);
         }
         return;
-      case rv_opcode['fcvt.s.w']:
+      case rv_opcode['fcvt.s.w']: {
+        // @todo THIS IS WRONG!!!!! CHECK WHICH ONE HANDLES SIGNED/UNSIGNED AND FIX THE OTHER
+        // @todo rounding mode
+        this.registerWriteFloat32(d.rd, f_to_biguint(Number(v1)));
         return;
-      case rv_opcode['fcvt.s.wu']:
+      }
+      case rv_opcode['fcvt.s.wu']: {
+        // @todo THIS IS WRONG!!!!! CHECK WHICH ONE HANDLES SIGNED/UNSIGNED AND FIX THE OTHER
+        // @todo rounding mode
+        this.registerWriteFloat32(d.rd, f_to_biguint(Number(v1)));
         return;
+      }
       case rv_opcode['fmv.w.x']:
         this.registerWriteFloat32(d.rd, v1);
         return;
@@ -1089,7 +1284,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         if (
           rv32im ||
           [
-            rv_opcode['fmv.w.x'],
+            rv_opcode['fmv.x.w'],
+            rv_opcode['fcvt.w.s'],
             rv_opcode['fcvt.w.s'],
             rv_opcode['fcvt.wu.s'],
             rv_opcode['feq.s'],
@@ -1103,7 +1299,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           str += rv_reg_f[rd];
         }
       } else if (c === '1') {
-        if (rv32im || [rv_opcode['fmv.x.w'], rv_opcode['fcvt.s.w'], rv_opcode['fcvt.s.wu']].includes(opcode)) {
+        if (rv32im || [rv_opcode['fmv.w.x'], rv_opcode['fcvt.s.w'], rv_opcode['fcvt.s.wu']].includes(opcode)) {
           str += rv_reg[rs1];
         } else if (rv32f) {
           str += rv_reg_f[rs1];
