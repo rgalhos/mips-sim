@@ -1,78 +1,88 @@
 ![Chakra](https://img.shields.io/badge/chakra-%234ED1C5.svg?style=for-the-badge&logo=chakraui&logoColor=white)
 ![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
-![Netlify](https://img.shields.io/badge/netlify-%23000000.svg?style=for-the-badge&logo=netlify&logoColor=#00C7B7)
 
-**Choose your language**
+# RV-SIM
 
-<a target="_blank" href="https://github.com/ReinaldoAssis/mips-sim">
-<img src="https://img.shields.io/badge/English%20-%20%231E90FF?style=flat-square&link=https%3A%2F%2Fgithub.com%2FReinaldoAssis%2Fmips-sim%2Ftree%2Fmaster" />
-</a>
+The very creatively named RV-SIM is a web-based educational RISC-V (RV32I/RV32M/RV32F) simulator with editor, stepping, memory inspection, syscalls, screen & keyboard I/O.
 
-<a target="_blank" href="./README-br.md">
-<img src="https://img.shields.io/badge/Brazilian%20Portuguese%20-%20%23228B22?style=flat-square&link=https%3A%2F%2Fgithub.com%2FReinaldoAssis%2Fmips-sim%2Fblob%2Fmaster%2FREADME-br.md"/>
-</a>
-
-<a target="_blank" href="./README-fr.md">
-<img src="https://img.shields.io/badge/French%20-%20%23DC143C?style=flat-square&link=https%3A%2F%2Fgithub.com%2FReinaldoAssis%2Fmips-sim%2Fblob%2Fmaster%2FREADME-fr.md"/>
-</a>
-
-
-
-
-# WIMS (Web-based Interactive MIPS Simulator)
-
-A simulator based on the MIPS 32 architecture envisioned to help students learn and explore the foundations of assembly language and architecture schematics.
-
+It is a fork of the [WIMS](https://github.com/ReinaldoAssis/mips-sim) web-based MIPS simulator created by [@ReinaldoAssis](https://github.com/ReinaldoAssis).
 
 ## Features
 
-- Built-in code editor
-- Step by step execution and debugging
-- I/O Output (screen and keyboard)
-- Terminal Output
-- Datapath visualization
+- [x] Built-in code editor
+- [x] Step by step execution and debugging
+- [x] I/O Output (screen and keyboard)
+- [x] Terminal Output
+- [x] User-friendly memory and register visualization
+- [ ] Datapath visualization
 
+## Supported extensions
 
-## Documentation
-
-The simulator's documentation can be viewed at [WIMS Doc.](https://reinaldoassis.github.io/wims-doc/docs/intro)
-
+- [x] RV32I (except fence)
+- [x] RV32M
+- [ ] RV32A
+- [x] RV32F (except round mode)
+- [ ] RV32D
+- [ ] RV32Q
+- [ ] RV32C
+- [ ] CSRs
 
 ## Usage/Examples
 
 This is the default code when you first open the editor, it computes the nth number of the fibonacci sequence. You can either press the green button to assemble and run or you can step through each instruction using the yellow button. The result is displayed in the terminal.
 
 ```assembly
-addi $t0, $zero, 0 #f1
-addi $t1, $zero, 1 #f2
-addi $a0, $zero, 15 #n
-addi $a0 $a0 -1
+.text
 
-fibonacci:
-	addi $a0, $a0, -1
-	add $t2, $t0, $t1 #soma
-	add $t0, $zero, $t1 #f1 = f2
-	add $t1, $zero, $t2 #f2 = soma
-	beq $a0, $zero, main
-	bne $a0, $zero, fibonacci
+.equ val a0
+.equ t1 s0
+.equ t2 s1
+.equ max_val s2
 
-main:
-	addi $v0, $t1, 0
-	call 1
+addi a7, zero, SYSCALL_PRINT_INT # load print syscall
+
+lui max_val, %hi(2971215073) # load top bits of const in s2
+addi max_val, max_val, %lo(2971215073) # load bottom bits of const in s2
+
+# print 0
+addi val, zero, 0 # val = 0
+ecall # print
+
+# print 1
+addi val, zero, 1 # val = 1
+ecall # print
+
+addi t1, zero, 0 # t1 = 0
+addi t2, zero, 1 # t2 = 1
+
+fib:
+    add val, t1, t2 # val = t1 + t2
+    ecall # print
+
+    beq max_val, val, end #  if (max_val == val) goto end
+
+    add t1, zero, t2 # t1 = t2
+    add t2, zero, val # t2 = val
+    jal zero, fib # goto fib
+
+end:
 ```
-
 
 ## Screenshots
 
 Editor and terminal
 
-![Editor and terminal](https://i.ibb.co/3RHngxw/image.png)
+![Editor and terminal](./docs/assets/img-editor.jpg)
 
 Instruction Set
 
-![Instruction Set](https://i.ibb.co/PYVB0np/image.png)
+![Instruction Set](./docs/assets/img-hex-view.jpg)
+
+Memory inspector
+
+![Memory](./docs/assets/img-memory.jpg)
 
 ## Authors
 
 - [@reinaldoassis](https://www.github.com/reinaldoassis)
-
+- [@rgalhos](https://www.github.com/rgalhos)
