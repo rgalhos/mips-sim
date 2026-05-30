@@ -263,14 +263,14 @@ export enum rv_opcode_pseudo {
 }
 
 export enum rv_f_rm {
-  RNE = 0b000,
-  RTZ = 0b001,
-  RDN = 0b010,
-  RUP = 0b011,
-  RMM = 0b100,
-  RES1 = 0b101,
-  RES2 = 0b110,
-  DYN = 0b111,
+  RNE = 0b000, // to nearest. ties to even
+  RTZ = 0b001, // towards zero
+  RDN = 0b010, // round down; towards -INF
+  RUP = 0b011, // round up; towards +INF
+  RMM = 0b100, // to nearest, ties to max magnitude
+  RES1 = 0b101, // reserved
+  RES2 = 0b110, // reserved
+  DYN = 0b111, // dynamic
 }
 
 export enum rv_directives {

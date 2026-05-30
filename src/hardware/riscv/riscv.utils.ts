@@ -365,3 +365,16 @@ export function ieee754_evaluate_fma_cases(
 
   return null;
 }
+
+export function rne(val: number) {
+  if (val % 1 !== 0.5 && val % 1 !== -0.5) {
+    return Math.round(val);
+  }
+
+  const floor = Math.floor(val);
+  return floor % 2 === 0 ? floor : floor + 1;
+}
+
+export function rmm(val: number) {
+  return Math.sign(val) * Math.round(Math.abs(val));
+}
