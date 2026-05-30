@@ -455,4 +455,115 @@ describe('RV32F', () => {
       expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(expected);
     });
   });
+
+  test('fsgnj.s fa0, ft0, ft1', () => {
+    const cpu = new RVProcessor();
+
+    cpu.cpu.registerF[rv_reg_f.ft0] = f_to_biguint(2);
+    cpu.cpu.registerF[rv_reg_f.ft1] = f_to_biguint(-3);
+    cpu.execute({
+      _op: rv_opcode['fsgnj.s'],
+      rd: rv_reg_f.fa0,
+      rs1: rv_reg_f.ft0,
+      rs2: rv_reg_f.ft1,
+    } as any);
+
+    expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(f_to_biguint(-2));
+  });
+
+  describe('fsgnj.s special cases', () => {
+    const cpu = new RVProcessor();
+
+    test.each([
+      ['+0 with sign of -0', 0n, 0x80000000n, 0x80000000n],
+      ['-0 with sign of +0', 0x80000000n, 0n, 0n],
+      ['+inf with sign of -inf', SP_POS_INF, SP_NEG_INF, SP_NEG_INF],
+      ['qNaN with sign of -finite', SP_CANONICAL_NAN, f_to_biguint(-1), 0xffc00000n],
+    ] as const)('%s', (_name, fs1, fs2, expected) => {
+      cpu.cpu.registerF[rv_reg_f.ft0] = fs1;
+      cpu.cpu.registerF[rv_reg_f.ft1] = fs2;
+      cpu.execute({
+        _op: rv_opcode['fsgnj.s'],
+        rd: rv_reg_f.fa0,
+        rs1: rv_reg_f.ft0,
+        rs2: rv_reg_f.ft1,
+      } as any);
+
+      expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(expected);
+    });
+  });
+
+  test('fsgnjn.s fa0, ft0, ft1', () => {
+    const cpu = new RVProcessor();
+
+    cpu.cpu.registerF[rv_reg_f.ft0] = f_to_biguint(2);
+    cpu.cpu.registerF[rv_reg_f.ft1] = f_to_biguint(-3);
+    cpu.execute({
+      _op: rv_opcode['fsgnjn.s'],
+      rd: rv_reg_f.fa0,
+      rs1: rv_reg_f.ft0,
+      rs2: rv_reg_f.ft1,
+    } as any);
+
+    expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(f_to_biguint(2));
+  });
+
+  describe('fsgnjn.s special cases', () => {
+    const cpu = new RVProcessor();
+
+    test.each([
+      ['+0 with negated sign of -0', 0n, 0x80000000n, 0n],
+      ['-0 with negated sign of +0', 0x80000000n, 0n, 0x80000000n],
+      ['+inf with negated sign of -inf', SP_POS_INF, SP_NEG_INF, SP_POS_INF],
+      ['qNaN with negated sign of -finite', SP_CANONICAL_NAN, f_to_biguint(-1), SP_CANONICAL_NAN],
+    ] as const)('%s', (_name, fs1, fs2, expected) => {
+      cpu.cpu.registerF[rv_reg_f.ft0] = fs1;
+      cpu.cpu.registerF[rv_reg_f.ft1] = fs2;
+      cpu.execute({
+        _op: rv_opcode['fsgnjn.s'],
+        rd: rv_reg_f.fa0,
+        rs1: rv_reg_f.ft0,
+        rs2: rv_reg_f.ft1,
+      } as any);
+
+      expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(expected);
+    });
+  });
+
+  test('fsgnjx.s fa0, ft0, ft1', () => {
+    const cpu = new RVProcessor();
+
+    cpu.cpu.registerF[rv_reg_f.ft0] = f_to_biguint(2);
+    cpu.cpu.registerF[rv_reg_f.ft1] = f_to_biguint(-3);
+    cpu.execute({
+      _op: rv_opcode['fsgnjx.s'],
+      rd: rv_reg_f.fa0,
+      rs1: rv_reg_f.ft0,
+      rs2: rv_reg_f.ft1,
+    } as any);
+
+    expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(f_to_biguint(-2));
+  });
+
+  describe('fsgnjx.s special cases', () => {
+    const cpu = new RVProcessor();
+
+    test.each([
+      ['+0 xor sign of -0', 0n, 0x80000000n, 0x80000000n],
+      ['-0 xor sign of +0', 0x80000000n, 0n, 0x80000000n],
+      ['+inf xor sign of -inf', SP_POS_INF, SP_NEG_INF, SP_NEG_INF],
+      ['abs via xor', f_to_biguint(-3), f_to_biguint(-3), f_to_biguint(3)],
+    ] as const)('%s', (_name, fs1, fs2, expected) => {
+      cpu.cpu.registerF[rv_reg_f.ft0] = fs1;
+      cpu.cpu.registerF[rv_reg_f.ft1] = fs2;
+      cpu.execute({
+        _op: rv_opcode['fsgnjx.s'],
+        rd: rv_reg_f.fa0,
+        rs1: rv_reg_f.ft0,
+        rs2: rv_reg_f.ft1,
+      } as any);
+
+      expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(expected);
+    });
+  });
 });
