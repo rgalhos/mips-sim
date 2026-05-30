@@ -1,6 +1,5 @@
 import { IAssembledInstruction } from "../hardware/common/simulator";
 import { rvExamples } from "../hardware/riscv/user/riscv.examples";
-import { addr, INPUT_BUFFER_ADDR } from "../Hardware/TemplatePorcessor";
 import Logger from "./Logger";
 
 export interface Instruction {
@@ -22,7 +21,6 @@ export interface IProcessor {
   instructionSet: Array<string>;
   useDebug: boolean;
   currentInstruction: Instruction;
-  memory : Array<addr>,
   regbank : Array<number>
 }
 
@@ -61,11 +59,6 @@ export default class SharedData {
   public debugInstructions: boolean = false;
   // Title of the current program
   public programTitle : string = "Recent";
-
-  public _startMemoryDefault : Array<addr> = [{address: INPUT_BUFFER_ADDR, value: 0}];
-
-  // the memory that the processor is initialized with
-  public startMemory : Array<addr> = this.resetStartMemory();
 
   public memoryterminalText : string = "";
 
@@ -106,12 +99,6 @@ export default class SharedData {
     if (this.monaco && this._currentProcessor) {
       //TODO
     }
-  }
-
-  public resetStartMemory()
-  {
-    this.startMemory = [{address: INPUT_BUFFER_ADDR, value: 0}];
-    return [{address: INPUT_BUFFER_ADDR, value: 0}];
   }
 
   public get currentStepLine(): number {
