@@ -235,17 +235,17 @@ export function splitHiLoS32(value: bigint): { hi: bigint; lo: bigint } {
 }
 
 export function biguint32_to_f(val: bigint) {
-  dv.setBigUint64(0, val);
-  return dv.getFloat32(4);
+  dv.setUint32(0, Number(u32(val)), true);
+  return dv.getFloat32(0, true);
 }
 
 export function cvt_u32_to_f(val: bigint) {
-  dv.setFloat32(0, Number(val));
+  dv.setFloat32(0, Number(val), true);
 }
 
 export function f_to_biguint(val: number) {
-  dv.setFloat32(4, val);
-  return dv.getBigUint64(0) >> 32n;
+  dv.setFloat32(0, val, true);
+  return BigInt(dv.getUint32(0, true));
 }
 
 export function is_sp_inf(val: bigint) {

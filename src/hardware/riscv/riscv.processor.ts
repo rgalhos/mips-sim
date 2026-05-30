@@ -920,7 +920,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         this.registerWriteF(d.rd, u32(this.memoryRead(addr, 32)));
         return;
       case rv_opcode.fsw:
-        this.memoryWrite(u32(v1 + d.imm), v2, 32);
+        this.memoryWrite(u32(v1 + d.imm), vf2, 32);
         return;
       case rv_opcode['fmadd.s']: {
         // @todo rounding mode
@@ -1004,7 +1004,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         } else if (is_sp_inf(vf1)) {
           return this.registerWriteF(d.rd, vf1);
         } else if (is_sp_inf(vf2)) {
-          return this.registerWriteF(d.rd, vf2);
+          return this.registerWriteF(d.rd, vf2 ^ 0x80000000n);
         }
 
         const a = biguint32_to_f(vf1);
@@ -1045,18 +1045,14 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           // 0 / 0 = NaN
           return this.registerWriteF(d.rd, SP_CANONICAL_NAN);
         } else if (is_sp_zero(vf2)) {
-          // x/0 = INF for x > 0, -INF for x < 0
-          return this.registerWriteF(d.rd, vf1 >> 31n ? SP_NEG_INF : SP_POS_INF);
+          const signal = ((vf1 >> 31n) ^ (vf2 >> 31n)) & 1n;
+          return this.registerWriteF(d.rd, signal ? SP_NEG_INF : SP_POS_INF);
         } else if (is_sp_inf(vf1)) {
           // INF/x = INF for x > 0, -INF for x < 0
           return this.registerWriteF(d.rd, vf2 >> 31n ? SP_NEG_INF : SP_POS_INF);
         }
 
-        if (is_sp_pos_zero(vf2)) {
-          this.registerWriteF(d.rd, SP_POS_INF);
-        } else if (is_sp_neg_zero(vf2)) {
-          this.registerWriteF(d.rd, SP_NEG_INF);
-        } else {
+        {
           const a = biguint32_to_f(vf1);
           const b = biguint32_to_f(vf2);
           this.registerWriteF(d.rd, f_to_biguint(Math.fround(a / b)));
@@ -1066,10 +1062,16 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       case rv_opcode['fsqrt.s']: {
         // @todo rounding mode
         if (is_sp_nan(vf1) || is_sp_neg_inf(vf1)) {
-          // @todo handle signaling NaN
+          // @todo handle signaling NaN and set NV bit
           return this.registerWriteF(d.rd, SP_CANONICAL_NAN);
         } else if (is_sp_pos_inf(vf1)) {
           return this.registerWriteF(d.rd, SP_POS_INF);
+        } else if ((vf1 >> 31n) & 1n) {
+          if (is_sp_neg_zero(vf1)) {
+            return this.registerWriteF(d.rd, vf1);
+          }
+
+          return this.registerWriteF(d.rd, SP_CANONICAL_NAN);
         }
 
         const a = biguint32_to_f(vf1);
