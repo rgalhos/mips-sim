@@ -423,6 +423,7 @@ describe('RV32F', () => {
     const cpu = new RVProcessor();
 
     cpu.cpu.registerF[rv_reg_f.ft0] = f_to_biguint(4);
+
     cpu.execute({
       _op: rv_opcode['fsqrt.s'],
       rd: rv_reg_f.fa0,
@@ -445,6 +446,7 @@ describe('RV32F', () => {
       ['-0', 0x80000000n, 0x80000000n],
     ] as const)('%s', (_name, fs1, expected) => {
       cpu.cpu.registerF[rv_reg_f.ft0] = fs1;
+
       cpu.execute({
         _op: rv_opcode['fsqrt.s'],
         rd: rv_reg_f.fa0,
@@ -461,6 +463,7 @@ describe('RV32F', () => {
 
     cpu.cpu.registerF[rv_reg_f.ft0] = f_to_biguint(2);
     cpu.cpu.registerF[rv_reg_f.ft1] = f_to_biguint(-3);
+
     cpu.execute({
       _op: rv_opcode['fsgnj.s'],
       rd: rv_reg_f.fa0,
@@ -482,6 +485,7 @@ describe('RV32F', () => {
     ] as const)('%s', (_name, fs1, fs2, expected) => {
       cpu.cpu.registerF[rv_reg_f.ft0] = fs1;
       cpu.cpu.registerF[rv_reg_f.ft1] = fs2;
+
       cpu.execute({
         _op: rv_opcode['fsgnj.s'],
         rd: rv_reg_f.fa0,
@@ -498,6 +502,7 @@ describe('RV32F', () => {
 
     cpu.cpu.registerF[rv_reg_f.ft0] = f_to_biguint(2);
     cpu.cpu.registerF[rv_reg_f.ft1] = f_to_biguint(-3);
+
     cpu.execute({
       _op: rv_opcode['fsgnjn.s'],
       rd: rv_reg_f.fa0,
@@ -519,6 +524,7 @@ describe('RV32F', () => {
     ] as const)('%s', (_name, fs1, fs2, expected) => {
       cpu.cpu.registerF[rv_reg_f.ft0] = fs1;
       cpu.cpu.registerF[rv_reg_f.ft1] = fs2;
+
       cpu.execute({
         _op: rv_opcode['fsgnjn.s'],
         rd: rv_reg_f.fa0,
@@ -535,6 +541,7 @@ describe('RV32F', () => {
 
     cpu.cpu.registerF[rv_reg_f.ft0] = f_to_biguint(2);
     cpu.cpu.registerF[rv_reg_f.ft1] = f_to_biguint(-3);
+
     cpu.execute({
       _op: rv_opcode['fsgnjx.s'],
       rd: rv_reg_f.fa0,
@@ -556,8 +563,95 @@ describe('RV32F', () => {
     ] as const)('%s', (_name, fs1, fs2, expected) => {
       cpu.cpu.registerF[rv_reg_f.ft0] = fs1;
       cpu.cpu.registerF[rv_reg_f.ft1] = fs2;
+
       cpu.execute({
         _op: rv_opcode['fsgnjx.s'],
+        rd: rv_reg_f.fa0,
+        rs1: rv_reg_f.ft0,
+        rs2: rv_reg_f.ft1,
+      } as any);
+
+      expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(expected);
+    });
+  });
+
+  test('fmin.s fa0, ft0, ft1', () => {
+    const cpu = new RVProcessor();
+
+    cpu.cpu.registerF[rv_reg_f.ft0] = f_to_biguint(2);
+    cpu.cpu.registerF[rv_reg_f.ft1] = f_to_biguint(3);
+
+    cpu.execute({
+      _op: rv_opcode['fmin.s'],
+      rd: rv_reg_f.fa0,
+      rs1: rv_reg_f.ft0,
+      rs2: rv_reg_f.ft1,
+    } as any);
+
+    expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(f_to_biguint(2));
+  });
+
+  describe('fmin.s special cases', () => {
+    const cpu = new RVProcessor();
+
+    test.each([
+      ['both NaN', SP_CANONICAL_NAN, 0x7fc00001n, SP_CANONICAL_NAN],
+      ['NaN in fs1', 0x7f800001n, f_to_biguint(2), f_to_biguint(2)],
+      ['NaN in fs2', f_to_biguint(2), 0x7fc00001n, f_to_biguint(2)],
+      ['+0 and -0', 0n, 0x80000000n, 0x80000000n],
+      ['-0 and +0', 0x80000000n, 0n, 0x80000000n],
+      ['-inf and finite', SP_NEG_INF, f_to_biguint(2), SP_NEG_INF],
+      ['+inf and finite', SP_POS_INF, f_to_biguint(2), f_to_biguint(2)],
+      ['-inf and +inf', SP_NEG_INF, SP_POS_INF, SP_NEG_INF],
+    ] as const)('%s', (_name, fs1, fs2, expected) => {
+      cpu.cpu.registerF[rv_reg_f.ft0] = fs1;
+      cpu.cpu.registerF[rv_reg_f.ft1] = fs2;
+
+      cpu.execute({
+        _op: rv_opcode['fmin.s'],
+        rd: rv_reg_f.fa0,
+        rs1: rv_reg_f.ft0,
+        rs2: rv_reg_f.ft1,
+      } as any);
+
+      expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(expected);
+    });
+  });
+
+  test('fmax.s fa0, ft0, ft1', () => {
+    const cpu = new RVProcessor();
+
+    cpu.cpu.registerF[rv_reg_f.ft0] = f_to_biguint(2);
+    cpu.cpu.registerF[rv_reg_f.ft1] = f_to_biguint(3);
+
+    cpu.execute({
+      _op: rv_opcode['fmax.s'],
+      rd: rv_reg_f.fa0,
+      rs1: rv_reg_f.ft0,
+      rs2: rv_reg_f.ft1,
+    } as any);
+
+    expect(cpu.cpu.registerF[rv_reg_f.fa0]).toBe(f_to_biguint(3));
+  });
+
+  describe('fmax.s special cases', () => {
+    const cpu = new RVProcessor();
+
+    test.each([
+      ['both NaN', SP_CANONICAL_NAN, 0x7fc00001n, SP_CANONICAL_NAN],
+      ['NaN in fs1', 0x7f800001n, f_to_biguint(2), f_to_biguint(2)],
+      ['NaN in fs2', f_to_biguint(2), 0x7fc00001n, f_to_biguint(2)],
+      ['+0 and -0', 0n, 0x80000000n, 0n],
+      ['-0 and +0', 0x80000000n, 0n, 0n],
+      ['-inf and finite', SP_NEG_INF, f_to_biguint(2), f_to_biguint(2)],
+      ['+inf and finite', SP_POS_INF, f_to_biguint(2), SP_POS_INF],
+      ['-inf and +inf', SP_NEG_INF, SP_POS_INF, SP_POS_INF],
+    ] as const)('%s', (_name, fs1, fs2, expected) => {
+      cpu.cpu.registerF[rv_reg_f.ft0] = fs1;
+      cpu.cpu.registerF[rv_reg_f.ft1] = fs2;
+
+      cpu.execute({
+        _op: rv_opcode['fmax.s'],
         rd: rv_reg_f.fa0,
         rs1: rv_reg_f.ft0,
         rs2: rv_reg_f.ft1,
