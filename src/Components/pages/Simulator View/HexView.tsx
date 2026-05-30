@@ -8,6 +8,7 @@ import { rv_codec } from '../../../hardware/riscv/riscv.const';
 import { IDecodedRVInstruction } from '../../../hardware/riscv/riscv.types';
 import * as rvUtils from '../../../hardware/riscv/riscv.utils';
 import { useSimulator } from '../../../hooks/simulator.hook';
+import { EHardwareType } from '../../../hardware/hardware';
 
 function cleanLine(line: string) {
   return line.replace(/#.*$/g, '').replace(/ +/g, ' ').trim();
@@ -75,7 +76,7 @@ const Bits = (props: { label: string; value: string; start: number; class?: stri
   </Tooltip>
 );
 
-const InstructionDecRV = memo(({ inst }: { inst: IDecodedRVInstruction }) => {
+const InstructionDecRV32 = memo(({ inst }: { inst: IDecodedRVInstruction }) => {
   const el: React.ReactNode[] = [];
 
   const pad = (v: number | bigint, len: number) => v.toString(2).padStart(len, '0');
@@ -157,7 +158,9 @@ const HexDisplay = memo(
           <Text color="pink.400" fontWeight="bold" whiteSpace="nowrap">
             0x{inst.decoded.bytecode.toString(16).toUpperCase().padStart(8, '0')}
           </Text>
-          <InstructionDecRV inst={inst.decoded as IDecodedRVInstruction} />
+          {simulator.hardwareType === EHardwareType.RV32 && (
+            <InstructionDecRV32 inst={inst.decoded as IDecodedRVInstruction} />
+          )}
         </Box>
         <Box py={1} px={2} minH="10">
           <Text color="purple.500" fontWeight="bold" wordBreak="break-word" lineHeight="2rem">

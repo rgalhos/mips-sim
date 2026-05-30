@@ -1,4 +1,5 @@
 import { IToken } from '../analyzer/tokenizer';
+import { EHardwareType } from '../hardware';
 import { IManualExample } from './examples';
 import type { IUserManual } from './manual';
 import type { IDecodedInstruction, IProcessor } from './processor';
@@ -33,6 +34,8 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
   public abstract readonly directives: string[];
 
   public abstract readonly consts: string[];
+
+  public abstract readonly hardwareType: EHardwareType;
 
   public readonly workerService = new WorkerService();
 

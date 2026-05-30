@@ -11,6 +11,7 @@ import {
 } from '../analyzer/tokenizer';
 import { IUserManual } from '../common/manual';
 import { IAssembledInstruction, ISimulator } from '../common/simulator';
+import { EHardwareType } from '../hardware';
 import {
   rv_codec,
   rv_consts,
@@ -32,10 +33,11 @@ const RV_RELOC_OPS = new Set(['hi', 'lo', 'pcrel_hi', 'pcrel_lo']);
 type RVAssembledLine = { decoded: IDecodedRVInstruction; tokens: IToken[] };
 
 export class RVSimulator extends ISimulator<RVProcessor> {
-  // @ts-expect-error Function.name
-  static name = 'RISC-V (RV32I)';
+  static simulatorName = 'RISC-V (RV32I)';
 
-  public readonly name = RVSimulator.name;
+  public readonly name = RVSimulator.simulatorName;
+
+  public readonly hardwareType = EHardwareType.RV32;
 
   public readonly manual: IUserManual = rvManual;
 

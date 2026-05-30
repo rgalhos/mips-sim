@@ -1,4 +1,4 @@
-import { Badge, Divider, Flex, Heading, useColorModeValue } from '@chakra-ui/react';
+import { Badge, Divider, Flex, Heading, Tooltip, useColorModeValue } from '@chakra-ui/react';
 import { Table, TableContainer, Tbody, Td, Th, Thead, Tr } from '@chakra-ui/table';
 import {} from '@monaco-editor/react';
 import Markdown from 'react-markdown';
@@ -7,8 +7,17 @@ import { useSimulator } from '../../../hooks/simulator.hook';
 export default function InstructionManual() {
   const { simulator } = useSimulator();
 
-  const regColors = ['green', 'red', 'cyan', 'gray', 'purple', 'yellow'];
-  const calcRegColor = (kind: string) => regColors[kind.charCodeAt(0) % regColors.length];
+  function calcRegColor(kind: string) {
+    return (
+      {
+        constant: 'gray',
+        pointer: 'purple',
+        temporary: 'red',
+        saved: 'green',
+        argument: 'cyan',
+      }[kind as string] || 'gray'
+    );
+  }
 
   return (
     <>
@@ -16,13 +25,19 @@ export default function InstructionManual() {
         {simulator.name} Instruction Set
       </Heading>
 
-      <Flex gap={2} style={{ marginBottom: 10 }}>
-        <Heading size="sm">Registers:</Heading>
-
+      <Heading size="sm">Registers:</Heading>
+      <Flex
+        display="grid"
+        gridTemplateColumns="repeat(32, fit-content(100%))"
+        textAlign="center"
+        userSelect="none"
+        gap={2}
+        my={2}
+      >
         {simulator.manual.registers.map((reg) => (
-          <Badge key={reg.name} colorScheme={calcRegColor(reg.kind)}>
-            {reg.alias || reg.name}
-          </Badge>
+          <Tooltip key={reg.name} label={<Markdown>{reg.description}</Markdown>}>
+            <Badge colorScheme={calcRegColor(reg.kind)}>{reg.alias || reg.name}</Badge>
+          </Tooltip>
         ))}
       </Flex>
 
