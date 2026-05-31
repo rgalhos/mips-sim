@@ -282,7 +282,6 @@ export function tokenize(line: string, lineNumber: number) {
       }
 
       if (line[j] === '.') {
-        console.log('dot');
         isFloat = true;
         j++;
         value += '.';
@@ -290,7 +289,6 @@ export function tokenize(line: string, lineNumber: number) {
           value += line[j];
           j++;
         }
-        console.log(value);
       }
 
       const v = Number(value) * isNegative;
@@ -303,7 +301,6 @@ export function tokenize(line: string, lineNumber: number) {
       if (isFloat) {
         dataViewHelper.setFloat32(0, v);
         const f = dataViewHelper.getUint32(0);
-        console.log({ type: ETokenType.NUMBER, value: f, lineNumber });
         tokens.push({ type: ETokenType.NUMBER, value: f, lineNumber });
       } else {
         tokens.push({ type: ETokenType.NUMBER, value: v, lineNumber });

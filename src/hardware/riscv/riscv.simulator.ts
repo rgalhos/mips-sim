@@ -373,6 +373,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         // RV32F instructions that are R-type but rs2 is always zeroed
         if (
           [
+            rv_opcode['fsqrt.s'],
             rv_opcode['fcvt.w.s'],
             rv_opcode['fcvt.wu.s'],
             rv_opcode['fmv.x.w'],

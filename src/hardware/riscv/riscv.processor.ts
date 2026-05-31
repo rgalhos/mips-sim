@@ -465,6 +465,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
               case 0b11100:
                 op = rv_opcode['fmv.x.w'];
                 break;
+              case 0b11110:
+                op = rv_opcode['fmv.w.x'];
+                break;
               case 0b10100:
                 op = rv_opcode['fle.s'];
                 break;
@@ -782,7 +785,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           nulIdx = nulIdx === -1 ? 255 : nulIdx;
 
           let i = 0;
-          const str = String.fromCharCode(...memory.slice(0, nulIdx)).replace(/%d|%u|%x|%X|%c|%p|%%/g, (match) => {
+          const str = String.fromCharCode(...memory.slice(0, nulIdx)).replace(/%d|%u|%x|%X|%c|%p|%f|%%/g, (match) => {
             i++;
             switch (match) {
               case '%d':
@@ -805,6 +808,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
                     .toUpperCase()
                     .padStart(8, '0')
                 );
+              case '%f':
+                return (biguint32_to_f(this.registerRead(rv_reg.a0 + i))).toString();
               case '%%':
                 return '%';
             }

@@ -45,6 +45,60 @@ end:
 });
 
 _rvExamples.push({
+  name: 'Calculate the approximation of PI and golden ratio using floating-point instructions',
+  code: `# Example:
+# Calculate PI and golden ratio using floating-point registers and instructions
+
+.rodata # read-only data section
+str_pi:  .asciz "PI: %f\\n"
+str_phi: .asciz "Golden Ratio: %f\\n"
+
+.macro print_float str_addr freg
+  lui a0, %hi(\\str_addr) # load higher bits of the string into a0
+  addi a0, a0, %lo(\\str_addr) # load lower bits of the string into a0
+  fmv.x.w a1, \\freg # a0 = \\freg; moves the value from floating-point register to a0
+  li a7, SYSCALL_PRINTF # a7 = SYSCALL_PRINTF
+  ecall
+.endmacro
+
+.text # executable section
+
+# Calculate PI
+calc_pi:
+li t0, 355.0 # t0 = 355.0
+li t1, 113.0 # t1 = 113.0
+
+# move values to floating-point registers
+fmv.w.x ft0, t0 # ft0 = t0
+fmv.w.x ft1, t1 # ft1 = t1
+fdiv.s ft2, ft0, ft1 # ft2 = ft0 / ft1 
+
+# call print macro; go to the hex view tab to see the expansion
+print_float str_pi, ft2
+
+# Calculate the golden ratio
+calc_phi:
+li t0, 1.0 # t0 = 1.0
+li t1, 5.0 # t1 = 5.0
+li t2, 2.0 # t2 = 2.0
+
+# move values to floating-point registers
+fmv.w.x ft0, t0 # ft0 = t0
+fmv.w.x ft1, t1 # ft1 = t1
+fmv.w.x ft2, t2 # ft2 = t2
+
+fsqrt.s ft3, ft1 # ft3 = sqrt(ft1)
+fadd.s ft3, ft0, ft3 # ft3 = ft0 + ft3
+fdiv.s ft3, ft3, ft2 # ft3 = ft3 / ft2
+
+# call print macro; go to the hex view tab to see the expansion
+print_float str_phi, ft3
+
+ebreak # pause simulation
+`,
+});
+
+_rvExamples.push({
   name: 'Logo IC-UFAL',
   code: `# Imagem hardcoded do logo do IC-UFAL
 # Autor: rgmg [arroba] ic.ufal.br
