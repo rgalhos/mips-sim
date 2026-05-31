@@ -282,7 +282,7 @@ function MemoryView({ visible = true }: { visible?: boolean }) {
     if (!dump) return {};
 
     return simulator.processor.getRegistersFriendly(dump.cpu);
-  }, [dump, simulator.processor.registers]);
+  }, [dump, simulator.processor]);
 
   return (
     <Box

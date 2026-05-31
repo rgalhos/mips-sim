@@ -52,10 +52,22 @@ const HexDisplayWrapper = chakra(Box, {
     '.rs2:hover span, .rs2:hover ~ .rs2 span': {
       background: '#666',
     },
+    '.rs3': {
+      color: 'oklch(75% .18 50)',
+    },
+    '.rs3:hover span, .rs3:hover ~ .rs3 span': {
+      background: '#666',
+    },
     '.rd': {
       color: 'oklch(75% .18 142)',
     },
     '.rd:hover span, .rd:hover ~ .rd span': {
+      background: '#666',
+    },
+    '.fmt, .rm': {
+      color: 'gray',
+    },
+    '.fmt:hover span, .fmt:hover ~ .fmt span, .rm:hover span, .rm:hover ~ .rm span': {
       background: '#666',
     },
   },
@@ -91,7 +103,7 @@ const InstructionDecRV32 = memo(({ inst }: { inst: IDecodedRVInstruction }) => {
     );
   } else if (inst.codec === rv_codec.i) {
     el.push(
-      <Bits label="imm[11:0]" value={pad(rvUtils.operand_funct7(inst.bytecode), 12)} start={0} class="imm" />,
+      <Bits label="imm[11:0]" value={pad(rvUtils.operand_iimm12(inst.bytecode), 12)} start={0} class="imm" />,
       <Bits label="rs1" value={pad(inst.rs1, 5)} start={12} class="rs1" />,
       <Bits label="funct3" value={pad(rvUtils.operand_funct3(inst.bytecode), 3)} start={17} class="funct3" />,
       <Bits label="rd" value={pad(inst.rd, 5)} start={20} class="rd" />,
@@ -129,6 +141,15 @@ const InstructionDecRV32 = memo(({ inst }: { inst: IDecodedRVInstruction }) => {
       <Bits label="imm[10:1]" value={pad((inst.bytecode >> 21n) & 0x3ffn, 1)} start={1} class="imm" />,
       <Bits label="imm[11]" value={pad((inst.bytecode >> 20n) & 1n, 1)} start={11} class="imm" />,
       <Bits label="imm[19:12]" value={pad((inst.bytecode >> 12n) & 0xffn, 1)} start={12} class="imm" />,
+      <Bits label="rd" value={pad(inst.rd, 5)} start={20} class="rd" />,
+    );
+  } else if (inst.codec === rv_codec.r4) {
+    el.push(
+      <Bits label="rs3" value={pad(inst.rs3, 5)} start={0} class="rs3" />,
+      <Bits label="fmt" value={pad(rvUtils.operand_funct7(inst.bytecode) & 0b11, 2)} start={5} class="fmt" />,
+      <Bits label="rs2" value={pad(inst.rs2, 5)} start={7} class="rs2" />,
+      <Bits label="rs1" value={pad(inst.rs1, 5)} start={12} class="rs1" />,
+      <Bits label="rm" value={pad(rvUtils.operand_funct3(inst.bytecode), 3)} start={17} class="rm" />,
       <Bits label="rd" value={pad(inst.rd, 5)} start={20} class="rd" />,
     );
   }

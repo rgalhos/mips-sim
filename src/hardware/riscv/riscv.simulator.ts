@@ -409,6 +409,14 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         dec.rd = this.ensureRegisterToken(tok1, constants);
         dec.imm = this.decodeImmediate(tokens, 2, constants, pc, dec.codec) & 0xfffffn;
         break;
+      case rv_codec.r4:
+        dec.rd = this.ensureRegisterToken(tok1, constants);
+        dec.rs1 = this.ensureRegisterToken(tok2, constants);
+        dec.rs2 = this.ensureRegisterToken(tok3, constants);
+        dec.rs3 = this.ensureRegisterToken(tokens?.[4], constants);
+        // @todo implement rounding mode
+        dec.rm = 0b111;
+        break;
     }
 
     dec.bytecode = this.processor.toBytecode(dec);
