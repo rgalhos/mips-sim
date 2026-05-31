@@ -55,32 +55,32 @@ export const rvManual: IUserManual = {
     { name: 'remu', operation: 'rd = u32(rs1) % u32(rs2)', usage: 'rd, rs1, rs2', description: 'Unsigned remainder of rs1 divided by rs2. If rs2 is 0, rd is rs1 (per RISC-V M extension).' },
 
     // RV32F
-    { name: 'flw', operation: 'fd = mem[rs1 + imm]', usage: 'fd, imm(rs1)', description: 'Low 32 bits of the two\'s-complement product of rs1 and rs2 (signed times signed).' },
-    { name: 'fsw',       operation: '', usage: 'fd, imm(rs1)', description: '' },
-    { name: 'fmadd.s',   operation: '', usage: 'fd, fs1, fs2, fs3, rm', description: '' },
-    { name: 'fmsub.s',   operation: '', usage: 'fd, fs1, fs2, fs3, rm', description: '' },
-    { name: 'fnmsub.s',  operation: '', usage: 'fd, fs1, fs2, fs3, rm', description: '' },
-    { name: 'fnmadd.s',  operation: '', usage: 'fd, fs1, fs2, fs3, rm', description: '' },
-    { name: 'fadd.s',    operation: '', usage: 'fd, fs1, fs2, rm', description: '' },
-    { name: 'fsub.s',    operation: '', usage: 'fd, fs1, fs2, rm', description: '' },
-    { name: 'fmul.s',    operation: '', usage: 'fd, fs1, fs2, rm', description: '' },
-    { name: 'fdiv.s',    operation: '', usage: 'fd, fs1, fs2, rm', description: '' },
-    { name: 'fsqrt.s',   operation: '', usage: 'fd, fs1, rm', description: '' },
-    { name: 'fsgnj.s',   operation: '', usage: 'fd, fs1, fs2', description: '' },
-    { name: 'fsgnjn.s',  operation: '', usage: 'fd, fs1, fs2', description: '' },
-    { name: 'fsgnjx.s',  operation: '', usage: 'fd, fs1, fs2', description: '' },
-    { name: 'fmin.s',    operation: '', usage: 'fd, fs1, fs2', description: '' },
-    { name: 'fmax.s',    operation: '', usage: 'fd, fs1, fs2', description: '' },
-    { name: 'fcvt.w.s',  operation: '', usage: 'rd, fs1, rm', description: '' },
-    { name: 'fcvt.wu.s', operation: '', usage: 'rd, fs1, rm', description: '' },
-    { name: 'fmv.x.w',   operation: '', usage: 'rd, fs1', description: '' },
-    { name: 'feq.s',     operation: '', usage: 'rd, fs1, fs2', description: '' },
-    { name: 'flt.s',     operation: '', usage: 'rd, fs1, fs2', description: '' },
-    { name: 'fle.s',     operation: '', usage: 'rd, fs1, fs2', description: '' },
-    { name: 'fclass.s',  operation: '', usage: 'rd, fs1', description: '' },
-    { name: 'fcvt.s.w',  operation: '', usage: 'fd, rs1, rm', description: '' },
-    { name: 'fcvt.s.wu', operation: '', usage: 'fd, rs1, rm', description: '' },
-    { name: 'fmv.w.x',   operation: '', usage: 'fd, rs1', description: '' },
+    { name: 'flw', operation: 'fd = mem[rs1 + imm]', usage: 'fd, imm(rs1)', description: 'Loads a word from memory into fd.' },
+    { name: 'fsw',       operation: 'mem[rs1 + imm] = fd', usage: 'fd, imm(rs1)', description: 'Stores the low 32 bits of the floating-point value in fd to memory.' },
+    { name: 'fmadd.s',   operation: 'fd = (fs1 * fs2) + fs3', usage: 'fd, fs1, fs2, fs3, rm', description: 'Single-Precision Fused Multiply-Add; Multiplies the values in fs1 and fs2, adds the value in fs3, and writes the final result to fd.' },
+    { name: 'fmsub.s',   operation: 'fd = (fs1 * fs2) - fs3', usage: 'fd, fs1, fs2, fs3, rm', description: 'Single-Precision Fused Multiply-Add; Multiplies the values in fs1 and fs2, subtracts the value in fs3, and writes the final result to fd.' },
+    { name: 'fnmsub.s',  operation: 'fd = -(fs1 * fs2) + fs3', usage: 'fd, fs1, fs2, fs3, rm', description: 'Single-Precision Fused Negate-Multiply-Subtract; Multiplies the values in fs1 and fs2, negates the product, adds the value in fs3, and writes the final result to fd.' },
+    { name: 'fnmadd.s',  operation: 'fd = -(fs1 * fs2) - fs3', usage: 'fd, fs1, fs2, fs3, rm', description: 'Single-Precision Fused Negate-Multiply-Add; Multiplies the values in fs1 and fs2, negates the product, subtracts the value in fs3, and writes the final result to fd.' },
+    { name: 'fadd.s',    operation: 'fd = fs1 + fs2', usage: 'fd, fs1, fs2, rm', description: 'Performs single-precision floating-point addition of fs1 and fs2 and writes the final result to fd.' },
+    { name: 'fsub.s',    operation: 'fd = fs1 - fs2', usage: 'fd, fs1, fs2, rm', description: 'Performs single-precision floating-point subtraction of fs1 and fs2 and writes the final result to fd.' },
+    { name: 'fmul.s',    operation: 'fd = fs1 * fs2', usage: 'fd, fs1, fs2, rm', description: 'Performs single-precision floating-point multiplication of fs1 and fs2 and writes the final result to fd.' },
+    { name: 'fdiv.s',    operation: 'fd = fs1 / fs2', usage: 'fd, fs1, fs2, rm', description: 'Performs single-precision floating-point division of fs1 by fs2 and writes the final result to fd.' },
+    { name: 'fsqrt.s',   operation: 'fd = sqrt(fs1)', usage: 'fd, fs1, rm', description: 'Performs single-precision floating-point square root of fs1 and writes the final result to fd.' },
+    { name: 'fsgnj.s',   operation: 'fd = fs2[31] fs1[30:0]', usage: 'fd, fs1, fs2', description: 'Sign-Inject Single-Precision; Takes all bits except the sign bit from fs1. The result\'s sign bit is taken from fs2\'s sign bit, and the result is written to the destination register fd.' },
+    { name: 'fsgnjn.s',  operation: 'fd = ~fs2[31] fs1[30:0]', usage: 'fd, fs1, fs2', description: 'Sign-Inject Negate Single-Precision; Takes all bits except the sign bit from fs1. The result\'s sign bit is opposite of fs2\'s sign bit, and the result is written to the destination register fd.' },
+    { name: 'fsgnjx.s',  operation: 'fd = fs1[31] ^ fs2[31] fs1[30:0]', usage: 'fd, fs1, fs2', description: 'Sign-Inject Exclusive-Or Single-Precision; Takes all bits except the sign bit from fs1. The result\'s sign bit is the exclusive-or of fs1\'s and fs2\'s sign bits, and the result is written to the destination register fd.' },
+    { name: 'fmin.s',    operation: 'fd = min(fs1, fs2)', usage: 'fd, fs1, fs2', description: 'Writes smaller of fs1 and fs2 to fd.' },
+    { name: 'fmax.s',    operation: 'fd = max(fs1, fs2)', usage: 'fd, fs1, fs2', description: 'Writes larger of fs1 and fs2 to fd.' },
+    { name: 'fcvt.w.s',  operation: 'rd = f32_to_i32(fs1, rm)', usage: 'rd, fs1, rm', description: 'Convert Single-Precision to Word; Converts a floating-point number in floating-point register fs1 to a signed 32-bit integer in integer register rd.' },
+    { name: 'fcvt.wu.s', operation: 'rd = f32_to_u32(fs1, rm)', usage: 'rd, fs1, rm', description: 'Convert Single-Precision to Unsigned Word; Converts a floating-point number in floating-point register fs1 to an unsigned 32-bit integer in integer register rd.' },
+    { name: 'fmv.x.w',   operation: 'rd = fs1', usage: 'rd, fs1', description: 'Move Single-Precision Word to Integer Register; Moves the single-precision value in floating-point register fs1 represented in IEEE 754-2008 encoding to the lower 32 bits of integer register rd. The bits are not modified in the transfer.' },
+    { name: 'feq.s',     operation: 'rd = (fs1 == fs2) ? 1 : 0', usage: 'rd, fs1, fs2', description: 'Equal Single-Precision; Writes 1 to rd if fs1 and fs2 are equal, and 0 otherwise. If either operand is NaN, the result is 0 (not equal). Positive zero is considered equal to negative zero.' },
+    { name: 'flt.s',     operation: 'rd = (f1 < fs2) ? 1 : 0', usage: 'rd, fs1, fs2', description: 'Less Than Single-Precision; Writes 1 to rd if fs1 is less than fs2, and 0 otherwise. If either operand is NaN, the result is 0 (not equal).' },
+    { name: 'fle.s',     operation: 'rd = (f1 <= f2) ? 1 : 0', usage: 'rd, fs1, fs2', description: 'Less Than or Equal Single-Precision; Writes 1 to rd if fs1 is less than or equal to fs2, and 0 otherwise. If either operand is NaN, the result is 0 (not equal). Positive zero and negative zero are considered equal.' },
+    { name: 'fclass.s',  operation: '', usage: 'rd, fs1', description: 'Classify Single-Precision; Examines the value in floating-point register fs1 and writes to integer register rd a 10-bit mask that indicates the class of the floating-point number.\n\nPlease refer to the [manual](https://riscv.github.io/riscv-unified-db/manual/html/isa/isa_20240411/insts/fclass.s.html) for more details.' },
+    { name: 'fcvt.s.w',  operation: 'fd = i32_to_f32(fs1, rm)', usage: 'fd, rs1, rm', description: 'Convert Word to Single-Precision; Converts a 32-bit signed integer in integer register xs1 into a floating-point number in floating-point register fd.\n\nA floating-point register can be initialized to floating-point positive zero using `fcvt.s.w fd, x0`.' },
+    { name: 'fcvt.s.wu', operation: 'fd = u32_to_f32(fs1, rm)', usage: 'fd, rs1, rm', description: 'Convert Unsigned Word to Single-Precision; Converts a 32-bit unsigned integer in integer register xs1 into a floating-point number in floating-point register fd.' },
+    { name: 'fmv.w.x',   operation: 'fd = rs1', usage: 'fd, rs1', description: 'Move Single-Precision Word from Integer Register; Moves the single-precision value encoded in IEEE 754-2008 standard encoding from the lower 32 bits of integer register xs1 to the floating-point register fd. The bits are not modified in the transfer.' },
 
     // Pseudo-instructions
     { name: 'nop', operation: '—', usage: '', description: '**(pseudoinstruction)** No operation; expands to addi with zero effect.' },
@@ -231,6 +231,15 @@ export const rvManual: IUserManual = {
         '**ecall** service number in **a7** (**12**).\n\n'
         + '**a0** carries the low byte of the character to print.\n\n'
         + 'The char will be printed in the simulator terminal.',
+    },
+    {
+      name: 'SYSCALL_PRINTF',
+      description:
+        '**ecall** service number in **a7** (**14**).\n\n'
+        + 'Prints a formatted string to the simulator terminal (like a small `printf`).\n\n'
+        + '**a0** — address of a null-terminated format string in memory (up to 255 bytes).\n\n'
+        + '**a1** through **a6** — values substituted left to right for each conversion in the format string (first placeholder uses **a1**, second uses **a2**, and so on).\n\n'
+        + 'Supported conversions: **%d** (signed decimal), **%u** (unsigned decimal), **%x** / **%X** (hex), **%c** (character), **%p** (pointer), **%f** (single-precision float), **%%** (literal `%`).',
     },
     {
       name: 'SYSCALL_UPDATE_SCREEN',

@@ -23,6 +23,7 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
 
   function handleEditorWillMount(monaco: Monaco) {
     monaco.languages.register({ id: 'mips' });
+
     monaco.languages.setMonarchTokensProvider('mips', {
       keywords: keywords.concat(directives),
       typeKeywords: consts,
@@ -96,7 +97,11 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
 
     let manualEntries = simulator.manual.instructions.map((inst) => [
       inst.name,
-      [{ value: inst.operation }, { value: inst.description }],
+      [
+        { value: inst.operation },
+        { value: inst.description },
+        // { value: `[[Manual]](${simulator.linkToManual(inst.name)})` }, // @todo this opens the link the the same tab
+      ],
     ]);
 
     manualEntries = manualEntries.concat(
@@ -117,14 +122,26 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
 
     monaco.languages.registerHoverProvider('mips', {
       provideHover: (model, position) => {
-        const word = model.getWordAtPosition(position);
+        const lineContent = model.getLineContent(position.lineNumber);
+        const column = position.column;
 
-        if (word && word.word) {
-          const w = word.word.toLowerCase();
-          const entry = manualMap[w];
+        const regex = /([a-zA-Z0-9_.]+)/g;
+        let match;
 
-          if (entry) {
-            return { contents: entry };
+        while ((match = regex.exec(lineContent)) !== null) {
+          const startColumn = match.index + 1;
+          const endColumn = startColumn + match[0].length;
+
+          if (column >= startColumn && column <= endColumn) {
+            const w = match[0].toLowerCase();
+            const entry = manualMap[w];
+
+            if (entry) {
+              return {
+                range: new monaco.Range(position.lineNumber, startColumn, position.lineNumber, endColumn),
+                contents: entry,
+              };
+            }
           }
         }
       },
@@ -133,34 +150,48 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
     const instuctionsManual = Object.fromEntries(simulator.manual.instructions.map((inst) => [inst.name, inst]));
 
     monaco.languages.registerCompletionItemProvider('mips', {
-      // @ts-expect-error bleeeeeeh
-      provideCompletionItems: () => {
+      triggerCharacters: ['.', '%'],
+      provideCompletionItems: (model, position) => {
+        const line = model.getLineContent(position.lineNumber);
+        let startColumn = position.column;
+
+        while (startColumn > 1 && /[a-zA-Z0-9_.$%]/.test(line[startColumn - 2])) {
+          startColumn--;
+        }
+
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn,
+          endColumn: position.column,
+        };
+
         return {
           suggestions: [
             ...simulator.instructionKeywords.map((keyword) => ({
               insertText: keyword,
               label: { label: keyword, detail: ' ' + (instuctionsManual[keyword]?.usage || '') },
               kind: monaco.languages.CompletionItemKind.Keyword,
-              range: 0,
+              range,
             })),
             ...consts.map((c) => ({
               insertText: c,
               label: c,
               kind: monaco.languages.CompletionItemKind.Constant,
-              range: 0,
+              range,
             })),
             ...directives.map((directive) => ({
               insertText: directive,
               label: directive,
-              kind: monaco.languages.CompletionItemKind.EnumMember, // uuuh....
-              range: 0,
+              kind: monaco.languages.CompletionItemKind.EnumMember,
+              range,
             })),
             ...registers.map((register, i) => ({
               insertText: register,
               label: register,
-              kind: monaco.languages.CompletionItemKind.EnumMember, // uuuh....
+              kind: monaco.languages.CompletionItemKind.EnumMember,
               detail: simulator.manual.registers?.[i]?.alias || '',
-              range: 0,
+              range,
             })),
           ],
         };

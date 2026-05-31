@@ -1,8 +1,9 @@
-import { Badge, Divider, Flex, Heading, Tooltip, useColorModeValue } from '@chakra-ui/react';
+import { Badge, Divider, Flex, Heading, Icon, Tooltip, useColorModeValue } from '@chakra-ui/react';
 import { Table, TableContainer, Tbody, Td, Th, Thead, Tr } from '@chakra-ui/table';
 import {} from '@monaco-editor/react';
 import Markdown from 'react-markdown';
 import { useSimulator } from '../../../hooks/simulator.hook';
+import { FaBook } from 'react-icons/fa';
 
 export default function InstructionManual() {
   const { simulator } = useSimulator();
@@ -55,6 +56,7 @@ export default function InstructionManual() {
               <Th>Instruction</Th>
               <Th>Operation</Th>
               <Th>Description</Th>
+              <Th>Manual</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -65,6 +67,15 @@ export default function InstructionManual() {
                   <Td>{inst.operation}</Td>
                   <Td>
                     <Markdown>{inst.description}</Markdown>
+                  </Td>
+                  <Td sx={{ textAlign: 'center' }}>
+                    <a
+                      href={simulator.linkToManual(inst.name)}
+                      target="__blank"
+                      aria-label={'Abrir documentação da instrução ' + inst.name}
+                    >
+                      <Icon as={FaBook} boxSize="1.15em" />
+                    </a>
                   </Td>
                 </Tr>
               );
