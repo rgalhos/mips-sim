@@ -1354,7 +1354,6 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           [
             rv_opcode['fmv.x.w'],
             rv_opcode['fcvt.w.s'],
-            rv_opcode['fcvt.w.s'],
             rv_opcode['fcvt.wu.s'],
             rv_opcode['feq.s'],
             rv_opcode['flt.s'],

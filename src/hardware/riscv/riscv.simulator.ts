@@ -16,6 +16,7 @@ import {
   rv_codec,
   rv_consts,
   rv_directives,
+  rv_ext,
   rv_opcode,
   RV_OPCODE_DATA,
   rv_opcode_pseudo,
@@ -98,11 +99,15 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     return BigInt(cur.value as number);
   }
 
-  private ensureRegisterToken(t: IToken | undefined, constants: Record<string, IToken>): number {
+  private ensureRegisterToken(
+    t: IToken | undefined,
+    constants: Record<string, IToken>,
+    registers: any = rv_reg,
+  ): number {
     if (!t) throw throwUnexpectedToken([]);
     const cur = this.followConstSubst(t, constants);
     const v = String(cur.value).toLowerCase();
-    const r = rv_reg[v as keyof typeof rv_reg] ?? rv_reg_f[v as keyof typeof rv_reg_f];
+    const r = registers[v as keyof typeof rv_reg];
     if (typeof r === 'undefined') throw throwUnexpectedToken([t]);
     return r;
   }
@@ -366,58 +371,95 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     const tok2 = tokens[2];
     const tok3 = tokens[3];
 
-    switch (dec.codec) {
-      case rv_codec.r:
-        dec.rd = this.ensureRegisterToken(tok1, constants);
-        dec.rs1 = this.ensureRegisterToken(tok2, constants);
-        // RV32F instructions that are R-type but rs2 is always zeroed
-        if (
-          [
-            rv_opcode['fsqrt.s'],
+    if (data.extension === rv_ext.RV32I || data.extension === rv_ext.RV32M) {
+      switch (dec.codec) {
+        case rv_codec.r:
+          dec.rd = this.ensureRegisterToken(tok1, constants);
+          dec.rs1 = this.ensureRegisterToken(tok2, constants);
+          dec.rs2 = this.ensureRegisterToken(tok3, constants);
+          break;
+        case rv_codec.i:
+          if (dec._op === rv_opcode.ebreak || dec._op === rv_opcode.ecall) break;
+
+          dec.rd = this.ensureRegisterToken(tok1, constants);
+          dec.rs1 = this.ensureRegisterToken(tok2, constants);
+          dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
+          break;
+        case rv_codec.s:
+          dec.rs2 = this.ensureRegisterToken(tok1, constants);
+          dec.rs1 = this.ensureRegisterToken(tok2, constants);
+          dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
+          break;
+        case rv_codec.b:
+          dec.rs1 = this.ensureRegisterToken(tok1, constants);
+          dec.rs2 = this.ensureRegisterToken(tok2, constants);
+          dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
+          break;
+        case rv_codec.u:
+        case rv_codec.j:
+          dec.rd = this.ensureRegisterToken(tok1, constants);
+          dec.imm = this.decodeImmediate(tokens, 2, constants, pc, dec.codec) & 0xfffffn;
+          break;
+      }
+    } else if (data.extension === rv_ext.RV32F) {
+      switch (dec.codec) {
+        case rv_codec.r:
+          const rdRegKind = [
             rv_opcode['fcvt.w.s'],
             rv_opcode['fcvt.wu.s'],
             rv_opcode['fmv.x.w'],
+            rv_opcode['feq.s'],
+            rv_opcode['flt.s'],
+            rv_opcode['fle.s'],
             rv_opcode['fclass.s'],
-            rv_opcode['fcvt.s.w'],
-            rv_opcode['fcvt.s.wu'],
-            rv_opcode['fmv.w.x'],
           ].includes(dec._op)
-        ) {
-          dec.rs2 = 0;
-        } else {
-          dec.rs2 = this.ensureRegisterToken(tok3, constants);
-        }
-        break;
-      case rv_codec.i:
-        if (dec._op === rv_opcode.ebreak || dec._op === rv_opcode.ecall) break;
+            ? rv_reg
+            : rv_reg_f;
+          const rs1RegKind = [rv_opcode['fmv.w.x'], rv_opcode['fcvt.s.w'], rv_opcode['fcvt.s.wu']].includes(dec._op)
+            ? rv_reg
+            : rv_reg_f;
 
-        dec.rd = this.ensureRegisterToken(tok1, constants);
-        dec.rs1 = this.ensureRegisterToken(tok2, constants);
-        dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
-        break;
-      case rv_codec.s:
-        dec.rs2 = this.ensureRegisterToken(tok1, constants);
-        dec.rs1 = this.ensureRegisterToken(tok2, constants);
-        dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
-        break;
-      case rv_codec.b:
-        dec.rs1 = this.ensureRegisterToken(tok1, constants);
-        dec.rs2 = this.ensureRegisterToken(tok2, constants);
-        dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
-        break;
-      case rv_codec.u:
-      case rv_codec.j:
-        dec.rd = this.ensureRegisterToken(tok1, constants);
-        dec.imm = this.decodeImmediate(tokens, 2, constants, pc, dec.codec) & 0xfffffn;
-        break;
-      case rv_codec.r4:
-        dec.rd = this.ensureRegisterToken(tok1, constants);
-        dec.rs1 = this.ensureRegisterToken(tok2, constants);
-        dec.rs2 = this.ensureRegisterToken(tok3, constants);
-        dec.rs3 = this.ensureRegisterToken(tokens?.[4], constants);
-        // @todo implement rounding mode
-        dec.rm = 0b111;
-        break;
+          dec.rd = this.ensureRegisterToken(tok1, constants, rdRegKind);
+          dec.rs1 = this.ensureRegisterToken(tok2, constants, rs1RegKind);
+          // RV32F instructions that are R-type but rs2 is always zeroed
+          if (
+            [
+              rv_opcode['fsqrt.s'],
+              rv_opcode['fcvt.w.s'],
+              rv_opcode['fcvt.wu.s'],
+              rv_opcode['fmv.x.w'],
+              rv_opcode['fclass.s'],
+              rv_opcode['fcvt.s.w'],
+              rv_opcode['fcvt.s.wu'],
+              rv_opcode['fmv.w.x'],
+            ].includes(dec._op)
+          ) {
+            dec.rs2 = 0;
+          } else {
+            dec.rs2 = this.ensureRegisterToken(tok3, constants, rv_reg_f);
+          }
+          break;
+        case rv_codec.i:
+          if (dec._op === rv_opcode.ebreak || dec._op === rv_opcode.ecall) break;
+
+          dec.rd = this.ensureRegisterToken(tok1, constants, rv_reg_f);
+          dec.rs1 = this.ensureRegisterToken(tok2, constants);
+          dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
+          break;
+        case rv_codec.s:
+          dec.rs2 = this.ensureRegisterToken(tok1, constants, rv_reg_f);
+          dec.rs1 = this.ensureRegisterToken(tok2, constants);
+          dec.imm = this.decodeImmediate(tokens, 3, constants, pc, dec.codec) & 0xfffn;
+          break;
+        case rv_codec.r4:
+          dec.rd = this.ensureRegisterToken(tok1, constants, rv_reg_f);
+          dec.rs1 = this.ensureRegisterToken(tok2, constants, rv_reg_f);
+          dec.rs2 = this.ensureRegisterToken(tok3, constants, rv_reg_f);
+          dec.rs3 = this.ensureRegisterToken(tokens?.[4], constants, rv_reg_f);
+          // @todo implement rounding mode
+          dec.rm = 0b111;
+          break;
+      }
     }
 
     dec.bytecode = this.processor.toBytecode(dec);

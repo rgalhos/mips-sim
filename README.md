@@ -15,13 +15,15 @@ It is a fork of the [WIMS](https://github.com/ReinaldoAssis/mips-sim) web-based 
 - [x] Terminal Output
 - [x] User-friendly memory and register visualization
 - [ ] Datapath visualization
+- [ ] Cache visualization
+- [ ] Multi-stage pipeline
 
 ## Supported extensions
 
 - [x] RV32I (except fence)
 - [x] RV32M
 - [ ] RV32A
-- [x] RV32F (except round mode)
+- [x] RV32F (except rounding mode)
 - [ ] RV32D
 - [ ] RV32Q
 - [ ] RV32C
