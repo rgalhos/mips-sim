@@ -22,7 +22,6 @@ import { BsFileEarmarkCode, BsTerminalFill } from 'react-icons/bs';
 import { CgScreen } from 'react-icons/cg';
 import { FaDownload, FaFolderOpen } from 'react-icons/fa';
 import { HiPause, HiPlay } from 'react-icons/hi';
-import { IoMdSave } from 'react-icons/io';
 import { RiSettings2Fill } from 'react-icons/ri';
 import { stringifyTokenizerError } from '../../../hardware/analyzer/tokenizer';
 import { IAssembledInstruction } from '../../../hardware/common/simulator';
@@ -324,29 +323,6 @@ export default function SimulatorView() {
               onClick={() => setConfigModalOpen(true)}
             >
               Configuration
-            </IconButton>
-          </Tooltip>
-          <Tooltip label="Save">
-            <IconButton
-              icon={<Icon as={IoMdSave} style={{ transform: 'scale(1.2)' }} />}
-              zIndex={10}
-              aria-label="Save"
-              backgroundColor={SharedData.theme.editorBackground}
-              color="white"
-              borderRadius={50}
-              size="sm"
-              onClick={() => {
-                share.saveProgram(share.programTitle.toLowerCase(), share.code);
-                toast({
-                  title: 'Code saved',
-                  description: 'Your code has been saved',
-                  status: 'success',
-                  duration: 3000,
-                  isClosable: true,
-                });
-              }}
-            >
-              Save
             </IconButton>
           </Tooltip>
           <Tooltip label="Load">

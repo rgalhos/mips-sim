@@ -6,8 +6,10 @@ import { useEffect, useState } from 'react';
 import { IManualExample } from '../../../hardware/common/examples';
 
 function loadExample(code: string) {
-  SharedData.instance.code = code;
-  SharedData.instance.changePage(0);
+  const share = SharedData.instance;
+  share.code = code;
+  share.updateMonacoCode();
+  share.changePage(0);
 }
 
 function Example(props: { title: string; code: string; fsize?: number }) {

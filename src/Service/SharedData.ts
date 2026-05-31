@@ -24,19 +24,15 @@ export interface IProcessor {
   regbank : Array<number>
 }
 
-export interface ICachedProgram {
-  name: string;
-  id: number;
-  code: string;
-}
-
 export interface ThemeData {
   editorBackground: string;
 }
 
 export default class SharedData {
   private static _instance: SharedData;
+  private static readonly EDITOR_DRAFT_KEY = 'editor_draft';
   private log = Logger.instance;
+  private _saveDraftTimer: ReturnType<typeof setTimeout> | null = null;
 
   public static theme: ThemeData = {
     editorBackground: "#282a36",
@@ -136,18 +132,56 @@ export default class SharedData {
     }
   }
 
-  public updateCode(){
-    if(this.monacoEditor) this._code = this.monacoEditor.getValue();
+  public updateCode() {
+    if (this.monacoEditor) {
+      this.code = this.monacoEditor.getValue();
+    }
   }
 
   public get code(): string {
-    // if (this.monacoEditor) return this.monacoEditor.getValue();
-    // else return this._code;
     return this._code;
   }
 
   public set code(value: string) {
     this._code = value;
+    this.scheduleSaveEditorDraft(value);
+  }
+
+  public loadEditorDraft(): string | null {
+    if (!this.existsCached(SharedData.EDITOR_DRAFT_KEY)) {
+      return null;
+    }
+
+    const draft = this.getCached(SharedData.EDITOR_DRAFT_KEY);
+    return typeof draft === 'string' ? draft : null;
+  }
+
+  public hasEditorDraft(): boolean {
+    return this.existsCached(SharedData.EDITOR_DRAFT_KEY);
+  }
+
+  public saveEditorDraft(code: string) {
+    this.setCached(SharedData.EDITOR_DRAFT_KEY, code);
+  }
+
+  public flushEditorDraft() {
+    if (this._saveDraftTimer) {
+      clearTimeout(this._saveDraftTimer);
+      this._saveDraftTimer = null;
+    }
+
+    this.saveEditorDraft(this._code);
+  }
+
+  private scheduleSaveEditorDraft(code: string) {
+    if (this._saveDraftTimer) {
+      clearTimeout(this._saveDraftTimer);
+    }
+
+    this._saveDraftTimer = setTimeout(() => {
+      this.saveEditorDraft(code);
+      this._saveDraftTimer = null;
+    }, 500);
   }
 
   public updateMonacoCode(){
@@ -222,55 +256,14 @@ export default class SharedData {
     this.setCached(key, value, ignoreStringify);
   }
 
-  /*
-    Saves a program in local storage and updates the list of cached programs
-    @param programName: name of the program to be saved
-    @returns void
-  */
-  public saveProgram(programName: string, code: string){
-    if(this.existsCached("cached_programs")){
-      let list = this.getCached("cached_programs") as Array<string>;
-      if (!list.includes(programName)){
-        list.push(programName);
-      this.updateCached("cached_programs", list);
-      }
-
-      this.setCached(programName, code);
-      return;
+  private constructor() {
+    const draft = this.loadEditorDraft();
+    if (draft !== null) {
+      this._code = draft;
     }
 
-    this.setCached("cached_programs", [programName]);
-    this.setCached(programName, code);
-
+    window.addEventListener('pagehide', () => this.flushEditorDraft());
   }
-
-  /*
-    Load program from local storage if it exists
-    @param programName: name of the program to be loaded
-    @returns code or null
-  */
-  public loadProgram(programName: string){
-    if (!this.existsCached(programName)) return null;
-    return this.getCached(programName);
-  }
-
-  public removeProgram(programName: string){
-    if (!this.existsCached(programName)) return false;
-    this.removeCached(programName);
-    let list = this.getCached("cached_programs") as Array<string>;
-    list = list.filter((item) => item !== programName);
-    this.updateCached("cached_programs", list);
-    return true;
-  }
-
-  public getListOfCachedPrograms() : Array<string> {
-    let chached_programs = this.getCached("cached_programs");
-    if(chached_programs) return chached_programs as Array<string>;
-    else return [];
-  }
-
-
-  private constructor() {}
 
   public static get instance(): SharedData {
     if (!SharedData._instance) SharedData._instance = new SharedData();

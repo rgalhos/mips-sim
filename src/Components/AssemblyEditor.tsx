@@ -237,14 +237,12 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       resizeObserver?.disconnect();
     });
 
-    // makes sure the editor mounts with the right code
-    const defaultcode = share.defaultCode;
-
-    if (!share.code) {
-      editor.setValue(share.code);
-    } else {
-      editor.setValue(defaultcode);
+    const initialCode = share.hasEditorDraft() ? share.code : share.defaultCode;
+    if (!share.hasEditorDraft()) {
+      share.code = initialCode;
     }
+
+    editor.setValue(initialCode);
   }
 
   return (
@@ -253,7 +251,7 @@ function AssemblyEditor(props: { onEditorChange: (value: string | undefined, eve
       height="82vh"
       defaultLanguage="mips"
       theme={colorMode === 'dark' ? 'mipsdark' : 'mipslight'}
-      defaultValue={'# MIPS Assembly Sim. by Reinaldo Assis \n# Project supervisor: prof. Bruno Costa\n\n'}
+      defaultValue={''}
       options={{
         automaticLayout: false,
         scrollBeyondLastLine: false,
