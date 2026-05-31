@@ -45,7 +45,7 @@ export default class Logger {
   }
 
   public debug(message: string): void {
-    this._log += `DEBUG: ${message}\n`;
+    // this._log += `DEBUG: ${message}\n`;
     this._debug.push(message);
 
     this._onchange();

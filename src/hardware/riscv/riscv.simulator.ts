@@ -215,7 +215,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
       case 'li': {
         const rd = this.ensureRegisterToken(tok1, constants);
-        const imm = this.ensureNumericImmediate(tok2, constants);
+        const imm = this.decodeImmediate(tokens, 2, constants, pc, rv_codec.i);
         if (imm >= -2048n && imm <= 2047n) {
           return this.assembleLine(tokenize(`addi x${rd}, zero, ${imm}`, lineNo), constants, pc, true);
         }
@@ -565,6 +565,23 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           currentAddr += val;
         } else if (directive === '.org') {
           currentAddr = this.ensureNumericImmediate(tokens[1], constants);
+        } else if (directive === '.align' || directive === '.p2align') {
+          const power = tokens[1] ? this.ensureNumericImmediate(tokens[1], constants) : 2n;
+          const fill = tokens[2] ? this.ensureNumericImmediate(tokens[2], constants) : null;
+          const maxPad = tokens[3] ? this.ensureNumericImmediate(tokens[3], constants) : null;
+
+          const alignment = 1n << power;
+          const aligned = (currentAddr + alignment - 1n) & ~(alignment - 1n);
+          const padding = aligned - currentAddr;
+
+          if (padding > 0n && (maxPad === null || padding <= maxPad)) {
+            if (fill !== null) {
+              for (let offset = 0n; offset < padding; offset++) {
+                this.processor.memoryWrite(currentAddr + offset, fill, 8);
+              }
+            }
+            currentAddr = aligned;
+          }
         } else if (directive === '.ascii' || directive === '.asciz' || directive === '.string') {
           const tkValue = tokens[1];
 
