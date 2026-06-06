@@ -3,7 +3,7 @@
 
 # RV-SIM
 
-The very creatively named RV-SIM is a web-based educational RISC-V (RV32I/RV32M/RV32F) simulator with editor, stepping, memory inspection, syscalls, screen & keyboard I/O.
+The very creatively named RV-SIM is a web-based educational RISC-V (RV32IMF) simulator with editor, stepping, memory inspection, syscalls, screen & keyboard I/O.
 
 It is a fork of the [WIMS](https://github.com/ReinaldoAssis/mips-sim) web-based MIPS simulator created by [@ReinaldoAssis](https://github.com/ReinaldoAssis).
 
@@ -15,7 +15,7 @@ It is a fork of the [WIMS](https://github.com/ReinaldoAssis/mips-sim) web-based 
 - [x] Terminal Output
 - [x] User-friendly memory and register visualization
 - [ ] Datapath visualization
-- [ ] Cache visualization
+- [ ] Cache simulation
 - [ ] Multi-stage pipeline
 
 ## Supported extensions
@@ -29,9 +29,9 @@ It is a fork of the [WIMS](https://github.com/ReinaldoAssis/mips-sim) web-based 
 - [ ] RV32C
 - [ ] CSRs
 
-## Usage/Examples
+## Usage
 
-This is the default code when you first open the editor, it computes the nth number of the fibonacci sequence. You can either press the green button to assemble and run or you can step through each instruction using the yellow button. The result is displayed in the terminal.
+This is the default code when you first open the editor. It prints the Fibonacci sequence to the terminal, starting at 0 and 1 and continuing until the largest Fibonacci number that fits in 32 bits (2971215073). Press Assemble, then Run, or use Step to execute one instruction at a time.
 
 ```assembly
 .text
@@ -83,6 +83,10 @@ Instruction Set
 Memory inspector
 
 ![Memory](./docs/assets/img-memory.jpg)
+
+# Contributing
+
+Feel free to contribute to the project by opening issues or pull requests. Bug reports, fixes for instruction misimplementations, feature requests and code contributions are all welcome.
 
 ## Authors
 

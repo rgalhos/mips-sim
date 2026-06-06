@@ -1,7 +1,14 @@
-import { Box, Flex, Text } from '@chakra-ui/react';
+import { Box, Button, ButtonGroup, Flex, Text, Tooltip } from '@chakra-ui/react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { EWorkerCommand, IWorkerCPUDump, WorkerMessageResponse } from '../../../hardware/common/worker-service';
+import { RVProcessor } from '../../../hardware/riscv/riscv.processor';
 import { useSimulator } from '../../../hooks/simulator.hook';
+
+type IMemoryRegion = {
+  label: string;
+  address: number;
+  tooltip?: string;
+};
 
 const monoStyles = {
   fontFamily: 'mono',
@@ -139,16 +146,19 @@ function MemoryHexBlock({
   dump,
   start,
   end,
+  regions,
 }: {
   dump: { memory: Uint8Array; cycle: number };
   start: number;
   end: number;
+  regions: IMemoryRegion[];
 }) {
   const memory = dump.memory;
   const totalRows = Math.ceil((end - start) / MEM_ROW_BYTES);
   const viewportPx = MEM_VISIBLE_ROWS * MEM_ROW_HEIGHT_PX;
 
   const [scrollTop, setScrollTop] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollTopPendingRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const throttleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -166,6 +176,20 @@ function MemoryHexBlock({
     lastCommitMsRef.current = performance.now();
     setScrollTop(scrollTopPendingRef.current);
   }, []);
+
+  const scrollToAddress = useCallback(
+    (address: number) => {
+      const clamped = Math.max(start, Math.min(address, end - 1));
+      const rowIndex = Math.floor((clamped - start) / MEM_ROW_BYTES);
+      const newScrollTop = rowIndex * MEM_ROW_HEIGHT_PX;
+
+      scrollTopPendingRef.current = newScrollTop;
+      lastCommitMsRef.current = performance.now();
+      setScrollTop(newScrollTop);
+      scrollContainerRef.current?.scrollTo({ top: newScrollTop });
+    },
+    [start, end],
+  );
 
   useEffect(() => {
     return () => {
@@ -219,7 +243,27 @@ function MemoryHexBlock({
       <Text color={accent.regName} fontWeight="bold" fontSize="sm" mb={1}>
         Memory
       </Text>
+
+      <ButtonGroup size="sm" variant="outline" isAttached mb={2}>
+        {regions.map(({ label, address, tooltip }) => {
+          const button = (
+            <Button key={label} onClick={() => scrollToAddress(address)}>
+              {label}
+            </Button>
+          );
+
+          return tooltip ? (
+            <Tooltip key={label} label={tooltip}>
+              {button}
+            </Tooltip>
+          ) : (
+            button
+          );
+        })}
+      </ButtonGroup>
+
       <Box
+        ref={scrollContainerRef}
         h={`${viewportPx}px`}
         flexShrink={0}
         overflowY="auto"
@@ -284,6 +328,50 @@ function MemoryView({ visible = true }: { visible?: boolean }) {
     return simulator.processor.getRegistersFriendly(dump.cpu);
   }, [dump, simulator.processor]);
 
+  // @todo make this generic for all processors
+  const ImemoryRegions = useMemo((): IMemoryRegion[] => {
+    const processor = simulator.processor;
+    const rvProcessor = processor as RVProcessor;
+
+    return [
+      {
+        label: '.text',
+        address: Number(processor.PC_START),
+        tooltip: 'Executable section of the program.',
+      },
+      {
+        label: '.data',
+        address: Number(processor.DATA_START),
+        tooltip: 'Global and static variables',
+      },
+      {
+        label: '.rodata',
+        address: Number(processor.RODATA_START),
+        tooltip: 'Store constant data',
+      },
+      {
+        label: '.bss',
+        address: Number(processor.BSS_START),
+        tooltip: 'Uninitialized global and static variables',
+      },
+      {
+        label: 'System',
+        address: Number(rvProcessor.KBD_STAT),
+        tooltip: 'This is where the simulator will provide data such as keyboard and terminal inputs',
+      },
+      {
+        label: 'Video Memory',
+        address: Number(processor.FB_START),
+        tooltip: 'Framebuffer',
+      },
+      {
+        label: 'Stack',
+        address: Number(processor.STACK_START),
+        tooltip: 'Used for temporary storage; Grows downward',
+      },
+    ];
+  }, [simulator.processor]);
+
   return (
     <Box
       position="relative"
@@ -333,7 +421,7 @@ function MemoryView({ visible = true }: { visible?: boolean }) {
           maxH="min(75vh, 720px)"
         >
           <Box flex="1 1 58%" minW={0} minH={0} display="flex" flexDirection="column" alignSelf="stretch">
-            <MemoryHexBlock dump={dump} start={0} end={simulator.processor.memorySize} />
+            <MemoryHexBlock dump={dump} start={0} end={simulator.processor.memorySize} regions={ImemoryRegions} />
           </Box>
           <Box
             flex={{ base: 'none', lg: '0 0 22rem' }}
