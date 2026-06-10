@@ -1,4 +1,5 @@
 import { IAssembledInstruction } from './simulator';
+import { IWorkerCPUDebugDump } from './worker-service';
 
 type TAnyEnum = Record<string, any>;
 
@@ -43,6 +44,9 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   public lastExecutedInstruction: TDecodedInstruction | null = null;
 
   public _memoryOperationDiff: Record<number, number> = {};
+
+  public _dbgMemChanges: IWorkerCPUDebugDump['memory'] = [];
+  public _dbgRegChanges: IWorkerCPUDebugDump['registers'] = [];
 
   public _workerBuffer: any;
 
@@ -162,69 +166,57 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
       console.error('WIMS: Writing to inexistent register: ', reg);
     }
 
-    this.cpu.register[reg] = value;
-  }
-
-  public _memoryWrite(address: number | bigint, value: bigint, bits: 8 | 16 | 32 = 8): void {
-    address = Number(address);
-    switch (bits) {
-      // case 64:
-      //   this.memory[address + 7] = (value >> 56) & 0xff;
-      //   this.memory[address + 6] = (value >> 48) & 0xff;
-      //   this.memory[address + 5] = (value >> 40) & 0xff;
-      //   this.memory[address + 4] = (value >> 32) & 0xff;
-      // @ts-expect-error // eslint-disable-next-line no-fallthrough
-      case 32: {
-        this.memory[address + 3] = Number((value >> 24n) & 0xffn);
-        this._memoryOperationDiff[address + 3] = Number((value >> 24n) & 0xffn);
-        this.memory[address + 2] = Number((value >> 16n) & 0xffn);
-        this._memoryOperationDiff[address + 2] = Number((value >> 16n) & 0xffn);
-      }
-      // @ts-expect-error // eslint-disable-next-line no-fallthrough
-      case 16: {
-        this.memory[address + 1] = Number((value >> 8n) & 0xffn);
-        this._memoryOperationDiff[address + 1] = Number((value >> 8n) & 0xffn);
-      } // eslint-disable-next-line no-fallthrough
-      default: {
-        this.memory[address + 0] = Number(value & 0xffn);
-        this._memoryOperationDiff[address + 0] = Number(value & 0xffn);
-      }
-    }
+    this._dbgRegChanges.push({
+      reg: this.registers[reg],
+      value: (this.cpu.register[reg] = value),
+      cycle: this.cycle,
+      pc: this.cpu.pc,
+    });
   }
 
   public memoryWrite(address: bigint, value: bigint, bits: 8 | 16 | 32 = 8): void {
+    const addr = Number(address);
     const v = Number(value);
     switch (bits) {
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 32:
-        // @ts-expect-error bigint as index
-        this._memoryOperationDiff[address + 3n] = this.memory[address + 3n] = (v >>> 24) & 0xff;
-        // @ts-expect-error bigint as index
-        this._memoryOperationDiff[address + 2n] = this.memory[address + 2n] = (v >>> 16) & 0xff;
+        this._dbgMemChanges.push({
+          address: addr + 3,
+          value: (this._memoryOperationDiff[addr + 3] = this.memory[addr + 3] = (v >>> 24) & 0xff),
+          cycle: this.cycle,
+          pc: this.cpu.pc,
+        });
+
+        this._dbgMemChanges.push({
+          address: addr + 2,
+          value: (this._memoryOperationDiff[addr + 2] = this.memory[addr + 2] = (v >>> 16) & 0xff),
+          cycle: this.cycle,
+          pc: this.cpu.pc,
+        });
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 16:
-        // @ts-expect-error bigint as index
-        this._memoryOperationDiff[address + 1n] = this.memory[address + 1n] = (v >>> 8) & 0xff;
+        this._dbgMemChanges.push({
+          address: addr + 2,
+          value: (this._memoryOperationDiff[addr + 1] = this.memory[addr + 1] = (v >>> 8) & 0xff),
+          cycle: this.cycle,
+          pc: this.cpu.pc,
+        });
       // eslint-disable-next-line no-fallthrough
       default:
-        // @ts-expect-error bigint as index
-        this._memoryOperationDiff[address] = this.memory[address] = v & 0xff;
+        this._dbgMemChanges.push({
+          address: addr + 2,
+          value: (this._memoryOperationDiff[addr] = this.memory[addr] = v & 0xff),
+          cycle: this.cycle,
+          pc: this.cpu.pc,
+        });
     }
   }
 
   public memoryRead(address: number | bigint, bits: 8 | 16 | 32 | 64 = 8): bigint {
     address = Number(address);
-    // deixei pra lá: If address is empty we generate a random number (garbage) and save it to the address.
-    const read = (addr: number) => {
-      let v = BigInt(this.memory[addr]);
-      // if (typeof v === 'undefined') {
-      //   v = BigInt((Math.random() * 32768) & 255);
-      //   this.memoryWrite(addr, v);
-      // }
-      return v;
-    };
-
-    let v = 0n;
+    // will have to change to bigint again if we implement 64 bit architectures
+    const read = (addr: number) => this.memory[addr];
+    let v = 0;
 
     switch (bits) {
       // case 64: {
@@ -236,17 +228,17 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
       // }
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 32: {
-        v |= ((read(address + 3) & 0xffn) << 24n) | ((read(address + 2) & 0xffn) << 16n);
+        v |= ((read(address + 3) & 0xff) << 24) | ((read(address + 2) & 0xff) << 16);
       } // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 16: {
-        v |= (read(address + 1) & 0xffn) << 8n;
+        v |= (read(address + 1) & 0xff) << 8;
       } // eslint-disable-next-line no-fallthrough
       default: {
-        v |= read(address + 0) & 0xffn;
+        v |= read(address + 0) & 0xff;
       }
     }
 
-    return v;
+    return BigInt(v);
   }
 
   public abstract loadProgram(program: Array<IAssembledInstruction>): void;

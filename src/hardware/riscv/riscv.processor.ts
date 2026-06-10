@@ -809,7 +809,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
                     .padStart(8, '0')
                 );
               case '%f':
-                return (biguint32_to_f(this.registerRead(rv_reg.a0 + i))).toString();
+                return biguint32_to_f(this.registerRead(rv_reg.a0 + i)).toString();
               case '%%':
                 return '%';
             }
@@ -1430,7 +1430,12 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       throw new Error('RVSIM: inexistent RV32F register: ' + reg);
     }
 
-    this.cpu.registerF[reg] = u32(value);
+    this._dbgRegChanges.push({
+      reg: rv_reg_f[reg],
+      value: (this.cpu.registerF[reg] = u32(value)),
+      cycle: this.cycle,
+      pc: this.cpu.pc,
+    });
   }
 
   public loadProgram(program: Array<IAssembledInstruction<IDecodedRVInstruction>>) {

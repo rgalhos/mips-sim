@@ -65,9 +65,7 @@ export default function SimulatorView() {
   const txtProgramtitle = useRef<HTMLInputElement>(null);
 
   const [consoleOpen, setConsoleOpen] = useState<boolean>(false);
-  const [consoleTxt, setConsoleTxt] = useState<string>('');
   const [currentTerminal, setCurrentTerminal] = useState<number>(0);
-  const [debugTxt, setDebugTxt] = useState<string>('');
   const [configModalOpen, setConfigModalOpen] = useState<boolean>(false);
   const [loadProgramModalOpen, setLoadProgramModalOpen] = useState<boolean>(false);
   const [screenModalOpen, setScreenModalOpen] = useState<boolean>(false);
@@ -81,19 +79,6 @@ export default function SimulatorView() {
   useEffect(() => {
     if (txtProgramtitle.current) txtProgramtitle.current.value = share.programTitle;
   }, [share.programTitle, program, currentInstruction]);
-
-  useEffect(() => {
-    Logger.instance.onLogChange(() => {
-      setConsoleTxt(log.getConsole() + log.getErrors());
-      setDebugTxt(log.getDebug());
-
-      let debugTxtArea = document.getElementById('debugTxtArea');
-      if (debugTxtArea) debugTxtArea.scrollTop = debugTxtArea.scrollHeight;
-
-      let consoleTxtArea = document.getElementById('consoleTxtArea');
-      if (consoleTxtArea) consoleTxtArea.scrollTop = consoleTxtArea.scrollHeight;
-    });
-  }, [consoleOpen, debugTxt, log]);
 
   useEffect(() => {
     const ws = simulator.workerService;
@@ -446,13 +431,7 @@ export default function SimulatorView() {
             <ConsoleTerminal />
           </Box>
           <Box display={currentTerminal === 1 ? 'block' : 'none'} aria-hidden={currentTerminal !== 1}>
-            <DebugTerminal
-              value={debugTxt}
-              onClear={() => {
-                setDebugTxt('');
-                Logger.instance.clearDebug();
-              }}
-            />
+            <DebugTerminal />
           </Box>
         </Box>
       </Slide>

@@ -30,10 +30,20 @@ const postCpuDump = (fullDump = false) => {
       lastExecutedInstruction: cpu.lastExecutedInstruction,
     },
   });
+
+  postMessage({
+    command: EWorkerCommand.CPU_DEBUG_DUMP,
+    data: {
+      memory: cpu._dbgMemChanges,
+      registers: cpu._dbgRegChanges,
+    },
+  });
+
+  cpu._dbgMemChanges = [];
+  cpu._dbgRegChanges = [];
 };
 
-const shouldPostDumpAfterStep = () =>
-  cpu.halted || cpu.cycle % (Math.min(111, Math.ceil(cpu.frequency / 11)) | 1) === 0;
+const shouldPostDumpAfterStep = () => cpu.halted || cpu.cycle % Math.max(100, Math.ceil(cpu.frequency / 10)) === 0;
 
 const cancelRunLoop = () => {
   cpu.setHalted(true);
@@ -56,11 +66,11 @@ const handleCpuStep = () => {
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const startRunLoop = async () => {
-  const t0 = performance.now();
+  const t0 = Date.now();
   const freq = Math.max(1, cpu.frequency);
   const cyclesPerWake = Math.max(1, Math.ceil(freq / 1000));
   const sliceMs = (cyclesPerWake * 1000) / freq;
-  let nextDeadline = performance.now();
+  let nextDeadline = Date.now();
 
   while (!cpu.halted) {
     for (let i = 0; i < cyclesPerWake && !cpu.halted; i++) {
@@ -68,14 +78,14 @@ const startRunLoop = async () => {
     }
 
     nextDeadline += sliceMs;
-    const delay = nextDeadline - performance.now();
+    const delay = nextDeadline - Date.now();
 
     if (delay > 0) {
       await sleep(delay);
     }
   }
 
-  const t1 = performance.now();
+  const t1 = Date.now();
 
   const tDelta = t1 - t0;
   console.log(`perf: Program execution took ${tDelta}ms and ${cpu.cycle} cycles. (${cpu.cycle / (tDelta / 1000)}Hz)`);

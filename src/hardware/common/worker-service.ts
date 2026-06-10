@@ -16,6 +16,7 @@ export const enum EWorkerCommand {
   SET_MEMORY_SIZE = 'SET_MEMORY_SIZE',
   MEMORY_RETRIEVE = 'MEMORY_RETRIEVE',
   CPU_DUMP = 'CPU_DUMP',
+  CPU_DEBUG_DUMP = 'CPU_DEBUG_DUMP',
   MEMORY_OVERWRITE = 'MEMORY_OVERWRITE',
   ASSEMBLE_CODE = 'ASSEMBLE_CODE',
   SYNC_WORKER = 'SYNC_WORKER',
@@ -29,6 +30,11 @@ export interface IWorkerCPUDump {
   cycle: number;
   halted: boolean;
   lastExecutedInstruction: any;
+}
+
+export interface IWorkerCPUDebugDump {
+  memory: Array<{ address: number; value: number; pc: bigint; cycle: number }>;
+  registers: Array<{ reg: string; value: bigint; pc: bigint; cycle: number }>;
 }
 
 export type WorkerMessage =
@@ -65,7 +71,7 @@ export type WorkerMessage =
         | EWorkerCommand.CPU_STEP
         | EWorkerCommand.CPU_RESET
         | EWorkerCommand.MEMORY_RETRIEVE
-        | EWorkerCommand.CPU_DUMP;
+        | EWorkerCommand.CPU_DUMP
       data: never;
     };
 
@@ -89,6 +95,10 @@ export type WorkerMessageResponse =
   | {
       command: EWorkerCommand.TERMINAL_PRINT;
       data: string;
+    }
+  | {
+      command: EWorkerCommand.CPU_DEBUG_DUMP;
+      data: IWorkerCPUDebugDump;
     }
   | {
       command: EWorkerCommand.CPU_SETUP | EWorkerCommand.CPU_RUN | EWorkerCommand.CPU_STEP | EWorkerCommand.CPU_RESET;
