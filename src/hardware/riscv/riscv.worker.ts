@@ -54,12 +54,17 @@ const handleCpuStep = () => {
 
   if (ret & rv_worker_commands.SYNC_LISTENERS) {
     postCpuDump(true);
-  } else if (shouldPostDumpAfterStep()) {
+  } else if (shouldPostDumpAfterStep() || ret & rv_worker_commands.UPDATE_FRAMEBUFFER) {
     postCpuDump();
   }
 
   if (ret & rv_worker_commands.PRINT_STRING) {
     postMessage({ command: EWorkerCommand.TERMINAL_PRINT, data: cpu._workerBuffer });
+  }
+
+  if (ret & rv_worker_commands.UPDATE_FRAMEBUFFER) {
+    //@ts-expect-error data: never
+    postMessage({ command: EWorkerCommand.UPDATE_SCREEN });
   }
 };
 
@@ -154,6 +159,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     cpu.cpu = data.cpu as IRVCPU;
     cpu.memory = data.memory;
     cpu.setFrequency(data.frequency);
+    cpu.optExplicitScreenUpdate = data.optExplicitScreenUpdate;
 
     postCpuDump(true);
     //@ts-expect-error data: never

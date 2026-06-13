@@ -21,6 +21,7 @@ export const enum EWorkerCommand {
   ASSEMBLE_CODE = 'ASSEMBLE_CODE',
   SYNC_WORKER = 'SYNC_WORKER',
   TERMINAL_PRINT = 'TERMINAL_PRINT',
+  UPDATE_SCREEN = 'UPDATE_SCREEN',
 }
 
 export interface IWorkerCPUDump {
@@ -52,6 +53,7 @@ export type WorkerMessage =
         cpu: ICPU;
         memory: Uint8Array;
         frequency: number;
+        optExplicitScreenUpdate: boolean;
       };
     }
   | {
@@ -101,7 +103,12 @@ export type WorkerMessageResponse =
       data: IWorkerCPUDebugDump;
     }
   | {
-      command: EWorkerCommand.CPU_SETUP | EWorkerCommand.CPU_RUN | EWorkerCommand.CPU_STEP | EWorkerCommand.CPU_RESET;
+      command:
+        | EWorkerCommand.CPU_SETUP
+        | EWorkerCommand.CPU_RUN
+        | EWorkerCommand.CPU_STEP
+        | EWorkerCommand.CPU_RESET
+        | EWorkerCommand.UPDATE_SCREEN;
       data: never;
     };
 
@@ -192,6 +199,7 @@ export class WorkerService extends EventEmitter {
         cpu: data.cpu,
         memory: data.memory,
         frequency: data.frequency,
+        optExplicitScreenUpdate: data.optExplicitScreenUpdate,
       },
     });
   }

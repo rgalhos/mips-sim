@@ -56,8 +56,6 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   public readonly processor: RVProcessor = new RVProcessor();
 
-  public _optExplicitScreenUpdate = false;
-
   protected createCpuWorkerInstance(workerOptions?: WorkerOptions) {
     return new Worker(new URL('./riscv.worker.ts', import.meta.url), workerOptions);
   }
@@ -497,6 +495,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
     this.processor.resetState();
     this.processor.memory = new Uint8Array(this.processor.memorySize);
+    this.processor.optExplicitScreenUpdate = false;
 
     let currentAddr = 0x0n;
     let currentLabel = '';
@@ -620,7 +619,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           const val = tokens[1]?.value;
 
           if (val === rv_consts.OPTION_EXPLICIT_SCREEN_UPDATE) {
-            this._optExplicitScreenUpdate = true;
+            this.processor.optExplicitScreenUpdate = true;
           } else {
             throw throwUnexpectedToken(tokens);
           }

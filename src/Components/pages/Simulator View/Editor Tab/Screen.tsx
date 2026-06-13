@@ -93,12 +93,20 @@ export default function Screen({ visible = false }: { visible?: boolean }) {
         return;
       }
 
-      if (visible) {
+      const explicitScreenUpdate = simulator.processor.optExplicitScreenUpdate;
+
+      if (!explicitScreenUpdate && visible) {
         redraw();
       }
     },
-    [redraw, FB_START, FB_END, FB_BYTE_LEN, visible],
+    [redraw, FB_START, FB_END, FB_BYTE_LEN, visible, simulator.processor],
   );
+
+  const onUpdateScreen = useCallback(() => {
+    if (visible) {
+      redraw();
+    }
+  }, [visible, redraw]);
 
   useEffect(() => {
     if (!visible) return;
@@ -108,12 +116,16 @@ export default function Screen({ visible = false }: { visible?: boolean }) {
   useEffect(() => {
     const ws = simulator.workerService;
     ws.on(EWorkerCommand.CPU_DUMP, onDump);
+    ws.on(EWorkerCommand.UPDATE_SCREEN, onUpdateScreen);
+    ws.on(EWorkerCommand.CPU_RESET, redraw);
     ws.requestCpuDump();
 
     return () => {
       ws.off(EWorkerCommand.CPU_DUMP, onDump);
+      ws.off(EWorkerCommand.UPDATE_SCREEN, onUpdateScreen);
+      ws.off(EWorkerCommand.CPU_RESET, redraw);
     };
-  }, [simulator.workerService, onDump]);
+  }, [simulator.workerService, onDump, onUpdateScreen, redraw]);
 
   const handleKeyPress = useCallback(
     (e: KeyboardEvent) => {

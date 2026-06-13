@@ -51,6 +51,11 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   public _workerBuffer: any;
 
   /**
+   * Only refreshes screen  after an explicit update-screen syscall
+   */
+  public optExplicitScreenUpdate = false;
+
+  /**
    * Simulator memory
    */
   public memory: Uint8Array = new Uint8Array(this.defaultMemorySize);
