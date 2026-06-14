@@ -181,7 +181,7 @@ export default function SimulatorView() {
 
   return (
     <Tabs index={mainTabIndex} onChange={setMainTabIndex} variant="soft-rounded" style={{ zIndex: 50 }}>
-      <TabList style={{ zIndex: 50 }}>
+      <TabList position="sticky" top={0} zIndex={49} bg={toolbarBg} style={{ zIndex: 50 }}>
         <Tab style={{ zIndex: 50 }}>Editor</Tab>
         <Tab style={{ zIndex: 50 }}>Hex View</Tab>
         {/* <Tab style={{ zIndex: 50 }}>Datapath</Tab> */}
@@ -190,7 +190,7 @@ export default function SimulatorView() {
 
       <Box
         position="sticky"
-        top={0}
+        top="40px"
         zIndex={49}
         bg={toolbarBg}
         borderBottomWidth="1px"

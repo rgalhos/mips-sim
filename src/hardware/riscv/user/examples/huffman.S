@@ -1,0 +1,290 @@
+# Extract a base64-encoded huffman-compressed image and draw it on the framebuffer
+# Author: rgmg [at] ic.ufal.br
+#
+# note: For the default input the program takes 321734 cycles,
+#       so I recommend changing the simulation speed to 10000Hz or faster
+
+.equ FILE_LENGTH  s1
+.equ FILE_PTR     s2
+.equ FILE_END_PTR s3
+.equ DEC_OUT_PTR  s4
+.equ B64_DEC_PTR  s5
+
+# huffman_extract scratch registers
+.equ TREE_PTR   s6  # advancing read cursor over the serialized tree (&str[pos])
+.equ ARENA_PTR  s7  # bump allocator: address of the next free node (malloc)
+.equ TREE_ROOT  s8  # root of the rebuilt huffman tree
+.equ ENC_PTR    s9  # cursor over the encoded bitstream
+.equ ENC_LEFT   s10 # remaining encoded bytes to process (the C 'i' counter)
+.equ OUT_PTR    s11 # framebuffer write cursor
+
+# huffman tree node, 12 bytes: { byte item @0 ; word left @4 ; word right @8 }
+.equ NODE_SIZE 12
+
+.macro push reg
+  addi sp, sp, -4
+  sw \\reg, 0(sp)
+.endmacro
+
+.macro pop reg
+  lw \\reg , 0(sp)
+  addi sp, sp, 4
+.endmacro
+
+.text
+
+main:
+lui FILE_END_PTR, %hi(input_file_end)
+addi FILE_END_PTR, FILE_END_PTR, %lo(input_file_end)
+
+lui FILE_PTR, %hi(input_file)
+addi FILE_PTR, FILE_PTR, %lo(input_file)
+
+# Get file length by subtracting pointers
+sub FILE_LENGTH, FILE_END_PTR, FILE_PTR
+
+call b64_decode
+
+call huffman_extract
+
+ebreak
+
+# Decompress the huffman stream left in 'decoded' by b64_decode and draw the
+# resulting image to the framebuffer (starting at FB_START).
+#
+# Mirrors extract() from the reference C program. The decoded buffer holds:
+#   decoded[0..1] : 2-byte header
+#   decoded[2..]  : pre-order serialized huffman tree (treeSize bytes)
+#   then          : the encoded bitstream (fileSize bytes)
+# (the leading "trash" bits are ignored, as requested)
+huffman_extract:
+push ra
+
+# t0 = decoded (base of the b64-decoded buffer)
+lui t0, %hi(decoded)
+addi t0, t0, %lo(decoded)
+
+# DEC_OUT_PTR = total decoded length (left pointing past the data by
+# b64_decode) - decoded
+sub t1, DEC_OUT_PTR, t0
+
+# header[0] = t2, header[1] = t3
+lbu t2, 0(t0)
+lbu t3, 1(t0)
+
+# treeSize = (byte_t)(header[0] << 3) * 32 + header[1]
+slli t4, t2, 3
+andi t4, t4, 0xFF
+slli t4, t4, 5
+add t4, t4, t3
+
+# treeStr starts right after the header
+addi TREE_PTR, t0, 2
+
+# the encoded bitstream starts after the header and the tree
+add ENC_PTR, TREE_PTR, t4
+
+# fileSize = totalLength - 2 - treeSize
+addi ENC_LEFT, t1, -2
+sub ENC_LEFT, ENC_LEFT, t4
+
+# rebuild the huffman tree from its pre-order serialization
+lui ARENA_PTR, %hi(huff_tree)
+addi ARENA_PTR, ARENA_PTR, %lo(huff_tree)
+call build_tree
+mv TREE_ROOT, a0
+
+# decode the bitstream into the framebuffer
+li OUT_PTR, FB_START
+mv t0, TREE_ROOT # t0 = current node
+
+# for (i = fileSize; i > 1; i--)
+.huff_byte_loop:
+  li t1, 1
+  blez ENC_LEFT, .huff_done
+
+  lbu t2, 0(ENC_PTR) # currentByte
+  addi ENC_PTR, ENC_PTR, 1
+
+  li t3, 0x80 # bit mask, walked from MSB (j = 7) down to LSB (j = 0)
+
+.huff_bit_loop:
+  and t4, t2, t3
+  beqz t4, .huff_left
+  lw t0, 8(t0) # node = node->right
+  j .huff_check_leaf
+.huff_left:
+  lw t0, 4(t0) # node = node->left
+.huff_check_leaf:
+  lw t4, 4(t0) # node->left == NULL marks a leaf
+  bnez t4, .huff_next_bit
+  # leaf reached: emit the byte and restart from the root
+  lbu t4, 0(t0)
+  sb t4, 0(OUT_PTR)
+  addi OUT_PTR, OUT_PTR, 1
+  mv t0, TREE_ROOT
+.huff_next_bit:
+  srli t3, t3, 1
+  bnez t3, .huff_bit_loop
+  
+  addi ENC_LEFT, ENC_LEFT, -1
+  j .huff_byte_loop
+
+.huff_done:
+  pop ra
+ret
+
+# Mirrors buildHuffTree(); recursively build the huffman tree from
+# the pre-order serialized tree.
+# TREE_PTR plays the role of &str[pos] and ARENA_PTR of malloc.
+# Returns the new node in a0.
+build_tree:
+mv a0, ARENA_PTR # node = malloc(NODE_SIZE)
+addi ARENA_PTR, ARENA_PTR, NODE_SIZE
+sw zero, 4(a0) # node->left = NULL
+sw zero, 8(a0) # node->right = NULL
+
+lbu t0, 0(TREE_PTR) # c = str[pos]
+addi TREE_PTR, TREE_PTR, 1 # pos++
+sb t0, 0(a0) # node->item = c
+
+li t1, '*'
+beq t0, t1, .bt_internal
+li t1, 92 # '\\' escape
+beq t0, t1, .bt_escape
+ret # leaf node
+
+.bt_internal:
+  push ra
+  push a0 # preserve node across the recursive calls
+  call build_tree # node->left = buildHuffTree(...)
+  lw t2, 0(sp)
+  sw a0, 4(t2)
+  call build_tree # node->right = buildHuffTree(...)
+  pop t2
+  sw a0, 8(t2)
+  mv a0, t2
+  pop ra
+  ret
+
+.bt_escape:
+  lbu t0, 0(TREE_PTR) # item = str[pos]
+  addi TREE_PTR, TREE_PTR, 1 # pos++
+  sb t0, 0(a0)
+ret
+
+b64_decode:
+lui DEC_OUT_PTR, %hi(decoded)
+addi DEC_OUT_PTR, DEC_OUT_PTR, %lo(decoded)
+
+lui B64_DEC_PTR, %hi(b64alpha)
+addi B64_DEC_PTR, B64_DEC_PTR, %lo(b64alpha)
+
+# macro to get the value from the hashtable
+# \\reg = mem[B64_DEC_PTR + \\reg]
+.macro b64_translate reg
+add t5, B64_DEC_PTR, \\reg
+lb \\reg, 0(t5)
+.endmacro
+
+addi t0, zero, 0 # loop index
+addi t6, zero, 6 # t6 = 6; helper for subsequent mul instructions
+
+# for (t0 = 0; t0 < FILE_LENGTH; t0 += 4)
+.dec_loop:
+  bgeu FILE_PTR, FILE_END_PTR .dec_loop_end
+  addi t1, zero, 0 # decode block
+
+  # unrolled loop: a=t2 from 0 to 3
+  lb t2, 0(FILE_PTR) # t2 = input[i + 0] # a = 0
+  b64_translate t2
+
+  # block |= decoded_val << ((3 - a) * 6)
+  # (3 - 0) * 6 = 3*6 = 18
+  slli t2, t2, 18
+  or t1, t1, t2
+
+  lb t2, 1(FILE_PTR) # t2 = input[i + 1] # a = 1
+  b64_translate t2
+  # (3 - 1) * 6 = 2*6 = 12
+  slli t2, t2, 12
+  or t1, t1, t2
+
+  lb t2, 2(FILE_PTR) # t2 = input[i + 2] # a = 2
+  b64_translate t2
+  # (3 - 2) * 6 = 1*6 = 6
+  slli t2, t2, 6
+  or t1, t1, t2
+
+  lb t2, 3(FILE_PTR) # t2 = input[i + 3] # a = 3
+  b64_translate t2
+  # (3 - 3) * 6 = 0*6 = 0
+  # slli t2, t2, 0 # nop
+  or t1, t1, t2
+
+  # blockAux = (block >> 16) & 0xFF
+  srli t3, t1, 16
+  andi t3, t3, 0xFF
+
+  sb t3, 0(DEC_OUT_PTR)
+  addi DEC_OUT_PTR, DEC_OUT_PTR, 1
+
+  # Check padding 1
+  lb t2, 2(FILE_PTR)
+  addi t3, zero, '='
+  beq t2, t3, .dec_loop_end_after_inc
+
+  srli t3, t1, 8
+  andi t3, t3, 0xFF
+
+  sb t3, 0(DEC_OUT_PTR)
+  addi DEC_OUT_PTR, DEC_OUT_PTR, 1
+
+  # Check padding 2
+  lb t2, 3(FILE_PTR)
+  addi t3, zero, '='
+  beq t2, t3, .dec_loop_end_after_inc
+
+  andi t3, t1, 0xFF
+  sb t3, 0(DEC_OUT_PTR)
+
+  addi DEC_OUT_PTR, DEC_OUT_PTR, 1
+  addi FILE_PTR, FILE_PTR, 4
+
+  j .dec_loop
+
+.dec_loop_end_after_inc:
+  addi FILE_PTR, FILE_PTR, 4
+.dec_loop_end:
+
+ret
+
+# Read-only data section
+# (it overflows to the .data section) on the simulator's default memory layout
+.rodata
+# base64 decode table. it's basically a pre-computed hashtable
+b64alpha:
+.byte 0,   0,  0,  0 , 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0
+.byte 0,   0,  0,  0 , 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0
+.byte 0,   0,  0,  0 , 0,  0,  0,  0,  0,  0,  0,  62, 0,  0,  0, 63
+.byte 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,  0,  0,  0,  0,  0, 0
+.byte 0,   0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14
+.byte 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,  0,  0,  0,  0, 0
+.byte 0,  26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40
+.byte 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,  0,  0,  0,  0, 0
+.align 4
+# The huffman-encoded image in base64
+# Encoded using an old data structures project of mine:
+#     https://github.com/rgalhos/huffman
+input_file: .string "AFgq/ypcKioqKirEbk7bKioqkioqKioqiSq2siryKqUqrqkqSfsqKioqltbgKiomKo7JKqRpwCqT5Cq7lyq3KnIqSioqKu0q9s0qKoUqKir6UvHoKirSZenfAAAAAAOT5PkwAAAAAAAAAAAAAAB/L+Ofl8vl8vD+/IgAAAAAAAAAAAAAA/l/fl8vDDDDDDl8vn5EAAAAAAAAAAAAAA/q8/Lwwwwwwwwwww5f8cmAAAAAAAAAAAAAH8YYYYYcp5Tynn5Tz8+GGHL/r5MAAAAAAAAAAAAA5Fhhhhy8P58juQ+VXIOQYc+GGHL/rAAAD/3/AAAAAAAAA5PDDDDl/33fd/Z/X9Ofnwww/gAN93xjnOf379+v379+znH7vQAAAAAAB/fDDDl/w/9939n9XK+HPhhh/UD/9xmqqqqqqqqs82gAAAAAByfLww5+Ve7vXuPs1X9vPz4Yf33NVVVVVVVVVVVnsAAAAAA/jDDDDkPrrr3f2Oar9ytz4YYbVVVVVVfv1VVVVVcaAAAAADnww5+VfHfu++Ps5qr+3DDDn/szVVnOcfvuOO+/e973u++Psc5/VVVnsAAAAAMMMOU8j/uOOPvs5qq5LDnw5/5/Wcfu/db/gAAN939mqqz0AAAAA5PDDDn5Bj999jnNVVyWHPhh/HXtAAAAA/97xqrPYAAAAHJ4YYc/IM5znNVVXJcrc+GH8AAAAAAN+qr4AAAADDDDn/pVVVVXJYc+GH8AAAAAAB9VfAAAAA58MOfkaqqqqv7cOfDn5EAAAAAADc1cAAAAB/GGHPhyVVVVVyNz4Yc/JgAAD//93f8AAOKvAAAAD+XLww5/6VVVVcr4c+GH9YAB/7u7u711172gAA9+sgAAAN46/rwww5/6VVVXJYc+GHL/kADd3d3d3d66697QAAOswAAAHs2f5cvDDnw/pyVVV/bhz4Ycv+/s+A/93d3d3d3d66973QAAD34AAAN+quP6vLww5+fD+nK/JclyX9OVsOfDDDn2zof//u7u7u7u7vXXve90AAAcAAAD36qrkL+OXhhhz4YYYYYc/Phhhz/yzwD//93d3d3d3d666973ugAAAAAAfVVVnkL+OXhhhhhhhhhhhhhz/y40D/3d3d3d3d3rrr3ve90AAAAAANzVVVfvfxz4YYYYYYYYYc/9+UfAP/d3d3d3d3euuve973vAAAAAAHqqqqq75R/nz8/Pz8/Pz8/9/7OvAP/d3d3d3d3euuve973veAAAAAAcVVVVVV37+z+f8/5/z/s5R7+8A/93d3d3d3d666973ve97wAAAAAH1VVfd1VVWf6n777NdAP//3d3d3d3d666973ve973gAAAAA/8aqr922qqqqqzoB/7u7u7u7u9dde973ve973gAAAABuaqrOm1VVVVWgP//3d3d3d3d3rr3ve973ve78AAAAAbVVWQ2qqqqrQH//7u7u7u7u711173ve973vd+AAAAAbVVXwNqqqqroA/93d3d3d3d666973ve973vd+AAAAA39VVdgbVVVVdgH/u7u7u7u7vXXXve973ve97vvwAAAANzVVeAbVVVViAf+7u7u7u7u9dde973ve973ffffgAAAA3NVX7oA2qqqs6A/93d3d3d3d666973ve973ve97vwAAAAY1VfugBtVVVdgP//3d3d3d3d666973t3d3rr3ve60AAAAfVVXQAbVVVZAf//u7u7u7u7111727u9e93xx99999x7QAAAO6qrwANqqqugP//3d3d3d3d66690/9697vvvjj77HOc5zj4AAAbVVdgAbVVViB//+7u7u7u7vXXXWt3eve933xx999jnOas9AAAKqr4ABtVVWgf+7u7u7u7vXXXRu7vXXve774+++xznP6q+AAB9VVkAA2qqvgP/d3d3d3d3eutH/u7vXve7744++xznOaqzoAB6qrOgAG1VVoP/d3d3d3d3eutB/7u9de933xx99jnOc1VXQADNVXgABtVVkH/u7u7u7u7vXWgP/d3r3u++OPvvsc5zVVXgAd1VfAABtVV0H//7u7u7u7u9daAf+7vXvd98cfffY5zmqqrwA3NVZ0AANqq/B//+7u7u7u7vXWgD/3d697vvjj777HOc1VVZ0A7qq7AABtVXw///d3d3d3d3rrrW/4G7u9e933xx99jnOc1VVXwBmqsgAAbVV0f//u7u7u7u7111rd3/D/3d6973ffHH32Oc5zVVVXgFVXgAANqq0/93d3d3d3euuut3d3f///93d3r3vd98fffY5zn9VVVWf8CqsgAANqrE/93d3d3d3d666111u7u7u7vXve7744+++xznP6qqqrsCqtAAAbVXBu7u7u7u7vXXvbvuut3d3d3rr3vd98cffY45zmqqqq/AVWQAADaq8/93d3d3d3euuvdPe9111u7vXXXve7744+++xznOaqqqq8Cq0AAA2qum7u7u7u7vXXXvbvfve911111173vd998cfffY5zn9VVVVWQVZAAAG1Wdbu7u7u7vXXXved99+973ve973vd98occfffY5znNVVVVUCrwAAA2qz/t3d3d3d666973nHfffve973ve7775Q44+++xxznP6qqqqq6CoAAANqsTd3d3d3rrr3ve9vHHfffffffffffffHHH332OOc5zVVVVVXAV8AAAG1Xz/3d3d3euuve9729fcccd9999999983HHH3332Oc5z+qqqqqrEK8AAAG1Xzd3d3d666973ve3333HHHHHHHHHHHHH33332Oc5z+qqqqqqyFaAAAG1Xzd3d3d66973ve9vf33333HHHHHHH333332OOc5zmqqqqqqgs/4AAAbVfN3d3d666973ve9vGP3333333333333332OOc5zmqqqqqqoLEAAAG1Xzd3d3rrr3ve973t4zjj99999999999jjjnOc5zVVVVVVVBfAAAA2q+bu7vXXXve973ve3jOcccccfvvsccccc5znOf1VVVVVVVkL4AAAG1Xzd3euuve973ve97rvOc5znHHHHHOc5znOc/qqqqqqqqxC+AAABtVi3d666973ve973ve6/ZznOc5znOc5znOf1VVVVVVVVwF8AAADarP/u9dde973ve973u+9s5znOc5znOc5z+qqqqqqqqq6CxAAABtVnd666973ve973vd997mv37Oc5znOf1VVVVVVVVVQLP+AAAG1V066973ve973vd999+4qqqqqqqqqqqqqqyCtAAADaq866973ve973vd99997VVVVVVVVVVVVVV4FfAAABtVcN973ve973vd99983N1mqqqqqqqqqqqqqgMaAAADaqxb73ve973vd99983Nze9VVVVVVVVVVVVVdgdZvgAABtVft33ve973vd999983Nzc3s1VVVVVVVVVVVVn/Ad14AAA2qrp73ve973fffffNzc3HHvVVVVVVVVVVVVV2AOK0AABtVXz3ve973fffffNzc3HHHHvqqqqqqqqqqqqsQAcfrwAAG1Vfm+973u+++++bm5uOOOOO/Zqqqqqqqqqqqs6AB7N9oAAbVVdPe97vvvvvm5ubjjjjjj73v1VVVVVVVVVVXgAB3nPH+AAbVVYuve93333zc3Nxxxxxx99971VVVVVVVVVVeAAA9jn7QANqqrXfu++++bm5uOOOOOPvvvvu9qqqqqqqqqq8AAAN7xzxoA2qqvnu++++bm5ubjjjjjj777777jc1VVVVVVVVnQAAADe/u9A2qqr/d99983NzccccccffffffY4/bxVVVVVVVV8AAAAAANqqq+e5u+bm5uOOOOOPvvvvvsccccfezVVVVVVWegAAAAAA2qqq13zc3Nxxxxxx999999jjjjjjn7rvOaqqqqznwAAAAAAG1VVWW83Nxxxxxx999999jjjjjjjjnP3u+Psc/qr9nH7vQAAAAAADaqqq7e444444++++++xxxxxxxxznOf2PHfNzccccccccdgAAAAAABtVVVZ3ebjjjj777777HHHHHHHHOc5znP79nOOOOOOf1kAAAAAAANqqqq+dcccffffffY44444445znOc5z+/fv379VVkAAAAAAANqqqqu3uOPvvvvvscccccccc5znOc/v379+/fqqsgAAAAAABtVVVVdOb777777HHHHHHHHOc5znP79+/fv36qqyAAAAAAAG1VVVVa4++++xxxxxxxxznOc5z+/fv379+qqrIAAAAAAAbVVVVV+1x99jjjjjjjjnOc5zn9+/fv379VVVkAAAAAAANqqqqqs64xxxxxxxxznOc5zn9+/fv36qqqyAAAAAAAG1VVVVVnXNjjjjjjnOc5znP79+/fv1VVVZAAAAAAADaqqqqqs9PY4445znOc5z+/fv379VVVVkAAAAAAANqqqqqqrzrHHOc5znOf379+/fqqqqrIAAAAAAAbVVVVVVV8fZznOc5/fv379+qqqqrIAAAAAAAbVVVVVVVZ17Oc5z+/fv379VVVVVkAAAAAAANqqqqqqqq7f/Gc/v379+/VVVVVWQAAAAAAA2qqqqqqqqzreM/v379+qqqqqsgAAAAAABtVVVVVVVVdje8f1VVVVVWQAAAAAAA2qqqqqqqquwOubNVVVVVkAAAAAAAHfffffffffffffffffffffffffegDffZuVOVKqq5UyAAAAAAAAAAAAAAG9e7445ubm5ubwAAAAAAAAAAAAAAAAAAAA="
+# Helper used to get the input_file length (*input_file_end - *input_file = length)
+input_file_end:
+
+# Dynamic data section
+.bss
+# huffman tree node arena
+# 256 possible bytes * 12 bytes of the struct = 3072 bytes
+huff_tree: .space 3072
+.align 4
+# decoded bas64 output
+decoded:
