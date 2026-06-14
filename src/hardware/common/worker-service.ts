@@ -12,6 +12,7 @@ export const enum EWorkerCommand {
   SET_FREQUENCY = 'SET_FREQUENCY',
   GET_FREQUENCY = 'GET_FREQUENCY',
   KEY_EVENT = 'KEY_EVENT',
+  STDIN_EVENT = 'STDIN_EVENT',
   LOAD_PROGRAM = 'LOAD_PROGRAM',
   SET_MEMORY_SIZE = 'SET_MEMORY_SIZE',
   MEMORY_RETRIEVE = 'MEMORY_RETRIEVE',
@@ -59,6 +60,10 @@ export type WorkerMessage =
   | {
       command: EWorkerCommand.SET_FREQUENCY | EWorkerCommand.SET_MEMORY_SIZE | EWorkerCommand.KEY_EVENT;
       data: number;
+    }
+  | {
+      command: EWorkerCommand.STDIN_EVENT;
+      data: string;
     }
   | {
       command: EWorkerCommand.LOAD_PROGRAM;
@@ -190,6 +195,10 @@ export class WorkerService extends EventEmitter {
 
   sendKey(key: number) {
     this._postMessage({ command: EWorkerCommand.KEY_EVENT, data: key } as WorkerMessage);
+  }
+
+  sendStdin(line: string) {
+    this._postMessage({ command: EWorkerCommand.STDIN_EVENT, data: line } as WorkerMessage);
   }
 
   syncWorker(data: IProcessor<IDecodedInstruction>) {

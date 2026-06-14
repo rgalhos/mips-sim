@@ -85,6 +85,10 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly KBD_STAT = 0x6000n;
   public readonly KBD_DATA = 0x6004n;
 
+  public readonly STDIN_STAT = 0x6010n;
+  public readonly STDIN_DATA = 0x6014n;
+  public readonly STDIN_SIZE = 256;
+
   public program: IAssembledInstruction[] = [];
 
   /**
@@ -820,10 +824,54 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           this._workerBuffer = str;
           ret = rv_worker_commands.PRINT_STRING;
         } else if (syscall === rv_syscalls.syscall_print_int) {
-          const a0 = String(this.registerRead(rv_reg.a0));
+          const a0 = BigInt.asIntN(32, this.registerRead(rv_reg.a0));
           this._workerBuffer = a0 + '\n';
 
           ret = rv_worker_commands.PRINT_STRING;
+        } else if (syscall === rv_syscalls.syscall_print_float) {
+          const a0 = this.registerRead(rv_reg.a0);
+          this._workerBuffer = biguint32_to_f(a0).toString() + '\n';
+
+          ret = rv_worker_commands.PRINT_STRING;
+        } else if (syscall === rv_syscalls.syscall_read_int) {
+          const stdinData = Number(this.STDIN_DATA);
+          const len = Math.min(255, Number(this.memoryRead(this.STDIN_STAT, 32)));
+          const memval = this.memory.slice(stdinData, stdinData + len);
+          const num = Number.parseInt(String.fromCharCode(...memval), 10);
+
+          if (!Number.isNaN(num)) {
+            this.registerWrite(rv_reg.a0, u32(BigInt(num)));
+          } else {
+            this.registerWrite(rv_reg.a0, this.memoryRead(this.STDIN_DATA, 32));
+          }
+
+          this.memoryWrite(this.STDIN_STAT, 0, 32);
+        } else if (syscall === rv_syscalls.syscall_read_string) {
+          const addr = Number(this.registerRead(rv_reg.a0));
+          const len = Math.min(255, Number(this.memoryRead(this.STDIN_STAT, 32)));
+          const str = this.memory.slice(Number(this.STDIN_DATA), Number(this.STDIN_DATA) + len);
+
+          for (let i = 0; i < str.length; i++) {
+            this.memoryWrite(addr + i, str[i], 8);
+          }
+
+          this.memoryWrite(this.STDIN_STAT, 0, 32);
+        } else if (syscall === rv_syscalls.syscall_read_char) {
+          this.registerWrite(rv_reg.a0, this.memoryRead(this.STDIN_DATA, 8));
+
+          this.memoryWrite(this.STDIN_STAT, 0, 32);
+        } else if (syscall === rv_syscalls.syscall_read_float) {
+          const len = Math.min(255, Number(this.memoryRead(this.STDIN_STAT, 32)));
+          const memval = this.memory.slice(Number(this.STDIN_DATA), Number(this.STDIN_DATA) + len);
+          const num = Math.fround(Number.parseFloat(String.fromCharCode(...memval)));
+
+          if (!Number.isNaN(num)) {
+            this.registerWrite(rv_reg.a0, f_to_biguint(num));
+          } else {
+            this.registerWrite(rv_reg.a0, this.memoryRead(this.STDIN_DATA, 32));
+          }
+
+          this.memoryWrite(this.STDIN_STAT, 0, 32);
         } else if (syscall === rv_syscalls.syscall_random_bytes) {
           const addr = this.registerRead(rv_reg.a0);
           const bytes = Math.min(4, Number(this.registerRead(rv_reg.a1))) || 4;

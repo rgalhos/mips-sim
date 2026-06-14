@@ -1,13 +1,17 @@
-import { Icon, Textarea } from '@chakra-ui/react';
-import { useEffect, useRef, useState } from 'react';
+import { Icon, Input, Textarea } from '@chakra-ui/react';
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { MdDelete } from 'react-icons/md';
 import { EWorkerCommand, WorkerMessageResponse } from '../../../../hardware/common/worker-service';
 import { useSimulator } from '../../../../hooks/simulator.hook';
 
+const STDIN_MAX_LEN = 255;
+
 export default function ConsoleTerminal() {
   const { simulator } = useSimulator();
   const [output, setOutput] = useState('');
+  const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   function handleClear() {
     setOutput('');
@@ -15,6 +19,24 @@ export default function ConsoleTerminal() {
 
   function onMessage(message: WorkerMessageResponse) {
     setOutput((curr) => curr + message.data);
+  }
+
+  function submitInput() {
+    simulator.handleStdinInput(input);
+    setOutput((curr) => curr + input + '\n');
+    setInput('');
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    submitInput();
+  }
+
+  function handleInputKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitInput();
+    }
   }
 
   useEffect(() => {
@@ -50,12 +72,24 @@ export default function ConsoleTerminal() {
         border="hidden"
         placeholder="Empty"
         value={output}
-        height="280px"
+        height="240px"
         style={{ position: 'relative', bottom: 50, userSelect: 'text' }}
         id="consoleTxtArea"
         scrollBehavior="smooth"
         ref={textareaRef}
-      ></Textarea>
+      />
+      <form onSubmit={handleSubmit} style={{ position: 'relative', bottom: 50 }}>
+        <Input
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value.slice(0, STDIN_MAX_LEN))}
+          onKeyDown={handleInputKeyDown}
+          placeholder="Terminal input"
+          maxLength={STDIN_MAX_LEN}
+          borderRadius={0}
+          size="sm"
+        />
+      </form>
     </>
   );
 }

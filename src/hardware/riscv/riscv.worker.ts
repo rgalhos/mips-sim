@@ -167,6 +167,15 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   } else if (command === EWorkerCommand.KEY_EVENT) {
     cpu.memoryWrite(cpu.KBD_STAT, 1n, 8);
     cpu.memoryWrite(cpu.KBD_DATA, BigInt(data), 8);
+  } else if (command === EWorkerCommand.STDIN_EVENT) {
+    const line = String(data || '').slice(0, cpu.STDIN_SIZE - 1);
+
+    for (let i = 0; i < line.length; i++) {
+      cpu.memoryWrite(cpu.STDIN_DATA + BigInt(i), BigInt(line.charCodeAt(i)), 8);
+    }
+
+    cpu.memoryWrite(cpu.STDIN_DATA + BigInt(line.length), 0n, 8);
+    cpu.memoryWrite(cpu.STDIN_STAT, BigInt(line.length), 8);
   }
 };
 

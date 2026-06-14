@@ -300,6 +300,9 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           true,
         );
       }
+      case 'bgez': {
+        return this.assembleLine(tokenize(`bge ${tok1.value}, zero, ${tok2.value}`, lineNo), constants, pc, true);
+      }
       // BLA BLA BLA @todo resto das instruções
       case 'call': {
         let rt = rv_reg.ra;
@@ -482,10 +485,17 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       FB_END: { type: ETokenType.NUMBER, value: Number(this.processor.FB_END), lineNumber: 0 },
       KBD_STAT: { type: ETokenType.NUMBER, value: Number(this.processor.KBD_STAT), lineNumber: 0 },
       KBD_DATA: { type: ETokenType.NUMBER, value: Number(this.processor.KBD_DATA), lineNumber: 0 },
+      STDIN_STAT: { type: ETokenType.NUMBER, value: Number(this.processor.STDIN_STAT), lineNumber: 0 },
+      STDIN_DATA: { type: ETokenType.NUMBER, value: Number(this.processor.STDIN_DATA), lineNumber: 0 },
       SYSCALL_PRINT_INT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_int, lineNumber: 0 },
       SYSCALL_PRINT_STRING: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_string, lineNumber: 0 },
       SYSCALL_PRINT_CHAR: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_char, lineNumber: 0 },
+      SYSCALL_PRINT_FLOAT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_float, lineNumber: 0 },
       SYSCALL_PRINTF: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_printf, lineNumber: 0 },
+      SYSCALL_READ_INT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_read_int, lineNumber: 0 },
+      SYSCALL_READ_STRING: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_read_string, lineNumber: 0 },
+      SYSCALL_READ_CHAR: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_read_char, lineNumber: 0 },
+      SYSCALL_READ_FLOAT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_read_float, lineNumber: 0 },
       SYSCALL_UPDATE_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_update_screen, lineNumber: 0 },
       SYSCALL_FILL_SCREEN: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_fill_screen, lineNumber: 0 },
       SYSCALL_RANDOM_BYTES: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_random_bytes, lineNumber: 0 },

@@ -150,7 +150,7 @@ export function tokenize(line: string, lineNumber: number) {
     // char
     else if (c === "'") {
       let value = line[i + 1];
-      tokens.push({ type: ETokenType.CHAR, value, lineNumber });
+      tokens.push({ type: ETokenType.NUMBER, value: value.charCodeAt(0), lineNumber });
       if (line[i + 2] !== "'") {
         tokens.push({ type: ETokenType.INVALID, value: line[i + 2], lineNumber });
         break;

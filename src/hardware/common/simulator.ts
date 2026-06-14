@@ -91,6 +91,12 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
     }
   }
 
+  public handleStdinInput(line: string) {
+    if (this.workerService.workerRunning) {
+      this.workerService.sendStdin(line);
+    }
+  }
+
   public linkToManual(instruction: string): string {
     void instruction;
 

@@ -212,6 +212,18 @@ export const rvManual: IUserManual = {
         'Memory-mapped word (**0x6004**) where the host injects pending keyboard input for the program to read.',
     },
     {
+      name: 'STDIN_STAT',
+      description:
+        'Memory-mapped word (**0x6010**) indicating if there is any pending terminal input for the program to read.\n\n'
+        + 'Set to **STDIN_DATA**\'s size after the user submits a line in the simulator terminal. Will be cleared to **0** after a stdin read syscall consumes the buffer.',
+    },
+    {
+      name: 'STDIN_DATA',
+      description:
+        'Memory-mapped buffer starting at **0x6014** where the host injects pending terminal input for the program to read.\n\n'
+        + 'Up to **255** characters plus a null terminator (**256** bytes total).',
+    },
+    {
       name: 'SYSCALL_PRINT_INT',
       description:
         '**ecall** service number in **a7** (**10**).\n\n'
@@ -233,6 +245,13 @@ export const rvManual: IUserManual = {
         + 'The char will be printed in the simulator terminal.',
     },
     {
+      name: 'SYSCALL_PRINT_FLOAT',
+      description:
+        '**ecall** service number in **a7** (**13**).\n\n'
+        + 'Intended for printing **a0** as a **32-bit IEEE-754 single-precision** floating-point.\n\n'
+        + 'The float will be printed in the simulator terminal.',
+    },
+    {
       name: 'SYSCALL_PRINTF',
       description:
         '**ecall** service number in **a7** (**14**).\n\n'
@@ -240,6 +259,34 @@ export const rvManual: IUserManual = {
         + '**a0** — address of a null-terminated format string in memory (up to 255 bytes).\n\n'
         + '**a1** through **a6** — values substituted left to right for each conversion in the format string (first placeholder uses **a1**, second uses **a2**, and so on).\n\n'
         + 'Supported conversions: **%d** (signed decimal), **%u** (unsigned decimal), **%x** / **%X** (hex), **%c** (character), **%p** (pointer), **%f** (single-precision float), **%%** (literal `%`).',
+    },
+    {
+      name: 'SYSCALL_READ_INT',
+      description:
+        '**ecall** service number in **a7** (**15**).\n\n'
+        + 'Reads an integer from the pending terminal input in **STDIN_DATA** (see **STDIN_STAT** for length) and stores the parsed value in **a0**.\n\n'
+        + 'Reading invalid input yields garbage. Clears **STDIN_STAT** after reading.',
+    },
+    {
+      name: 'SYSCALL_READ_STRING',
+      description:
+        '**ecall** service number in **a7** (**16**).\n\n'
+        + '**a0** — destination address where the pending terminal input from **STDIN_DATA** is copied as a null-terminated string.\n\n'
+        + 'Copies **STDIN_STAT** bytes and appends a null terminator. Clears **STDIN_STAT** after reading.',
+    },
+    {
+      name: 'SYSCALL_READ_CHAR',
+      description:
+        '**ecall** service number in **a7** (**17**).\n\n'
+        + 'Reads the first character from the pending terminal input in **STDIN_DATA** and stores its byte value in **a0**.\n\n'
+        + 'Clears **STDIN_STAT** after reading.',
+    },
+    {
+      name: 'SYSCALL_READ_FLOAT',
+      description:
+        '**ecall** service number in **a7** (**18**).\n\n'
+        + 'Reads a decimal number from the pending terminal input in **STDIN_DATA** and stores its **32-bit IEEE-754 single-precision** bit pattern in **a0**.\n\n'
+        + 'Reading invalid input yields garbage. Clears **STDIN_STAT** after reading.',
     },
     {
       name: 'SYSCALL_UPDATE_SCREEN',

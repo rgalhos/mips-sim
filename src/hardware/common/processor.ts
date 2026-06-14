@@ -179,7 +179,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
     });
   }
 
-  public memoryWrite(address: bigint, value: bigint, bits: 8 | 16 | 32 = 8): void {
+  public memoryWrite(address: bigint | number, value: bigint | number, bits: 8 | 16 | 32 = 8): void {
     const addr = Number(address);
     const v = Number(value);
     switch (bits) {
