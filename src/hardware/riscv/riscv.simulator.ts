@@ -487,6 +487,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       KBD_DATA: { type: ETokenType.NUMBER, value: Number(this.processor.KBD_DATA), lineNumber: 0 },
       STDIN_STAT: { type: ETokenType.NUMBER, value: Number(this.processor.STDIN_STAT), lineNumber: 0 },
       STDIN_DATA: { type: ETokenType.NUMBER, value: Number(this.processor.STDIN_DATA), lineNumber: 0 },
+      SYSCALL_PRINT_UINT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_uint, lineNumber: 0 },
       SYSCALL_PRINT_INT: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_int, lineNumber: 0 },
       SYSCALL_PRINT_STRING: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_string, lineNumber: 0 },
       SYSCALL_PRINT_CHAR: { type: ETokenType.NUMBER, value: rv_syscalls.syscall_print_char, lineNumber: 0 },

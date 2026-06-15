@@ -823,6 +823,11 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
           this._workerBuffer = str;
           ret = rv_worker_commands.PRINT_STRING;
+        } else if (syscall === rv_syscalls.syscall_print_uint) {
+          const a0 = BigInt.asUintN(32, this.registerRead(rv_reg.a0));
+          this._workerBuffer = a0 + '\n';
+
+          ret = rv_worker_commands.PRINT_STRING;
         } else if (syscall === rv_syscalls.syscall_print_int) {
           const a0 = BigInt.asIntN(32, this.registerRead(rv_reg.a0));
           this._workerBuffer = a0 + '\n';

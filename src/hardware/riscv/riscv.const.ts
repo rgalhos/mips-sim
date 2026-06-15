@@ -298,6 +298,7 @@ export enum rv_directives {
 }
 
 export const enum rv_syscalls {
+  syscall_print_uint = 9,
   syscall_print_int = 10,
   syscall_print_string = 11,
   syscall_print_char = 12,
@@ -331,6 +332,7 @@ export enum rv_consts {
   STDIN_STAT = 'STDIN_STAT',
   STDIN_DATA = 'STDIN_DATA',
   // syscalls
+  SYSCALL_PRINT_UINT = 'SYSCALL_PRINT_UINT',
   SYSCALL_PRINT_INT = 'SYSCALL_PRINT_INT',
   SYSCALL_PRINT_STRING = 'SYSCALL_PRINT_STRING',
   SYSCALL_PRINT_CHAR = 'SYSCALL_PRINT_CHAR',

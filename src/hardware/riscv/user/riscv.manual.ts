@@ -231,6 +231,13 @@ export const rvManual: IUserManual = {
           + 'The int will be printed in the simulator terminal.'
     },
     {
+      name: 'SYSCALL_PRINT_UINT',
+      description:
+        '**ecall** service number in **a7** (**9**).\n\n'
+        + 'Intended for printing **a0** as an unsigned decimal integer.\n\n'
+          + 'The int will be printed in the simulator terminal.'
+    },
+    {
       name: 'SYSCALL_PRINT_STRING',
       description:
         '**ecall** service number in **a7** (**11**).\n\n'

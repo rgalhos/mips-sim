@@ -14,7 +14,7 @@ _rvExamples.push({
 .equ t2 s1
 .equ max_val s2
 
-addi a7, zero, SYSCALL_PRINT_INT # load print syscall
+addi a7, zero, SYSCALL_PRINT_UINT # load print syscall
 
 lui max_val, %hi(2971215073) # load top bits of const in s2
 addi max_val, max_val, %lo(2971215073) # load bottom bits of const in s2
