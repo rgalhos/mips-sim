@@ -1,0 +1,5 @@
+#define SP_POS_INF 0x7f800000;
+#define SP_NEG_INF 0xff800000;
+#define SP_CANONICAL_NAN 0x7fc00000;
+
+

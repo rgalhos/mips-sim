@@ -1,9 +1,9 @@
-import { IToken } from '../analyzer/tokenizer';
-import { EHardwareType } from '../hardware';
-import { IManualExample } from './examples';
-import type { IUserManual } from './manual';
-import type { IDecodedInstruction, IProcessor } from './processor';
-import { WorkerService } from './worker-service';
+import { EHardwareType } from "../hardware";
+import type { IToken } from "../rv32/analyzer/rv32-tokenizer";
+import type { IManualExample } from "./examples";
+import type { IUserManual } from "./manual";
+import type { IDecodedInstruction, IProcessor } from "./processor";
+import { WorkerService } from "./worker-service";
 
 export interface IAssembledInstruction<TDecoded extends IDecodedInstruction = IDecodedInstruction> {
   code: string;
@@ -12,6 +12,11 @@ export interface IAssembledInstruction<TDecoded extends IDecodedInstruction = ID
   decoded: TDecoded;
   address: bigint;
   scope?: string;
+}
+
+export interface IAssemblerResult<TDecoded extends IDecodedInstruction = IDecodedInstruction> {
+  instructions: Array<IAssembledInstruction<TDecoded>>;
+  labels: { [label: string]: bigint | number };
 }
 
 export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor<any>> {
@@ -68,10 +73,7 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
 
   protected abstract createCpuWorkerInstance(workerOptions?: WorkerOptions): Worker;
 
-  public abstract assembleCode(code: string): {
-    assembledInstructions: Array<IAssembledInstruction>;
-    labels: Record<string, bigint>;
-  };
+  public abstract assembleCode(code: string): IAssemblerResult;
 
   public createCpuWorker(workerOptions?: WorkerOptions) {
     this.workerService.createCpuWorker(() => this.createCpuWorkerInstance(workerOptions));
@@ -100,6 +102,6 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
   public linkToManual(instruction: string): string {
     void instruction;
 
-    return '#';
+    return "#";
   }
 }

@@ -1,7 +1,7 @@
-import { IAssembledInstruction } from './simulator';
-import { IWorkerCPUDebugDump } from './worker-service';
+import type { IAssembledInstruction } from "./simulator";
+import type { IWorkerCPUDebugDump } from "./worker-service";
 
-type TAnyEnum = Record<string, any>;
+type TAnyEnum = Record<string, unknown>;
 
 export interface IDecodedInstruction {
   // Instruction bytecode
@@ -45,10 +45,10 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
   public _memoryOperationDiff: Record<number, number> = {};
 
-  public _dbgMemChanges: IWorkerCPUDebugDump['memory'] = [];
-  public _dbgRegChanges: IWorkerCPUDebugDump['registers'] = [];
+  public _dbgMemChanges: IWorkerCPUDebugDump["memory"] = [];
+  public _dbgRegChanges: IWorkerCPUDebugDump["registers"] = [];
 
-  public _workerBuffer: any;
+  public _workerBuffer: string | number = "";
 
   /**
    * Only refreshes screen  after an explicit update-screen syscall
@@ -76,19 +76,20 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   /**
    * Architecture base addresses
    */
-  public readonly DRAM_BASE_ADDRESS: bigint = 0x00000000000n;
-  public abstract readonly PC_START: bigint;
-  public abstract readonly PROGRAM_END: bigint;
-  public abstract readonly RODATA_START: bigint;
-  public abstract readonly RODATA_END: bigint;
-  public abstract readonly DATA_START: bigint;
-  public abstract readonly DATA_END: bigint;
-  public abstract readonly BSS_START: bigint;
-  public abstract readonly BSS_END: bigint;
-  public abstract readonly FB_START: bigint;
-  public abstract readonly FB_END: bigint;
-  public abstract readonly STACK_START: bigint;
-  public abstract readonly STACK_END: bigint;
+  public abstract readonly baseAddresses: { [key: string]: bigint };
+  // public readonly DRAM_BASE_ADDRESS: bigint = 0x00000000000n;
+  // public abstract readonly PC_START: bigint;
+  // public abstract readonly PROGRAM_END: bigint;
+  // public abstract readonly RODATA_START: bigint;
+  // public abstract readonly RODATA_END: bigint;
+  // public abstract readonly DATA_START: bigint;
+  // public abstract readonly DATA_END: bigint;
+  // public abstract readonly BSS_START: bigint;
+  // public abstract readonly BSS_END: bigint;
+  // public abstract readonly FB_START: bigint;
+  // public abstract readonly FB_END: bigint;
+  // public abstract readonly STACK_START: bigint;
+  // public abstract readonly STACK_END: bigint;
 
   /**
    * CPU
@@ -160,7 +161,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
   protected registerRead(reg: number): bigint {
     if (!this.registers[reg]) {
-      console.error('WIMS: Reading inexistent register: ', reg);
+      console.error("WIMS: Reading inexistent register: ", reg);
     }
 
     return this.cpu.register[reg];
@@ -168,11 +169,11 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
   protected registerWrite(reg: number, value: bigint) {
     if (!this.registers[reg]) {
-      console.error('WIMS: Writing to inexistent register: ', reg);
+      console.error("WIMS: Writing to inexistent register: ", reg);
     }
 
     this._dbgRegChanges.push({
-      reg: this.registers[reg],
+      reg: this.registers[reg] as string,
       value: (this.cpu.register[reg] = value),
       cycle: this.cycle,
       pc: this.cpu.pc,

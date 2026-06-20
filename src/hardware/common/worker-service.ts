@@ -1,28 +1,28 @@
-import EventEmitter from 'events';
-import { ICPU, IDecodedInstruction, IProcessor } from './processor';
-import { IAssembledInstruction } from './simulator';
+import { EventEmitter } from "events";
+import type { ICPU, IDecodedInstruction, IProcessor } from "./processor";
+import type { IAssembledInstruction } from "./simulator";
 
 export const enum EWorkerCommand {
-  GET_CPU_HALT = 'GET_CPU_HALT',
-  SET_CPU_HALT = 'SET_CPU_HALT',
-  CPU_SETUP = 'CPU_SETUP',
-  CPU_RUN = 'CPU_RUN',
-  CPU_STEP = 'CPU_STEP',
-  CPU_RESET = 'CPU_RESET',
-  SET_FREQUENCY = 'SET_FREQUENCY',
-  GET_FREQUENCY = 'GET_FREQUENCY',
-  KEY_EVENT = 'KEY_EVENT',
-  STDIN_EVENT = 'STDIN_EVENT',
-  LOAD_PROGRAM = 'LOAD_PROGRAM',
-  SET_MEMORY_SIZE = 'SET_MEMORY_SIZE',
-  MEMORY_RETRIEVE = 'MEMORY_RETRIEVE',
-  CPU_DUMP = 'CPU_DUMP',
-  CPU_DEBUG_DUMP = 'CPU_DEBUG_DUMP',
-  MEMORY_OVERWRITE = 'MEMORY_OVERWRITE',
-  ASSEMBLE_CODE = 'ASSEMBLE_CODE',
-  SYNC_WORKER = 'SYNC_WORKER',
-  TERMINAL_PRINT = 'TERMINAL_PRINT',
-  UPDATE_SCREEN = 'UPDATE_SCREEN',
+  GET_CPU_HALT = "GET_CPU_HALT",
+  SET_CPU_HALT = "SET_CPU_HALT",
+  CPU_SETUP = "CPU_SETUP",
+  CPU_RUN = "CPU_RUN",
+  CPU_STEP = "CPU_STEP",
+  CPU_RESET = "CPU_RESET",
+  SET_FREQUENCY = "SET_FREQUENCY",
+  GET_FREQUENCY = "GET_FREQUENCY",
+  KEY_EVENT = "KEY_EVENT",
+  STDIN_EVENT = "STDIN_EVENT",
+  LOAD_PROGRAM = "LOAD_PROGRAM",
+  SET_MEMORY_SIZE = "SET_MEMORY_SIZE",
+  MEMORY_RETRIEVE = "MEMORY_RETRIEVE",
+  CPU_DUMP = "CPU_DUMP",
+  CPU_DEBUG_DUMP = "CPU_DEBUG_DUMP",
+  MEMORY_OVERWRITE = "MEMORY_OVERWRITE",
+  ASSEMBLE_CODE = "ASSEMBLE_CODE",
+  SYNC_WORKER = "SYNC_WORKER",
+  TERMINAL_PRINT = "TERMINAL_PRINT",
+  UPDATE_SCREEN = "UPDATE_SCREEN",
 }
 
 export interface IWorkerCPUDump {
@@ -31,7 +31,7 @@ export interface IWorkerCPUDump {
   cpu: ICPU;
   cycle: number;
   halted: boolean;
-  lastExecutedInstruction: any;
+  lastExecutedInstruction: unknown;
 }
 
 export interface IWorkerCPUDebugDump {
@@ -78,7 +78,7 @@ export type WorkerMessage =
         | EWorkerCommand.CPU_STEP
         | EWorkerCommand.CPU_RESET
         | EWorkerCommand.MEMORY_RETRIEVE
-        | EWorkerCommand.CPU_DUMP
+        | EWorkerCommand.CPU_DUMP;
       data: never;
     };
 
@@ -130,9 +130,9 @@ export class WorkerService extends EventEmitter {
     return this._workerRunning;
   }
 
-  private _postMessage(...args: Parameters<Worker['postMessage']>) {
+  private _postMessage(...args: Parameters<Worker["postMessage"]>) {
     if (!this._worker) {
-      console.log('cpu worker: tried to send message but worker is not running', args);
+      console.log("cpu worker: tried to send message but worker is not running", args);
 
       return;
     }
@@ -157,10 +157,10 @@ export class WorkerService extends EventEmitter {
     const w = createWorker();
 
     w.onerror = (ev) => {
-      console.error('cpu worker:', ev.message, ev.filename, ev.lineno, ev.colno);
+      console.error("cpu worker:", ev.message, ev.filename, ev.lineno, ev.colno);
     };
 
-    w.addEventListener('message', this._onMessage);
+    w.addEventListener("message", this._onMessage);
 
     return (this._worker = w);
   }
@@ -213,16 +213,16 @@ export class WorkerService extends EventEmitter {
     });
   }
 
-  loadProgram(program: Parameters<IProcessor<IDecodedInstruction>['loadProgram']>[0]) {
+  loadProgram(program: Parameters<IProcessor<IDecodedInstruction>["loadProgram"]>[0]) {
     this._postMessage({ command: EWorkerCommand.LOAD_PROGRAM, data: program } as WorkerMessage);
   }
 
   terminate() {
     if (!this._worker) {
-      console.log('cpu worker: tried to terminate a non initialized worker');
+      console.log("cpu worker: tried to terminate a non initialized worker");
     }
 
-    this._worker?.removeEventListener('message', this._onMessage);
+    this._worker?.removeEventListener("message", this._onMessage);
     this._worker?.terminate();
     this._worker = null;
     this._workerRunning = false;
