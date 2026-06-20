@@ -1,20 +1,37 @@
 import { editorOptions, handleEditorWillMount } from "@/config/editor/editor.config";
 import { useEditor } from "@/lib/contexts/editor.context";
+import { debounce } from "@/lib/utils";
 import { Editor, type EditorProps } from "@monaco-editor/react";
 import { memo } from "react";
+
+const EDITOR_DRAFT_STORAGE_KEY = "editor_contents";
 
 function MemoEditorContainer(props: { handleEditorChange?: () => void }) {
   const { setEditor, setMonaco } = useEditor();
 
+  const saveEditorContents = (content: string) => {
+    localStorage.setItem(EDITOR_DRAFT_STORAGE_KEY, content);
+  };
+
+  const saveEditorContentsDebounced = debounce(saveEditorContents, 500);
+
   const handleEditorDidMount: EditorProps["onMount"] = (editor, monaco) => {
     setEditor(editor);
     setMonaco(monaco);
-    console.log(editor);
+
+    const draft = localStorage.getItem(EDITOR_DRAFT_STORAGE_KEY);
+    if (!!draft) {
+      editor.setValue(draft);
+    }
   };
 
   const handleEditorChange: EditorProps["onChange"] = (value, editor) => {
-    void value;
     void editor;
+
+    if (value) {
+      saveEditorContentsDebounced(value);
+    }
+
     props?.handleEditorChange?.();
   };
 

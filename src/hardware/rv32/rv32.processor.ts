@@ -1,4 +1,4 @@
-import { IProcessor } from "../common/processor";
+import { IProcessor, type IRegisterReadable } from "../common/processor";
 import type { IAssembledInstruction } from "../common/simulator";
 import {
   rv_codec,
@@ -88,7 +88,7 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   public readonly STDIN_STAT = 0x6010n;
   public readonly STDIN_DATA = 0x6014n;
   public readonly STDIN_SIZE = 256;
-  
+
   readonly baseAddresses = {};
 
   public program: IAssembledInstruction[] = [];
@@ -1507,16 +1507,27 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     }
   }
 
-  public getRegistersFriendly(cpu: IRVCPU) {
-    const reg: Record<string, bigint> = { pc: cpu.pc };
+  public getRegistersReadable(cpu: IRVCPU) {
+    const reg: IRegisterReadable = {
+      pc: {
+        value: cpu.pc,
+        str: cpu.pc.toString(10),
+      },
+    };
 
     for (const [r, v] of Object.entries(cpu.register)) {
-      reg[rv_reg[r as unknown as number]] = v;
+      reg[rv_reg[r as unknown as number]] = {
+        value: v,
+        str: v.toString(10),
+      };
     }
 
     if (this.extensions & rv_ext.RV32F) {
       for (const [r, v] of Object.entries(cpu.registerF)) {
-        reg[rv_reg_f[r as unknown as number]] = v;
+        reg[rv_reg_f[r as unknown as number]] = {
+          value: v,
+          str: biguint32_to_f(v).toString(10),
+        };
       }
     }
 

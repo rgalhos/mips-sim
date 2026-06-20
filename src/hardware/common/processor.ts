@@ -22,6 +22,13 @@ export type ICPU = Record<string, unknown> & {
   pc: bigint;
 };
 
+export type IRegisterReadable = {
+  [reg: string]: {
+    value: bigint;
+    str: string;
+  };
+};
+
 export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction> {
   /**
    * List of registes used by
@@ -249,5 +256,5 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
   public abstract loadProgram(program: Array<IAssembledInstruction>): void;
 
-  public abstract getRegistersFriendly(cpu: ICPU): Record<string, bigint>;
+  public abstract getRegistersReadable(cpu: ICPU): IRegisterReadable;
 }
