@@ -26,12 +26,16 @@ export const enum EWorkerCommand {
 }
 
 export interface IWorkerCPUDump {
-  memory: Uint8Array;
   memoryDiff: Record<number, number>;
   cpu: ICPU;
   cycle: number;
   halted: boolean;
   lastExecutedInstruction: unknown;
+}
+
+export interface IWorkerSetupPayload {
+  sharedBuffer: SharedArrayBuffer | ArrayBuffer;
+  memorySize: number;
 }
 
 export interface IWorkerCPUDebugDump {
@@ -52,10 +56,15 @@ export type WorkerMessage =
       command: EWorkerCommand.SYNC_WORKER;
       data: {
         cpu: ICPU;
-        memory: Uint8Array;
         frequency: number;
         optExplicitScreenUpdate: boolean;
+        memory?: Uint8Array;
+        memorySize: number;
       };
+    }
+  | {
+      command: EWorkerCommand.CPU_SETUP;
+      data: IWorkerSetupPayload;
     }
   | {
       command: EWorkerCommand.SET_FREQUENCY | EWorkerCommand.SET_MEMORY_SIZE | EWorkerCommand.KEY_EVENT;
@@ -73,7 +82,6 @@ export type WorkerMessage =
       command:
         | EWorkerCommand.GET_CPU_HALT
         | EWorkerCommand.GET_FREQUENCY
-        | EWorkerCommand.CPU_SETUP
         | EWorkerCommand.CPU_RUN
         | EWorkerCommand.CPU_STEP
         | EWorkerCommand.CPU_RESET
@@ -93,7 +101,7 @@ export type WorkerMessageResponse =
     }
   | {
       command: EWorkerCommand.MEMORY_RETRIEVE;
-      data: Uint8Array;
+      data: never;
     }
   | {
       command: EWorkerCommand.CPU_DUMP;
@@ -162,7 +170,12 @@ export class WorkerService extends EventEmitter {
 
     w.addEventListener("message", this._onMessage);
 
-    return (this._worker = w);
+    this._worker = w;
+    return w;
+  }
+
+  setupWorker(data: IWorkerSetupPayload) {
+    this._postMessage({ command: EWorkerCommand.CPU_SETUP, data } as WorkerMessage);
   }
 
   runCode() {
@@ -201,16 +214,22 @@ export class WorkerService extends EventEmitter {
     this._postMessage({ command: EWorkerCommand.STDIN_EVENT, data: line } as WorkerMessage);
   }
 
-  syncWorker(data: IProcessor<IDecodedInstruction>) {
+  syncWorker(data: IProcessor<IDecodedInstruction>, options?: { shared?: boolean }) {
+    const payload: Extract<WorkerMessage, { command: EWorkerCommand.SYNC_WORKER }>["data"] = {
+      cpu: data.cpu,
+      frequency: data.frequency,
+      optExplicitScreenUpdate: data.optExplicitScreenUpdate,
+      memorySize: data.memorySize,
+    };
+
+    if (!options?.shared) {
+      payload.memory = data.memory;
+    }
+
     this._postMessage({
       command: EWorkerCommand.SYNC_WORKER,
-      data: {
-        cpu: data.cpu,
-        memory: data.memory,
-        frequency: data.frequency,
-        optExplicitScreenUpdate: data.optExplicitScreenUpdate,
-      },
-    });
+      data: payload,
+    } as WorkerMessage);
   }
 
   loadProgram(program: Parameters<IProcessor<IDecodedInstruction>["loadProgram"]>[0]) {

@@ -1,19 +1,41 @@
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { EWorkerCommand, type WorkerMessageResponse } from "@/hardware/common/worker-service";
+import { useSimulator } from "@/lib/contexts/simulator.context";
 import { Hammer, Monitor, Pause, Play, Settings, StepForward, Terminal, UndoDot } from "lucide-react";
-import { memo, useMemo } from "react";
-import { Button } from "../ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { memo, useEffect, useMemo, useState } from "react";
 
 export function MemoSimulatorActions(props: {
   pendingChanges: boolean;
   onAssemble: () => void;
-  cpuRunning: boolean;
   onToggleExecution: () => void;
   onStep: () => void;
 }) {
+  const { simulator } = useSimulator();
+  const [cpuHalted, setCpuHalted] = useState(true);
+
+  useEffect(() => {
+    const ws = simulator.workerService;
+
+    const onCpuDump = (response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
+      // @todo BAD PRACTICE: It also syncs the state of the CPU outside the worker
+      simulator.processor.cpu = response.data.cpu;
+      simulator.processor.setHalted(response.data.halted);
+
+      setCpuHalted((prev) => (prev === response.data.halted ? prev : response.data.halted));
+    };
+
+    ws.on(EWorkerCommand.CPU_DUMP, onCpuDump);
+
+    return () => {
+      ws.off(EWorkerCommand.CPU_DUMP, onCpuDump);
+    };
+  }, [simulator]);
+
   const simulatorActions = useMemo(
     () => [
       {
-        Icon: props.cpuRunning ? <Pause color="var(--catppuccin-red)" /> : <Play color="var(--catppuccin-green)" />,
+        Icon: cpuHalted ? <Play color="var(--catppuccin-green)" /> : <Pause color="var(--catppuccin-red)" />,
         label: "Run program",
         action: props.onToggleExecution,
       },
@@ -21,7 +43,7 @@ export function MemoSimulatorActions(props: {
       { Icon: <StepForward color="var(--catppuccin-blue)" />, label: "Step one instruction", action: props.onStep },
       { Icon: <Settings />, label: "Simulator settings", action: () => void 0 },
     ],
-    [props]
+    [props, cpuHalted]
   );
 
   const simulatorTools = useMemo(
@@ -44,7 +66,7 @@ export function MemoSimulatorActions(props: {
                 aria-label={
                   props.pendingChanges
                     ? "Your program was modified. Do not forget to reassemble ;)"
-                    : "Assemble program."
+                    : "Assemble program"
                 }
                 onClick={props.onAssemble}
               />
@@ -67,7 +89,7 @@ export function MemoSimulatorActions(props: {
             )}
           </TooltipTrigger>
           <TooltipContent>
-            {props.pendingChanges ? "Your program was modified. Do not forget to reassemble ;)" : "Assemble program."}
+            {props.pendingChanges ? "Your program was modified. Do not forget to reassemble ;)" : "Assemble program"}
           </TooltipContent>
         </Tooltip>
 

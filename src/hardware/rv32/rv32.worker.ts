@@ -1,24 +1,25 @@
 import type { WorkerMessage, WorkerMessageResponse } from "../common/worker-service";
 import { EWorkerCommand } from "../common/worker-service";
+import { SharedMemory } from "../common/shared-memory";
 import { rv_worker_commands } from "./rv32.const";
 import { RVProcessor } from "./rv32.processor";
 import type { IRVCPU } from "./rv32.types";
 
 const cpu = new RVProcessor();
+let usingSharedMemory = false;
 
 const postMessage = (message: WorkerMessageResponse) => {
   self.postMessage(message);
 };
 
-const postCpuDump = (fullDump = false) => {
+const postCpuDump = () => {
   const memoryDiff = cpu._memoryOperationDiff;
   cpu._memoryOperationDiff = {};
 
   postMessage({
     command: EWorkerCommand.CPU_DUMP,
     data: {
-      memory: fullDump ? cpu.memory : new Uint8Array(),
-      memoryDiff: memoryDiff,
+      memoryDiff,
       cpu: {
         pc: cpu.cpu.pc,
         register: cpu.cpu.register,
@@ -52,7 +53,7 @@ const handleCpuStep = () => {
   const ret = +cpu.step();
 
   if (ret & rv_worker_commands.SYNC_LISTENERS) {
-    postCpuDump(true);
+    postCpuDump();
   } else if (shouldPostDumpAfterStep() || ret & rv_worker_commands.UPDATE_FRAMEBUFFER) {
     postCpuDump();
   }
@@ -101,7 +102,9 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   console.log("cpu worker:", { command, data, cpu });
 
   if (command === EWorkerCommand.CPU_SETUP) {
-    //@todo
+    cpu.attachMemory(SharedMemory.attach(data.sharedBuffer, data.memorySize));
+    cpu.setMemorySize(data.memorySize);
+    usingSharedMemory = data.sharedBuffer instanceof SharedArrayBuffer;
   } else if (command === EWorkerCommand.CPU_RESET) {
     cancelRunLoop();
     cpu.resetState();
@@ -126,14 +129,11 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     }
     cpu.setHalted(data);
 
-    // postMessage({ command: EWorkerCommand.GET_CPU_HALT, data: halted });
     postCpuDump();
   } else if (command === EWorkerCommand.GET_CPU_HALT) {
     postMessage({ command: EWorkerCommand.GET_CPU_HALT, data: cpu.halted });
   } else if (command === EWorkerCommand.SET_FREQUENCY) {
     cpu.setFrequency(data);
-
-    //postMessage({ command: EWorkerCommand.GET_FREQUENCY, data: freq });
   } else if (command === EWorkerCommand.GET_FREQUENCY) {
     postMessage({ command: EWorkerCommand.GET_FREQUENCY, data: cpu.frequency });
   } else if (command === EWorkerCommand.LOAD_PROGRAM) {
@@ -144,7 +144,8 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
 
     postCpuDump();
   } else if (command === EWorkerCommand.MEMORY_RETRIEVE) {
-    postMessage({ command: EWorkerCommand.MEMORY_RETRIEVE, data: cpu.memory });
+    //@ts-expect-error data: never
+    postMessage({ command: EWorkerCommand.MEMORY_RETRIEVE });
   } else if (command === EWorkerCommand.CPU_DUMP) {
     postCpuDump();
   } else if (command === EWorkerCommand.ASSEMBLE_CODE) {
@@ -153,14 +154,20 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     cpu.setMemorySize(data);
   } else if (command === EWorkerCommand.SYNC_WORKER) {
     cancelRunLoop();
-    cpu.resetState();
+    cpu.resetState({ clearMemory: !usingSharedMemory && !data.memory });
 
     cpu.cpu = data.cpu as IRVCPU;
-    cpu.memory = data.memory;
+
+    if (data.memory) {
+      cpu.attachMemory(data.memory);
+      usingSharedMemory = false;
+    }
+
+    cpu.setMemorySize(data.memorySize);
     cpu.setFrequency(data.frequency);
     cpu.optExplicitScreenUpdate = data.optExplicitScreenUpdate;
 
-    postCpuDump(true);
+    postCpuDump();
     //@ts-expect-error data: never
     postMessage({ command: EWorkerCommand.CPU_RESET });
   } else if (command === EWorkerCommand.KEY_EVENT) {

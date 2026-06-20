@@ -4,6 +4,25 @@ import { useSimulator } from "@/lib/contexts/simulator.context";
 import { fmtWordHex } from "@/lib/utils";
 import { memo, useCallback, useEffect, useState } from "react";
 
+const RegisterRow = memo(
+  function MemoRegisterRow({
+    reg,
+    values,
+    blink,
+  }: {
+    reg: string;
+    values: IRegisterReadable[keyof IRegisterReadable];
+    blink?: boolean;
+  }) {
+    return (
+      <div className={`reg px-1 reg-${reg} ${blink ? "blink-register" : ""}`}>
+        {reg.padEnd(5, " ")} {fmtWordHex(values.value)} ({values.str}) {"\n"}
+      </div>
+    );
+  },
+  (prev, next) => prev.values.value === next.values.value && prev.blink === next.blink
+);
+
 function MemoRegisterViewContainer() {
   const { simulator } = useSimulator();
   const [toBlink, setToBlink] = useState<Record<string, 1>>({});
@@ -42,10 +61,8 @@ function MemoRegisterViewContainer() {
 
   return (
     <div className="register-block font-mono text-sm whitespace-pre-wrap">
-      {Object.entries(registers).map(([reg, v]) => (
-        <div key={reg} className={`reg px-1 reg-${reg} ${toBlink[reg] ? "blink-register" : ""}`}>
-          {reg.padEnd(5, " ")} {fmtWordHex(v.value)} ({v.value}) {"\n"}
-        </div>
+      {Object.entries(registers).map(([reg, values]) => (
+        <RegisterRow key={reg} reg={reg} values={values} blink={!!toBlink[reg]} />
       ))}
     </div>
   );

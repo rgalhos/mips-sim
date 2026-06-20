@@ -146,7 +146,7 @@ const LabelRow = memo(function MemoLabelRow(props: { label: string }) {
   );
 });
 
-function MemoHexView(props: { program: IAssemblerResult }) {
+function MemoHexViewContainer(props: { program: IAssemblerResult }) {
   const { simulator } = useSimulator();
 
   const labelsByAddr = useMemo(() => {
@@ -196,8 +196,8 @@ function MemoHexView(props: { program: IAssemblerResult }) {
           const labels = labelsByAddr[inst.instruction.address.toString()];
 
           return (
-            <Fragment key={"hex-view-" + idx}>
-              {labels?.length && labels.map((label) => <LabelRow label={label} />)}
+            <Fragment key={"hex-view-row-" + idx}>
+              {labels?.length && labels.map((label) => <LabelRow key={`label-${label}-${idx}`} label={label} />)}
               <InstructionRow inst={inst} isCurrent={false} />
             </Fragment>
           );
@@ -207,4 +207,4 @@ function MemoHexView(props: { program: IAssemblerResult }) {
   );
 }
 
-export const HexViewContainer = memo(MemoHexView);
+export const HexViewContainer = memo(MemoHexViewContainer);

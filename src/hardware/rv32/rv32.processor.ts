@@ -177,10 +177,10 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
   public cpu: IRVCPU = Object.assign({}, this.initialCpuState);
 
-  public resetState() {
+  public resetState(options?: { clearMemory?: boolean }) {
     this.cpu = Object.assign({}, this.initialCpuState);
 
-    super.resetState();
+    super.resetState(options);
   }
 
   public toBytecode(instruction: Partial<IDecodedRVInstruction>): bigint {
@@ -619,8 +619,6 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   }
 
   public execute(d: IDecodedRVInstruction): rv_worker_commands | void {
-    // console.log('WIMS: rv.execute: ' + this.stringifyInstruction(d), d);
-
     this.lastExecutedInstruction = d;
     this.cycle++;
 
@@ -1494,8 +1492,9 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   }
 
   public loadProgram(program: Array<IAssembledInstruction<IDecodedRVInstruction>>) {
-    this.memory = new Uint8Array(); // force gc
-    this.memory = new Uint8Array(this.memorySize); // @todo
+    if (this.memory.length > 0) {
+      this.memory.fill(0);
+    }
 
     this.cycle = 0;
     this.cpu.pc = program[0]?.address ?? this.PC_START;

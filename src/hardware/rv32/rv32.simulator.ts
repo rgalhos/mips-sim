@@ -59,7 +59,6 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
   protected createCpuWorkerInstance(workerOptions?: WorkerOptions) {
     return new RVWorker(workerOptions);
-    // return new Worker(new URL("./rv32.worker.ts", import.meta.url), { type: "module", ...workerOptions });
   }
 
   public examples = () =>
@@ -506,8 +505,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     };
     const assembledInstructions: Array<IAssembledInstruction<IDecodedRVInstruction>> = [];
 
+    this.getSharedMemory();
     this.processor.resetState();
-    this.processor.memory = new Uint8Array(this.processor.memorySize);
     this.processor.optExplicitScreenUpdate = false;
 
     let currentAddr = 0x0n;
@@ -547,7 +546,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       if (!tkIdentifier) {
         continue;
       } else if (tkIdentifier.type !== ETokenType.IDENTIFIER) {
-        console.log("rv: unexpected token");
+        console.log("rv32: unexpected token");
       }
 
       // directive

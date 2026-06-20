@@ -259,10 +259,93 @@
   }
 
   & .reg:nth-child(odd) {
-    background: rgba(255, 255, 255, .1);
+    background: rgba(255, 255, 255, 0.1);
   }
 }
 
 .blink-register {
   color: var(--catppuccin-red);
+}
+
+/* https://simonomi.dev/blog/color-code-your-bytes/ */
+.memory-hex-block {
+  & .mem-hex-row {
+    margin: 0;
+    min-height: 23px;
+    font-size: 1rem;
+    font-weight: bold;
+    line-height: 23px;
+    white-space: pre;
+    color: oklch(70.8% 0 0);
+  }
+
+  .byte {
+    margin-left: 1ch;
+  }
+
+  & .nibble-0.nibble2-0 {
+    color: gray;
+  }
+  & .nibble-0 {
+    color: oklch(75% 0.18 360);
+  }
+  & .nibble-1 {
+    color: oklch(75% 0.18 23);
+  }
+  & .nibble-2 {
+    color: oklch(75% 0.18 50);
+  }
+  & .nibble-3 {
+    color: oklch(75% 0.18 65);
+  }
+  & .nibble-4 {
+    color: oklch(75% 0.18 77);
+  }
+  & .nibble-5 {
+    color: oklch(75% 0.18 103);
+  }
+  & .nibble-6 {
+    color: oklch(75% 0.18 130);
+  }
+  & .nibble-7 {
+    color: oklch(75% 0.18 142);
+  }
+  & .nibble-8 {
+    color: oklch(75% 0.18 150);
+  }
+  & .nibble-9 {
+    color: oklch(75% 0.18 163);
+  }
+  & .nibble-A {
+    color: oklch(75% 0.18 184);
+  }
+  & .nibble-B {
+    color: oklch(75% 0.18 209);
+  }
+  & .nibble-C {
+    color: oklch(75% 0.18 232);
+  }
+  & .nibble-D {
+    color: oklch(75% 0.18 254);
+  }
+  & .nibble-E {
+    color: oklch(75% 0.18 294);
+  }
+  & .nibble-F {
+    color: oklch(75% 0.18 328);
+  }
+  & .nibble-F.nibble2-F {
+    color: white;
+  }
+
+  .active {
+    background-color: rgba(255, 255, 255, 0.25);
+    outline: 2px solid var(--catppuccin-red);
+    outline-offset: 2px;
+  }
+
+  .active-dim {
+    background-color: rgba(255, 255, 255, 0.1);
+    outline: 1px solid rgba(255, 255, 255, 0.2);
+  }
 }

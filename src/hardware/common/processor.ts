@@ -63,7 +63,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   public optExplicitScreenUpdate = false;
 
   /**
-   * Simulator memory
+   * Simulator memory (Uint8Array view over SharedArrayBuffer when shared memory is enabled)
    */
   public memory: Uint8Array = new Uint8Array(this.defaultMemorySize);
 
@@ -129,11 +129,18 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
     return (this._frequency = freq);
   }
 
+  public attachMemory(view: Uint8Array) {
+    this.memory = view;
+  }
+
   /**
    * Reset CPU registers to their initial states
    */
-  public resetState() {
-    this.memory = new Uint8Array();
+  public resetState(options?: { clearMemory?: boolean }) {
+    if (options?.clearMemory !== false && this.memory.length > 0) {
+      this.memory.fill(0);
+    }
+
     this.cycle = 0;
     this.lastExecutedInstruction = null;
 

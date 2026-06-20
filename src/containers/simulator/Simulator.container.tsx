@@ -10,6 +10,7 @@ import { useEditor } from "@/lib/contexts/editor.context";
 import { useSimulator } from "@/lib/contexts/simulator.context";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import { MemoryViewContainer } from "../memory-view/MemoryView.container";
 
 const enum ETabs {
   EDITOR,
@@ -18,12 +19,12 @@ const enum ETabs {
 }
 
 export function SimulatorContainer() {
-  const { simulator } = useSimulator();
+  const { simulator, createSimulatorWorker } = useSimulator();
   const { editor } = useEditor();
 
   const [program, setProgram] = useState<IAssemblerResult>({ instructions: [], labels: {} });
-  const [cpuRunning, setCpuRunning] = useState(false);
   const [pendingChanges, setPendingChanges] = useState(false);
+  const [activeTab, setActiveTab] = useState<ETabs>(ETabs.EDITOR);
 
   function handleEditorChange() {
     setPendingChanges(true);
@@ -37,9 +38,7 @@ export function SimulatorContainer() {
 
     const code = editor.getValue() as string;
 
-    if (!simulator.workerService.worker) {
-      simulator.createCpuWorker();
-    }
+    createSimulatorWorker();
 
     try {
       const t0 = performance.now();
@@ -49,34 +48,31 @@ export function SimulatorContainer() {
       setProgram(assembled);
 
       console.log(`perf: Code assemble took ${t1 - t0}ms`);
-      console.log(assembled);
 
       simulator.syncWorker();
 
       setPendingChanges(false);
-      setCpuRunning(false);
 
-      toast.success("Your code has been assembled");
+      toast.success("Your code has been assembled.");
     } catch (e) {
       toast.error("err: " + e?.toString());
     }
-  }, [editor, simulator, setProgram]);
+  }, [editor, simulator, createSimulatorWorker]);
 
   const onToggleExecution = useCallback(() => {
-    if (!simulator || !simulator.workerService.worker) {
-      console.log("No simulator or worker");
+    if (!simulator) {
+      console.log("onToggleExecution: no simulator?????");
       return;
+    } else if (!simulator.workerService.worker) {
+      onAssemble();
     }
 
-    if (cpuRunning) {
-      simulator.workerService.setHalted(true);
-      setCpuRunning(false);
-    } else {
+    if (simulator.processor.halted) {
       simulator.workerService.runCode();
-      setCpuRunning(true);
+    } else {
+      simulator.workerService.setHalted(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simulator, setCpuRunning]);
+  }, [simulator, onAssemble]);
 
   const onStep = useCallback(() => {
     if (!simulator || !simulator.workerService.worker) {
@@ -89,7 +85,11 @@ export function SimulatorContainer() {
 
   return (
     <TooltipProvider>
-      <Tabs defaultValue={ETabs.EDITOR} className="flex min-h-0 w-full flex-1 flex-col">
+      <Tabs
+        value={activeTab}
+        onValueChange={(tab) => setActiveTab(tab as ETabs)}
+        className="flex min-h-0 w-full flex-1 flex-col"
+      >
         <div className="sticky top-0 z-10 shrink-0 bg-background">
           <TabsList variant="line" className="my-2">
             <TabsTrigger value={ETabs.EDITOR}>Editor</TabsTrigger>
@@ -99,7 +99,6 @@ export function SimulatorContainer() {
             <SimulatorActions
               pendingChanges={pendingChanges}
               onAssemble={onAssemble}
-              cpuRunning={cpuRunning}
               onToggleExecution={onToggleExecution}
               onStep={onStep}
             />
@@ -114,6 +113,10 @@ export function SimulatorContainer() {
 
             <TabsContent value={ETabs.HEX_VIEW} keepMounted className="flex min-h-0 flex-1 flex-col">
               <HexViewContainer program={program} />
+            </TabsContent>
+
+            <TabsContent value={ETabs.MEMORY} keepMounted className="flex min-h-0 flex-1 flex-col">
+              <MemoryViewContainer visible={activeTab === ETabs.MEMORY} />
             </TabsContent>
           </ResizablePanel>
 

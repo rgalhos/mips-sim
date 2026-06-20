@@ -3,6 +3,7 @@ import type { IToken } from "../rv32/analyzer/rv32-tokenizer";
 import type { IManualExample } from "./examples";
 import type { IUserManual } from "./manual";
 import type { IDecodedInstruction, IProcessor } from "./processor";
+import { SharedMemory } from "./shared-memory";
 import { WorkerService } from "./worker-service";
 
 export interface IAssembledInstruction<TDecoded extends IDecodedInstruction = IDecodedInstruction> {
@@ -44,6 +45,17 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
 
   public readonly workerService = new WorkerService();
 
+  private _sharedMemory: SharedMemory | null = null;
+
+  protected getSharedMemory() {
+    if (!this._sharedMemory) {
+      this._sharedMemory = new SharedMemory(this.memorySize);
+      this.processor.attachMemory(this._sharedMemory.view);
+    }
+
+    return this._sharedMemory;
+  }
+
   /**
    * Memory size
    */
@@ -55,7 +67,19 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
 
   public setMemorySize(size: number) {
     this.workerService.setMemorySize(size);
-    return (this._memorySize = size);
+    this._memorySize = size;
+    this.getSharedMemory().resize(size);
+    this.processor.attachMemory(this._sharedMemory!.view);
+    this.processor.setMemorySize(size);
+
+    if (this.workerService.worker) {
+      this.workerService.setupWorker({
+        sharedBuffer: this._sharedMemory!.buffer,
+        memorySize: size,
+      });
+    }
+
+    return size;
   }
 
   public setFrequency(freq: number) {
@@ -77,6 +101,13 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
 
   public createCpuWorker(workerOptions?: WorkerOptions) {
     this.workerService.createCpuWorker(() => this.createCpuWorkerInstance(workerOptions));
+
+    const sharedMemory = this.getSharedMemory();
+
+    this.workerService.setupWorker({
+      sharedBuffer: sharedMemory.buffer,
+      memorySize: this.memorySize,
+    });
   }
 
   public syncWorker() {
@@ -84,7 +115,7 @@ export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor
       return;
     }
 
-    this.workerService.syncWorker(this.processor);
+    this.workerService.syncWorker(this.processor, { shared: this.getSharedMemory().shared });
   }
 
   public handleKeyPress(event: KeyboardEvent) {
