@@ -43,10 +43,5 @@ export function useMemoryInvalidation() {
     });
   }, []);
 
-  const getRowVersion = useCallback(
-    (rowAddr: number) => invalidation.epoch * 1_000_000 + (invalidation.rows.get(rowAddr) ?? 0),
-    [invalidation]
-  );
-
-  return { getRowVersion, applyMemoryDiff, bumpEpoch };
+  return { invalidation, applyMemoryDiff, bumpEpoch };
 }

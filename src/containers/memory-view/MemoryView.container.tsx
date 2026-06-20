@@ -1,7 +1,7 @@
 import { EWorkerCommand, type WorkerMessageResponse } from "@/hardware/common/worker-service";
 import { useSimulator } from "@/lib/contexts/simulator.context";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { VirtualMemoryList } from "./VirtualMemoryList";
+import { MemoryCanvasView } from "./MemoryCanvasView";
 import { useMemoryInvalidation } from "./use-memory-invalidation";
 
 type IMemoryMeta = {
@@ -26,7 +26,7 @@ const MemoryViewHeader = memo(function MemoryViewHeader({
 
 function MemoMemoryViewContainer({ visible = false }: { visible?: boolean }) {
   const { simulator } = useSimulator();
-  const { getRowVersion, applyMemoryDiff, bumpEpoch } = useMemoryInvalidation();
+  const { invalidation, applyMemoryDiff, bumpEpoch } = useMemoryInvalidation();
 
   const [meta, setMeta] = useState<IMemoryMeta>({ cycle: 0, lastExecutedInstruction: null });
 
@@ -71,7 +71,7 @@ function MemoMemoryViewContainer({ visible = false }: { visible?: boolean }) {
     <div className="flex min-h-0 flex-1 flex-col pt-2">
       <MemoryViewHeader cycle={Number(meta.cycle) || 0} lastInstruction={lastInstruction} />
 
-      <VirtualMemoryList getRowVersion={getRowVersion} />
+      <MemoryCanvasView invalidation={invalidation} />
     </div>
   );
 }
