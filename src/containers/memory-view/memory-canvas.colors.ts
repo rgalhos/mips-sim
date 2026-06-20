@@ -32,6 +32,8 @@ export const HIGHLIGHT_ACTIVE_FILL = "rgba(255, 255, 255, 0.25)";
 export const HIGHLIGHT_ACTIVE_STROKE = "#f38ba8";
 export const HIGHLIGHT_DIM_FILL = "rgba(255, 255, 255, 0.1)";
 export const HIGHLIGHT_DIM_STROKE = "rgba(255, 255, 255, 0.2)";
+export const HIGHLIGHT_SELECTION_FILL = "rgba(137, 180, 250, 0.35)";
+export const HIGHLIGHT_SELECTION_STROKE = "#89b4fa";
 
 export function byteColor(byte: number) {
   if (byte === 0) return BYTE_COLOR_00;

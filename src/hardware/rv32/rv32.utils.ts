@@ -239,6 +239,11 @@ export function biguint32_to_f(val: bigint) {
   return dv.getFloat32(0, true);
 }
 
+export function biguint64_to_d(val: bigint) {
+  dv.setBigUint64(0, val, true);
+  return dv.getFloat64(0, true);
+}
+
 export function cvt_u32_to_f(val: bigint) {
   dv.setFloat32(0, Number(val), true);
 }

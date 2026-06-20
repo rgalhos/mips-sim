@@ -6,8 +6,11 @@ import {
   HIGHLIGHT_ACTIVE_FILL,
   HIGHLIGHT_ACTIVE_STROKE,
   HIGHLIGHT_DIM_FILL,
+  HIGHLIGHT_SELECTION_FILL,
+  HIGHLIGHT_SELECTION_STROKE,
   byteColor,
 } from "./memory-canvas.colors";
+import type { IByteSelection } from "./memory-byte-selection";
 import { HEX_DIGITS, MEM_ROW_BYTES, MEM_ROW_HEIGHT_PX } from "./use-memory-invalidation";
 
 type IColumnLayout = {
@@ -67,6 +70,7 @@ export class MemoryCanvasRenderer {
   private layout: IMemoryCanvasLayout;
   private scrollTop = 0;
   private hoverAddr: number | null = null;
+  private selection: IByteSelection | null = null;
   private paintRaf: number | null = null;
   private width = 0;
   private height = 0;
@@ -125,6 +129,45 @@ export class MemoryCanvasRenderer {
     this.hoverAddr = addr;
     this.onHoverColumnChange?.(addr != null ? addr & (MEM_ROW_BYTES - 1) : null);
     this.schedulePaint();
+  }
+
+  setSelection(selection: IByteSelection | null) {
+    this.selection = selection;
+    this.schedulePaint();
+  }
+
+  getSelectionBounds(selection: IByteSelection) {
+    const startRow = Math.floor(selection.start / MEM_ROW_BYTES);
+    const endRow = Math.floor((selection.end - 1) / MEM_ROW_BYTES);
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (let row = startRow; row <= endRow; row++) {
+      const rowStart = row * MEM_ROW_BYTES;
+      const colFrom = row === startRow ? selection.start - rowStart : 0;
+      const colTo = row === endRow ? selection.end - 1 - rowStart : MEM_ROW_BYTES - 1;
+
+      const firstHex = this.layout.hexCols[colFrom]!;
+      const lastHex = this.layout.hexCols[colTo]!;
+      const y = this.rowY(row);
+
+      minX = Math.min(minX, firstHex.x - 2);
+      maxX = Math.max(maxX, lastHex.x + lastHex.width + 2);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y + this.layout.rowHeight);
+    }
+
+    if (!Number.isFinite(minX)) return null;
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
   }
 
   hitTest(canvasX: number, canvasY: number) {
@@ -261,6 +304,61 @@ export class MemoryCanvasRenderer {
     ctx.strokeRect(asciiCol.x - 1, y, asciiCol.width + 2, this.layout.rowHeight);
   }
 
+  private drawSelectionFill() {
+    if (!this.selection) return;
+
+    const { start, end } = this.selection;
+    const startRow = Math.floor(start / MEM_ROW_BYTES);
+    const endRow = Math.floor((end - 1) / MEM_ROW_BYTES);
+    const { ctx, layout } = this;
+
+    for (let row = startRow; row <= endRow; row++) {
+      const rowStart = row * MEM_ROW_BYTES;
+      const colFrom = row === startRow ? start - rowStart : 0;
+      const colTo = row === endRow ? end - 1 - rowStart : MEM_ROW_BYTES - 1;
+
+      const firstHex = layout.hexCols[colFrom]!;
+      const lastHex = layout.hexCols[colTo]!;
+      const y = this.rowY(row);
+
+      if (y + layout.rowHeight < 0 || y > this.height) continue;
+
+      const x = firstHex.x - 2;
+      const width = lastHex.x + lastHex.width + 2 - x;
+
+      ctx.fillStyle = HIGHLIGHT_SELECTION_FILL;
+      ctx.fillRect(x, y, width, layout.rowHeight);
+    }
+  }
+
+  private drawSelectionStroke() {
+    if (!this.selection) return;
+
+    const { start, end } = this.selection;
+    const startRow = Math.floor(start / MEM_ROW_BYTES);
+    const endRow = Math.floor((end - 1) / MEM_ROW_BYTES);
+    const { ctx, layout } = this;
+
+    for (let row = startRow; row <= endRow; row++) {
+      const rowStart = row * MEM_ROW_BYTES;
+      const colFrom = row === startRow ? start - rowStart : 0;
+      const colTo = row === endRow ? end - 1 - rowStart : MEM_ROW_BYTES - 1;
+
+      const firstHex = layout.hexCols[colFrom]!;
+      const lastHex = layout.hexCols[colTo]!;
+      const y = this.rowY(row);
+
+      if (y + layout.rowHeight < 0 || y > this.height) continue;
+
+      const x = firstHex.x - 2;
+      const width = lastHex.x + lastHex.width + 2 - x;
+
+      ctx.strokeStyle = HIGHLIGHT_SELECTION_STROKE;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, width, layout.rowHeight);
+    }
+  }
+
   private drawRow(row: number, y: number) {
     const { ctx, layout } = this;
     const rowAddr = row * MEM_ROW_BYTES;
@@ -292,10 +390,14 @@ export class MemoryCanvasRenderer {
     const firstRow = Math.max(0, Math.floor(this.scrollTop / layout.rowHeight));
     const lastRow = Math.min(this.totalRows - 1, Math.ceil((this.scrollTop + this.height) / layout.rowHeight));
 
-    if (this.hoverAddr != null) {
+    if (this.hoverAddr != null && !this.selection) {
       this.drawColumnHighlights();
       this.drawRowHighlight(this.hoverAddr);
       this.drawCellHighlightFill(this.hoverAddr);
+    }
+
+    if (this.selection) {
+      this.drawSelectionFill();
     }
 
     for (let row = firstRow; row <= lastRow; row++) {
@@ -304,8 +406,12 @@ export class MemoryCanvasRenderer {
       this.drawRow(row, y);
     }
 
-    if (this.hoverAddr != null) {
+    if (this.hoverAddr != null && !this.selection) {
       this.drawCellHighlightStroke(this.hoverAddr);
+    }
+
+    if (this.selection) {
+      this.drawSelectionStroke();
     }
   }
 }
