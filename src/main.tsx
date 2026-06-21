@@ -1,4 +1,5 @@
 import { ThemeProvider } from "@/components/theme-provider.tsx";
+import { TooltipProvider } from "@/components/ui/tooltip.tsx";
 import { EditorProvider } from "@/lib/contexts/editor.context.tsx";
 import { SimulatorProvider } from "@/lib/contexts/simulator.context.tsx";
 import { StrictMode } from "react";
@@ -11,7 +12,9 @@ createRoot(document.getElementById("root")!).render(
     <ThemeProvider>
       <EditorProvider>
         <SimulatorProvider>
-          <App />
+          <TooltipProvider>
+            <App />
+          </TooltipProvider>
         </SimulatorProvider>
       </EditorProvider>
     </ThemeProvider>

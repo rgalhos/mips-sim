@@ -10,6 +10,7 @@ export function MemoSimulatorActions(props: {
   onAssemble: () => void;
   onToggleExecution: () => void;
   onStep: () => void;
+  onToggleConsole: () => void;
 }) {
   const { simulator } = useSimulator();
   const [cpuHalted, setCpuHalted] = useState(true);
@@ -48,7 +49,7 @@ export function MemoSimulatorActions(props: {
 
   const simulatorTools = useMemo(
     () => [
-      { Icon: <Terminal />, label: "Open terminal", action: () => void 0 },
+      { Icon: <Terminal />, label: "Open terminal", action: props.onToggleConsole },
       { Icon: <Monitor />, label: "Open screen", action: () => void 0 },
     ],
     []

@@ -1,16 +1,20 @@
 import { SimulatorActions } from "@/components/simulator-actions/SimulatorActions.component";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { ConsoleContainer } from "@/containers/console/Console.container";
 import { EditorContainer } from "@/containers/editor/Editor.container";
 import { HexViewContainer } from "@/containers/hex-view/HexView.container";
+import { MemoryViewContainer } from "@/containers/memory-view/MemoryView.container";
 import { RegisterViewContainer } from "@/containers/register-view/RegisterView.container";
 import type { IAssemblerResult } from "@/hardware/common/simulator";
 import { useEditor } from "@/lib/contexts/editor.context";
 import { useSimulator } from "@/lib/contexts/simulator.context";
-import { useCallback, useState } from "react";
+import { cn } from "@/lib/utils";
+import { Fragment, useCallback, useLayoutEffect, useState } from "react";
+import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
-import { MemoryViewContainer } from "../memory-view/MemoryView.container";
+
+const CONSOLE_DEFAULT_SIZE = "340px";
 
 const enum ETabs {
   EDITOR,
@@ -24,7 +28,13 @@ export function SimulatorContainer() {
 
   const [program, setProgram] = useState<IAssemblerResult>({ instructions: [], labels: {} });
   const [pendingChanges, setPendingChanges] = useState(false);
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ETabs>(ETabs.EDITOR);
+  const consolePanelRef = usePanelRef();
+
+  useLayoutEffect(() => {
+    consolePanelRef.current?.collapse();
+  }, [consolePanelRef]);
 
   function handleEditorChange() {
     setPendingChanges(true);
@@ -83,55 +93,88 @@ export function SimulatorContainer() {
     simulator.workerService.stepCode();
   }, [simulator]);
 
+  const onToggleConsole = useCallback(() => {
+    const panel = consolePanelRef.current;
+    if (!panel) return;
+
+    if (panel.isCollapsed()) {
+      panel.resize(CONSOLE_DEFAULT_SIZE);
+      setConsoleOpen(true);
+    } else {
+      panel.collapse();
+      setConsoleOpen(false);
+    }
+  }, [consolePanelRef]);
+
   return (
-    <TooltipProvider>
-      <Tabs
-        value={activeTab}
-        onValueChange={(tab) => setActiveTab(tab as ETabs)}
-        className="flex min-h-0 w-full flex-1 flex-col"
-      >
-        <div className="sticky top-0 z-10 shrink-0 bg-background">
-          <TabsList variant="line" className="my-2">
-            <TabsTrigger value={ETabs.EDITOR}>Editor</TabsTrigger>
-            <TabsTrigger value={ETabs.HEX_VIEW}>Hex view</TabsTrigger>
-            <TabsTrigger value={ETabs.MEMORY}>Memory</TabsTrigger>
-
-            <SimulatorActions
-              pendingChanges={pendingChanges}
-              onAssemble={onAssemble}
-              onToggleExecution={onToggleExecution}
-              onStep={onStep}
-            />
-          </TabsList>
-        </div>
-
-        <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-          <ResizablePanel defaultSize="66.67%" className="flex min-h-0 flex-col">
-            <TabsContent value={ETabs.EDITOR} keepMounted className="flex min-h-0 flex-1 flex-col">
-              <EditorContainer handleEditorChange={handleEditorChange} />
-            </TabsContent>
-
-            <TabsContent value={ETabs.HEX_VIEW} keepMounted className="flex min-h-0 flex-1 flex-col">
-              <HexViewContainer program={program} />
-            </TabsContent>
-
-            <TabsContent value={ETabs.MEMORY} keepMounted className="flex min-h-0 flex-1 flex-col">
-              <MemoryViewContainer visible={activeTab === ETabs.MEMORY} />
-            </TabsContent>
-          </ResizablePanel>
-
-          <ResizableHandle withHandle className="mx-4" />
-
-          <ResizablePanel
-            defaultSize="20%"
-            maxSize="350px"
-            minSize="50px"
-            className="flex min-h-0 flex-col overflow-auto"
+    <Fragment>
+      <ResizablePanelGroup orientation="vertical">
+        <ResizablePanel className="flex min-h-0 flex-col">
+          <Tabs
+            value={activeTab}
+            onValueChange={(tab) => setActiveTab(tab as ETabs)}
+            className="flex min-h-0 w-full flex-1 flex-col"
           >
-            <RegisterViewContainer />
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </Tabs>
-    </TooltipProvider>
+            <div className="sticky top-0 z-10 shrink-0 bg-background">
+              <TabsList variant="line" className="my-2">
+                <TabsTrigger value={ETabs.EDITOR}>Editor</TabsTrigger>
+                <TabsTrigger value={ETabs.HEX_VIEW}>Hex view</TabsTrigger>
+                <TabsTrigger value={ETabs.MEMORY}>Memory</TabsTrigger>
+
+                <SimulatorActions
+                  pendingChanges={pendingChanges}
+                  onAssemble={onAssemble}
+                  onToggleExecution={onToggleExecution}
+                  onStep={onStep}
+                  onToggleConsole={onToggleConsole}
+                />
+              </TabsList>
+            </div>
+
+            <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
+              <ResizablePanel defaultSize="66.67%" className="flex min-h-0 flex-col">
+                <TabsContent value={ETabs.EDITOR} keepMounted className="flex min-h-0 flex-1 flex-col">
+                  <EditorContainer handleEditorChange={handleEditorChange} />
+                </TabsContent>
+
+                <TabsContent value={ETabs.HEX_VIEW} keepMounted className="flex min-h-0 flex-1 flex-col">
+                  <HexViewContainer program={program} />
+                </TabsContent>
+
+                <TabsContent value={ETabs.MEMORY} keepMounted className="flex min-h-0 flex-1 flex-col">
+                  <MemoryViewContainer visible={activeTab === ETabs.MEMORY} />
+                </TabsContent>
+              </ResizablePanel>
+
+              <ResizableHandle withHandle className="mx-4" />
+
+              <ResizablePanel
+                defaultSize="20%"
+                maxSize="350px"
+                minSize="50px"
+                className="flex min-h-0 flex-col overflow-auto"
+              >
+                <RegisterViewContainer />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </Tabs>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle disabled={!consoleOpen} className={cn("mt-4", !consoleOpen && "hidden")} />
+
+        <ResizablePanel
+          id="console"
+          panelRef={consolePanelRef}
+          collapsible
+          collapsedSize={0}
+          defaultSize={CONSOLE_DEFAULT_SIZE}
+          maxSize="500px"
+          minSize="120px"
+          className="flex min-h-0 flex-col overflow-auto"
+        >
+          <ConsoleContainer />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </Fragment>
   );
 }
