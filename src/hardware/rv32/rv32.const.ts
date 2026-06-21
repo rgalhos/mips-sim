@@ -284,6 +284,7 @@ export enum rv_directives {
   '.asciz',
   '.string',
   '.space',
+  '.equ',
   '.option',
   '.data',
   '.text',

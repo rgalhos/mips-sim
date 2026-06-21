@@ -36,15 +36,18 @@ function MemoEditorContainer(props: { handleEditorChange?: () => void }) {
   };
 
   return (
-    <Editor
-      width="100%"
-      language="riscv"
-      theme="rvsim-dark"
-      options={editorOptions}
-      beforeMount={handleEditorWillMount}
-      onMount={handleEditorDidMount}
-      onChange={handleEditorChange}
-    />
+    <div className="min-h-0 flex-1">
+      <Editor
+        width="100%"
+        height="100%"
+        language="riscv"
+        theme="rvsim-dark"
+        options={editorOptions}
+        beforeMount={handleEditorWillMount}
+        onMount={handleEditorDidMount}
+        onChange={handleEditorChange}
+      />
+    </div>
   );
 }
 

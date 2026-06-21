@@ -18,8 +18,10 @@ export interface IAssembledInstruction<TDecoded extends IDecodedInstruction = ID
 export interface IAssemblerResult<TDecoded extends IDecodedInstruction = IDecodedInstruction> {
   instructions: Array<IAssembledInstruction<TDecoded>>;
   labels: { [label: string]: bigint | number };
+  errors: Error[];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export abstract class ISimulator<TProcessor extends IProcessor<any> = IProcessor<any>> {
   public abstract readonly name: string;
 

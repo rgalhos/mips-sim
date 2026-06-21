@@ -7,12 +7,24 @@ const EditorContext = createContext(
     monaco: Monaco;
     setEditor: (editor: any) => void;
     setMonaco: (monaco: Monaco) => void;
+    focusLine: (line: number) => void;
   }
 );
 
 export const EditorProvider = ({ children }: { children: React.ReactNode }) => {
   const [editor, setEditor] = useState<any | null>(null);
   const [monaco, setMonaco] = useState<Monaco | null>(null);
+
+  const focusLine = (line: number) => {
+    if (!editor) {
+      console.warn("EditorProvider: focusLine: no editor!");
+      return;
+    }
+
+    editor.revealLine(line);
+    editor.setPosition({ lineNumber: line, column: 999 });
+    editor.focus();
+  };
 
   return (
     <EditorContext.Provider
@@ -21,6 +33,7 @@ export const EditorProvider = ({ children }: { children: React.ReactNode }) => {
         setEditor,
         monaco,
         setMonaco,
+        focusLine,
       }}
     >
       {children}

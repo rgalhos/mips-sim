@@ -101,6 +101,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
   private ensureRegisterToken(
     t: IToken | undefined,
     constants: Record<string, IToken>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     registers: any = rv_reg
   ): number {
     if (!t) throw throwUnexpectedToken([]);
@@ -405,7 +406,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       }
     } else if (data.extension === rv_ext.RV32F) {
       switch (dec.codec) {
-        case rv_codec.r:
+        case rv_codec.r: {
           const rdRegKind = [
             rv_opcode["fcvt.w.s"],
             rv_opcode["fcvt.wu.s"],
@@ -441,6 +442,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
             dec.rs2 = this.ensureRegisterToken(tok3, constants, rv_reg_f);
           }
           break;
+        }
         case rv_codec.i:
           if (dec._op === rv_opcode.ebreak || dec._op === rv_opcode.ecall) break;
 
@@ -475,6 +477,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
    * intermediárias e as salva no cache de instruções.
    */
   public assembleCode(code: string): IAssemblerResult {
+    const errors: Error[] = [];
     // label->address translation table
     const labels: Record<string, bigint> = {};
     // constant->value translation table
@@ -509,10 +512,16 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     this.processor.resetState();
     this.processor.optExplicitScreenUpdate = false;
 
+    let sourceLines: ReturnType<typeof preprocessor> = [];
     let currentAddr = 0x0n;
     let currentLabel = "";
 
-    const sourceLines = preprocessor(code);
+    try {
+      sourceLines = preprocessor(code);
+    } catch (e) {
+      errors.push(e as Error);
+    }
+
     for (const { line, lineNumber } of sourceLines) {
       if (!line) {
         continue;
@@ -536,7 +545,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         }
 
         if (!!labels[sLabel]) {
-          throw throwConflictingDeclaration([tokens[0]]);
+          errors.push(throwConflictingDeclaration([tokens[0]]));
+          continue;
         }
 
         labels[sLabel] = BigInt(currentAddr);
@@ -556,8 +566,10 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         if ([".byte", ".half", ".word"].includes(directive)) {
           const argTokens = tokens.slice(1);
           if (argTokens.length === 0) {
-            throw throwUnexpectedToken(tokens);
+            errors.push(throwUnexpectedToken(tokens));
+            continue;
           }
+
           for (const tk of argTokens) {
             const val = this.ensureNumericImmediate(tk, constants);
             if (directive === ".byte") {
@@ -597,7 +609,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           const tkValue = tokens[1];
 
           if (!tkValue || tkValue.type !== ETokenType.STRING) {
-            throw throwUnexpectedToken(tokens);
+            errors.push(throwUnexpectedToken(tokens));
+            continue;
           }
 
           for (const c of tkValue.value) {
@@ -615,7 +628,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           const tkVal = tokens[2];
 
           if (!tkName || tkName.type !== ETokenType.IDENTIFIER || !tkVal) {
-            throw throwUnexpectedToken([tkName, tkVal]);
+            errors.push(throwUnexpectedToken([tkName, tkVal]));
+            continue;
           }
 
           constants[tkName.value] = tkVal;
@@ -633,10 +647,12 @@ export class RVSimulator extends ISimulator<RVProcessor> {
           if (val === rv_consts.OPTION_EXPLICIT_SCREEN_UPDATE) {
             this.processor.optExplicitScreenUpdate = true;
           } else {
-            throw throwUnexpectedToken(tokens);
+            errors.push(throwUnexpectedToken(tokens));
+            continue;
           }
         } else {
-          throw throwUnknownKeyword([tokens[0]]);
+          errors.push(throwUnknownKeyword([tokens[0]]));
+          continue;
         }
       }
       // identifier (instruction)
@@ -644,26 +660,30 @@ export class RVSimulator extends ISimulator<RVProcessor> {
         // instruction addresses must be 4-byte aligned
         currentAddr = (currentAddr + 3n) & ~0x3n;
 
-        const decodedInstructions = this.assembleLine(tokens, constants, currentAddr);
+        try {
+          const decodedInstructions = this.assembleLine(tokens, constants, currentAddr);
 
-        for (const { decoded, tokens: instTokens } of decodedInstructions) {
-          if (decoded._op === rv_opcode.illegal) {
-            throw throwUnknownKeyword(tokens);
+          for (const { decoded, tokens: instTokens } of decodedInstructions) {
+            if (decoded._op === rv_opcode.illegal) {
+              throw throwUnknownKeyword(tokens);
+            }
+
+            assembledInstructions.push({
+              code: line,
+              lineNumber,
+              tokens: instTokens,
+              decoded,
+              address: currentAddr,
+              scope: currentLabel,
+            });
+
+            currentAddr += 4n;
           }
-
-          assembledInstructions.push({
-            code: line,
-            lineNumber,
-            tokens: instTokens,
-            decoded,
-            address: currentAddr,
-            scope: currentLabel,
-          });
-
-          currentAddr += 4n;
+        } catch (e) {
+          errors.push(e as Error);
         }
       } else {
-        throw throwUnexpectedToken(tokens);
+        errors.push(throwUnexpectedToken(tokens));
       }
     }
 
@@ -683,20 +703,28 @@ export class RVSimulator extends ISimulator<RVProcessor> {
       if (immTok?.type === ETokenType.RELOC) {
         const op = immTok.value;
         if (!RV_RELOC_OPS.has(op)) {
-          throw throwUnknownKeyword([immTok]);
+          errors.push(throwUnknownKeyword([immTok]));
+          continue;
         }
 
         const operand = tokens[immIdx + 1];
-        if (!operand) throw throwUnexpectedToken(tokens);
-        if (operand.type === ETokenType.NUMBER) continue;
-        if (operand.type !== ETokenType.IDENTIFIER) throw throwUnexpectedToken(tokens);
+        if (!operand) {
+          errors.push(throwUnexpectedToken(tokens));
+          continue;
+        } else if (operand.type === ETokenType.NUMBER) {
+          continue;
+        } else if (operand.type !== ETokenType.IDENTIFIER) {
+          errors.push(throwUnexpectedToken(tokens));
+          continue;
+        }
 
         const labelName = operand.value[0] === "." ? scope + operand.value : operand.value;
         if (this.resolveConstantName(labelName, constants) !== undefined) continue;
 
         const labelAddr = labels[labelName];
         if (typeof labelAddr === "undefined") {
-          throw throwUndeclaredLabel(tokens);
+          errors.push(throwUndeclaredLabel(tokens));
+          continue;
         }
 
         decoded.imm = this.relocImmediate(op, labelAddr, address);
@@ -712,7 +740,8 @@ export class RVSimulator extends ISimulator<RVProcessor> {
 
       const labelAddr = labels[labelName];
       if (typeof labelAddr === "undefined") {
-        throw throwUndeclaredLabel(tokens);
+        errors.push(throwUndeclaredLabel(tokens));
+        continue;
       }
 
       if (decoded.codec === rv_codec.j || decoded.codec === rv_codec.b || decoded.codec === rv_codec.s) {
@@ -733,6 +762,7 @@ export class RVSimulator extends ISimulator<RVProcessor> {
     return {
       instructions: assembledInstructions,
       labels,
+      errors,
     };
   }
 

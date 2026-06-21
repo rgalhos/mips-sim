@@ -1,3 +1,4 @@
+import { AssemblerErrors } from "@/components/assembler-errors/AssemblerErrors.component";
 import { SimulatorActions } from "@/components/simulator-actions/SimulatorActions.component";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,7 +27,7 @@ export function SimulatorContainer() {
   const { simulator, createSimulatorWorker } = useSimulator();
   const { editor } = useEditor();
 
-  const [program, setProgram] = useState<IAssemblerResult>({ instructions: [], labels: {} });
+  const [program, setProgram] = useState<IAssemblerResult>({ instructions: [], labels: {}, errors: [] });
   const [pendingChanges, setPendingChanges] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ETabs>(ETabs.EDITOR);
@@ -59,9 +60,14 @@ export function SimulatorContainer() {
 
       console.log(`perf: Code assemble took ${t1 - t0}ms`);
 
-      simulator.syncWorker();
-
       setPendingChanges(false);
+
+      if (assembled.errors.length > 0) {
+        console.log(`assembler: program contains ${assembled.errors.length} errors. not syncing with worker.`);
+        return;
+      }
+
+      simulator.syncWorker();
 
       toast.success("Your code has been assembled.");
     } catch (e) {
@@ -108,8 +114,8 @@ export function SimulatorContainer() {
 
   return (
     <Fragment>
-      <ResizablePanelGroup orientation="vertical">
-        <ResizablePanel className="flex min-h-0 flex-col">
+      <ResizablePanelGroup orientation="vertical" className="min-h-0 flex-1">
+        <ResizablePanel className="flex min-h-0 flex-col overflow-hidden">
           <Tabs
             value={activeTab}
             onValueChange={(tab) => setActiveTab(tab as ETabs)}
@@ -132,8 +138,10 @@ export function SimulatorContainer() {
             </div>
 
             <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-              <ResizablePanel defaultSize="66.67%" className="flex min-h-0 flex-col">
-                <TabsContent value={ETabs.EDITOR} keepMounted className="flex min-h-0 flex-1 flex-col">
+              <ResizablePanel defaultSize="66.67%" className="flex min-h-0 flex-col overflow-hidden">
+                <TabsContent value={ETabs.EDITOR} keepMounted className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <AssemblerErrors errors={program.errors} />
+
                   <EditorContainer handleEditorChange={handleEditorChange} />
                 </TabsContent>
 
@@ -169,7 +177,7 @@ export function SimulatorContainer() {
           collapsedSize={0}
           defaultSize={CONSOLE_DEFAULT_SIZE}
           maxSize="500px"
-          minSize="120px"
+          minSize="200px"
           className="flex min-h-0 flex-col overflow-auto"
         >
           <ConsoleContainer />
