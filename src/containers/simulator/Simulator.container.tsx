@@ -83,12 +83,20 @@ export function SimulatorContainer() {
       onAssemble();
     }
 
+    if (program.errors.length > 0) {
+      toast.warning("Fix all compilation errors and recompile before running", {
+        action: { label: "Show errors", onClick: () => setActiveTab(ETabs.EDITOR) },
+      });
+
+      return;
+    }
+
     if (simulator.processor.halted) {
       simulator.workerService.runCode();
     } else {
       simulator.workerService.setHalted(true);
     }
-  }, [simulator, onAssemble]);
+  }, [simulator, onAssemble, program]);
 
   const onStep = useCallback(() => {
     if (!simulator || !simulator.workerService.worker) {
@@ -96,8 +104,16 @@ export function SimulatorContainer() {
       return;
     }
 
+    if (program.errors.length > 0) {
+      toast.warning("Fix all compilation errors and recompile before running", {
+        action: { label: "Show errors", onClick: () => setActiveTab(ETabs.EDITOR) },
+      });
+
+      return;
+    }
+
     simulator.workerService.stepCode();
-  }, [simulator]);
+  }, [simulator, program]);
 
   const onToggleConsole = useCallback(() => {
     const panel = consolePanelRef.current;

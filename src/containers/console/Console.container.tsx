@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EWorkerCommand, type WorkerMessageResponse } from "@/hardware/common/worker-service";
+import type { ISimulator } from "@/hardware/common/simulator";
+import { EWorkerCommand, type IWorkerCPUDebugDump, type WorkerMessageResponse } from "@/hardware/common/worker-service";
 import { useSimulator } from "@/lib/contexts/simulator.context";
-import { cn } from "@/lib/utils";
+import { cn, debounce, fmtWordHex } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
 import { type KeyboardEvent, memo, useEffect, useRef, useState } from "react";
 
@@ -33,22 +34,13 @@ function ConsoleClearButton({ onClear }: { onClear: () => void }) {
   );
 }
 
-function MemoConsoleContainer() {
-  const { simulator } = useSimulator();
-
+const ConsoleTerminal = memo(function MemoConsoleTerminal({ simulator }: { simulator: ISimulator }) {
   const terminalInputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLTextAreaElement>(null);
   const [terminalValue, setTerminalValue] = useState("");
 
-  const debugRef = useRef<HTMLTextAreaElement>(null);
-  const [debugValue, setDebugValue] = useState("");
-
   const handleClearTerminal = () => {
     setTerminalValue("");
-  };
-
-  const handleClearDebug = () => {
-    setDebugValue("");
   };
 
   function submitInput() {
@@ -88,59 +80,126 @@ function MemoConsoleContainer() {
     }
   }, [terminalValue]);
 
+  return (
+    <div className="relative flex flex-col font-mono">
+      <ConsoleClearButton onClear={handleClearTerminal} />
+
+      <textarea
+        ref={terminalRef}
+        readOnly
+        value={terminalValue}
+        placeholder="Empty"
+        rows={10}
+        className={consoleTextareaClassName}
+      />
+
+      <input
+        ref={terminalInputRef}
+        onKeyDown={handleInputKeyDown}
+        placeholder="Terminal input"
+        maxLength={STDIN_MAX_LEN}
+        className={cn(
+          "h-8 w-full border border-input bg-background px-3 text-foreground",
+          "placeholder:text-muted-foreground focus-visible:outline-none"
+        )}
+      />
+    </div>
+  );
+});
+
+const DebugTerminal = memo(function MemoDebugTerminal({ simulator }: { simulator: ISimulator }) {
+  const debugRef = useRef<HTMLTextAreaElement>(null);
+  const debugBuffer = useRef<string[]>([]);
+  const [debugValue, setDebugValue] = useState("");
+
+  const handleClearDebug = () => {
+    setDebugValue("");
+  };
+
   useEffect(() => {
     if (debugRef.current) {
       debugRef.current.scrollTop = debugRef.current.scrollHeight;
     }
   }, [debugValue]);
 
+  const flushDebug = () => {
+    if (debugBuffer.current.length) {
+      setDebugValue((old) => old.slice(-10000) + debugBuffer.current.join(""));
+      debugBuffer.current = [];
+    }
+  };
+
+  useEffect(() => {
+    const updateDebugValue = debounce(flushDebug, 100);
+
+    const onDump = (response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DEBUG_DUMP }>) => {
+      [...response.data.registers, ...response.data.memory]
+        .sort((a, b) => Number(a.pc - b.pc))
+        .forEach((evt) => {
+          if (typeof (evt as IWorkerCPUDebugDump["registers"][0]).reg !== "undefined") {
+            const r = evt as IWorkerCPUDebugDump["registers"][0];
+
+            debugBuffer.current.push(
+              `[cycle ${r.cycle}] [pc ${fmtWordHex(r.pc)}] reg[${r.reg}] = ${fmtWordHex(r.value)}\n`
+            );
+          } else {
+            const r = evt as IWorkerCPUDebugDump["memory"][0];
+
+            debugBuffer.current.push(
+              `[cycle ${r.cycle}] [pc ${fmtWordHex(r.pc)}] ` +
+                `mem[${fmtWordHex(r.address)}] = ${fmtWordHex(r.value)}\n`
+            );
+          }
+        });
+
+      if (debugBuffer.current.length > 100) {
+        flushDebug();
+      }
+
+      updateDebugValue();
+    };
+
+    simulator.workerService.on(EWorkerCommand.CPU_DEBUG_DUMP, onDump);
+
+    return () => {
+      simulator.workerService.off(EWorkerCommand.CPU_DEBUG_DUMP, onDump);
+    };
+  }, [simulator]);
+
   return (
-    <Tabs value={ETabs.TERMINAL} className="mt-4 flex flex-col">
+    <div className="relative flex flex-col font-mono">
+      <ConsoleClearButton onClear={handleClearDebug} />
+
+      <textarea
+        ref={debugRef}
+        readOnly
+        id="debugTxtArea"
+        value={debugValue}
+        placeholder="Empty"
+        rows={10}
+        className={consoleTextareaClassName}
+      />
+    </div>
+  );
+});
+
+function MemoConsoleContainer() {
+  const { simulator } = useSimulator();
+  const [activeTab, setActiveTab] = useState<ETabs>(ETabs.TERMINAL);
+
+  return (
+    <Tabs value={activeTab} onValueChange={(tab) => setActiveTab(tab)} className="mt-4 flex flex-col">
       <TabsList variant="line">
         <TabsTrigger value={ETabs.TERMINAL}>Terminal</TabsTrigger>
         <TabsTrigger value={ETabs.DEBUG}>Debug</TabsTrigger>
       </TabsList>
 
       <TabsContent value={ETabs.TERMINAL} keepMounted>
-        <div className="relative flex flex-col font-mono">
-          <ConsoleClearButton onClear={handleClearTerminal} />
-
-          <textarea
-            ref={terminalRef}
-            readOnly
-            value={terminalValue}
-            placeholder="Empty"
-            rows={10}
-            className={consoleTextareaClassName}
-          />
-
-          <input
-            ref={terminalInputRef}
-            onKeyDown={handleInputKeyDown}
-            placeholder="Terminal input"
-            maxLength={STDIN_MAX_LEN}
-            className={cn(
-              "h-8 w-full border border-input bg-background px-3 text-foreground",
-              "placeholder:text-muted-foreground focus-visible:outline-none"
-            )}
-          />
-        </div>
+        <ConsoleTerminal simulator={simulator} />
       </TabsContent>
 
       <TabsContent value={ETabs.DEBUG} keepMounted>
-        <div className="relative flex flex-col font-mono">
-          <ConsoleClearButton onClear={handleClearDebug} />
-
-          <textarea
-            ref={debugRef}
-            readOnly
-            id="debugTxtArea"
-            value={debugValue}
-            placeholder="Empty"
-            rows={10}
-            className={consoleTextareaClassName}
-          />
-        </div>
+        <DebugTerminal simulator={simulator} />
       </TabsContent>
     </Tabs>
   );

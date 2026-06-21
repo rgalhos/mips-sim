@@ -41,7 +41,11 @@ export function MemoSimulatorActions(props: {
         action: props.onToggleExecution,
       },
       { Icon: <UndoDot color="var(--catppuccin-blue)" />, label: "Step back", disabled: true, action: () => void 0 },
-      { Icon: <StepForward color="var(--catppuccin-blue)" />, label: "Step one instruction", action: props.onStep },
+      {
+        Icon: <StepForward color="var(--catppuccin-blue)" />,
+        label: "Step one instruction",
+        action: props.onStep,
+      },
       { Icon: <Settings />, label: "Simulator settings", action: () => void 0 },
     ],
     [props, cpuHalted]
@@ -52,7 +56,7 @@ export function MemoSimulatorActions(props: {
       { Icon: <Terminal />, label: "Open terminal", action: props.onToggleConsole },
       { Icon: <Monitor />, label: "Open screen", action: () => void 0 },
     ],
-    []
+    [props]
   );
 
   return (
