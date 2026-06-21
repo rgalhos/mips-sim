@@ -3,6 +3,14 @@ export type IByteSelection = {
   end: number;
 };
 
+export function byteRange(start: number, spanBytes: number, memorySize: number): IByteSelection | null {
+  const end = start + spanBytes;
+
+  if (start < 0 || spanBytes <= 0 || end > memorySize) return null;
+
+  return { start, end };
+}
+
 export const MAX_BYTE_SELECTION = 8;
 
 export function normalizeByteSelection(

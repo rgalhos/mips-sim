@@ -1,6 +1,6 @@
+import { SharedMemory } from "../common/shared-memory";
 import type { WorkerMessage, WorkerMessageResponse } from "../common/worker-service";
 import { EWorkerCommand } from "../common/worker-service";
-import { SharedMemory } from "../common/shared-memory";
 import { rv_worker_commands } from "./rv32.const";
 import { RVProcessor } from "./rv32.processor";
 import type { IRVCPU } from "./rv32.types";
@@ -43,7 +43,20 @@ const postCpuDump = () => {
   cpu._dbgRegChanges = [];
 };
 
-const shouldPostDumpAfterStep = () => cpu.halted || cpu.cycle % Math.max(100, Math.ceil(cpu.frequency / 10)) === 0;
+// const shouldPostDumpAfterStep = () => cpu.halted || cpu.cycle % Math.max(100, Math.ceil(cpu.frequency / 10)) === 0;
+
+let nextDump = 0;
+
+function shouldPostDumpAfterStep() {
+  if (cpu.halted) return true;
+
+  if (cpu.cycle < nextDump) {
+    return false;
+  }
+
+  nextDump += cpu.frequency / 60;
+  return true;
+}
 
 const cancelRunLoop = () => {
   cpu.setHalted(true);

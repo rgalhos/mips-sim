@@ -12,6 +12,7 @@ import { MEM_ROW_BYTES, MEM_ROW_HEIGHT_PX } from "./use-memory-invalidation";
 
 type IMemoryCanvasViewProps = {
   invalidation: { epoch: number; rows: Map<number, number> };
+  pcHighlight: IByteSelection | null;
 };
 
 function clientToAddr(
@@ -24,7 +25,7 @@ function clientToAddr(
   return renderer.hitTest(clientX - rect.left, clientY - rect.top);
 }
 
-export function MemoryCanvasView({ invalidation }: IMemoryCanvasViewProps) {
+export function MemoryCanvasView({ invalidation, pcHighlight }: IMemoryCanvasViewProps) {
   const { simulator } = useSimulator();
 
   const memory = simulator.processor.memory;
@@ -150,6 +151,10 @@ export function MemoryCanvasView({ invalidation }: IMemoryCanvasViewProps) {
   useEffect(() => {
     rendererRef.current?.schedulePaint();
   }, [invalidation]);
+
+  useEffect(() => {
+    rendererRef.current?.setPcHighlight(pcHighlight);
+  }, [pcHighlight]);
 
   useEffect(() => {
     if (inspectorSelection) {

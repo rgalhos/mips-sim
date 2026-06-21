@@ -24,10 +24,9 @@ function ConsoleClearButton({ onClear }: { onClear: () => void }) {
     <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
       onClick={onClear}
       aria-label="Clear console"
-      className="absolute top-0 right-0 z-10"
+      className="absolute top-0 right-4 z-10"
     >
       <Trash2 />
     </Button>

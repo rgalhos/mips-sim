@@ -29,11 +29,15 @@ export const BYTE_COLOR_00 = "gray";
 export const BYTE_COLOR_FF = "white";
 
 export const HIGHLIGHT_ACTIVE_FILL = "rgba(255, 255, 255, 0.25)";
-export const HIGHLIGHT_ACTIVE_STROKE = "#f38ba8";
+export const HIGHLIGHT_ACTIVE_STROKE = "#f38ba8"; //  --catppuccin-red
 export const HIGHLIGHT_DIM_FILL = "rgba(255, 255, 255, 0.1)";
 export const HIGHLIGHT_DIM_STROKE = "rgba(255, 255, 255, 0.2)";
+//  --catppuccin-blue
 export const HIGHLIGHT_SELECTION_FILL = "rgba(137, 180, 250, 0.35)";
 export const HIGHLIGHT_SELECTION_STROKE = "#89b4fa";
+//  --catppuccin-green
+export const HIGHLIGHT_PC_FILL = "rgba(166, 227, 161, 0.25)";
+export const HIGHLIGHT_PC_STROKE = "#a6e3a1";
 
 export function byteColor(byte: number) {
   if (byte === 0) return BYTE_COLOR_00;

@@ -6,6 +6,8 @@ import {
   HIGHLIGHT_ACTIVE_FILL,
   HIGHLIGHT_ACTIVE_STROKE,
   HIGHLIGHT_DIM_FILL,
+  HIGHLIGHT_PC_FILL,
+  HIGHLIGHT_PC_STROKE,
   HIGHLIGHT_SELECTION_FILL,
   HIGHLIGHT_SELECTION_STROKE,
   byteColor,
@@ -71,6 +73,7 @@ export class MemoryCanvasRenderer {
   private scrollTop = 0;
   private hoverAddr: number | null = null;
   private selection: IByteSelection | null = null;
+  private pcHighlight: IByteSelection | null = null;
   private paintRaf: number | null = null;
   private width = 0;
   private height = 0;
@@ -133,6 +136,18 @@ export class MemoryCanvasRenderer {
 
   setSelection(selection: IByteSelection | null) {
     this.selection = selection;
+    this.schedulePaint();
+  }
+
+  setPcHighlight(pcHighlight: IByteSelection | null) {
+    if (
+      this.pcHighlight?.start === pcHighlight?.start &&
+      this.pcHighlight?.end === pcHighlight?.end
+    ) {
+      return;
+    }
+
+    this.pcHighlight = pcHighlight;
     this.schedulePaint();
   }
 
@@ -304,6 +319,51 @@ export class MemoryCanvasRenderer {
     ctx.strokeRect(asciiCol.x - 1, y, asciiCol.width + 2, this.layout.rowHeight);
   }
 
+  private drawPcHighlightFill() {
+    if (!this.pcHighlight) return;
+
+    const { start, end } = this.pcHighlight;
+    const row = Math.floor(start / MEM_ROW_BYTES);
+    const colFrom = start & (MEM_ROW_BYTES - 1);
+    const colTo = end - start - 1 + colFrom;
+    const { ctx, layout } = this;
+
+    const firstHex = layout.hexCols[colFrom]!;
+    const lastHex = layout.hexCols[colTo]!;
+    const y = this.rowY(row);
+
+    if (y + layout.rowHeight < 0 || y > this.height) return;
+
+    const x = firstHex.x - 2;
+    const width = lastHex.x + lastHex.width + 2 - x;
+
+    ctx.fillStyle = HIGHLIGHT_PC_FILL;
+    ctx.fillRect(x, y, width, layout.rowHeight);
+  }
+
+  private drawPcHighlightStroke() {
+    if (!this.pcHighlight) return;
+
+    const { start, end } = this.pcHighlight;
+    const row = Math.floor(start / MEM_ROW_BYTES);
+    const colFrom = start & (MEM_ROW_BYTES - 1);
+    const colTo = end - start - 1 + colFrom;
+    const { ctx, layout } = this;
+
+    const firstHex = layout.hexCols[colFrom]!;
+    const lastHex = layout.hexCols[colTo]!;
+    const y = this.rowY(row);
+
+    if (y + layout.rowHeight < 0 || y > this.height) return;
+
+    const x = firstHex.x - 2;
+    const width = lastHex.x + lastHex.width + 2 - x;
+
+    ctx.strokeStyle = HIGHLIGHT_PC_STROKE;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, width, layout.rowHeight);
+  }
+
   private drawSelectionFill() {
     if (!this.selection) return;
 
@@ -390,6 +450,10 @@ export class MemoryCanvasRenderer {
     const firstRow = Math.max(0, Math.floor(this.scrollTop / layout.rowHeight));
     const lastRow = Math.min(this.totalRows - 1, Math.ceil((this.scrollTop + this.height) / layout.rowHeight));
 
+    if (this.pcHighlight) {
+      this.drawPcHighlightFill();
+    }
+
     if (this.hoverAddr != null && !this.selection) {
       this.drawColumnHighlights();
       this.drawRowHighlight(this.hoverAddr);
@@ -404,6 +468,10 @@ export class MemoryCanvasRenderer {
       const y = this.rowY(row);
       if (y + layout.rowHeight < 0 || y > this.height) continue;
       this.drawRow(row, y);
+    }
+
+    if (this.pcHighlight) {
+      this.drawPcHighlightStroke();
     }
 
     if (this.hoverAddr != null && !this.selection) {
