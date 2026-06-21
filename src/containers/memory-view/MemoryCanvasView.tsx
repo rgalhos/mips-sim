@@ -3,11 +3,11 @@ import { ButtonGroup } from "@/components/ui/button-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { RVProcessor } from "@/hardware/rv32/rv32.processor";
 import { useSimulator } from "@/lib/contexts/simulator.context";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MemoryByteInspector } from "./MemoryByteInspector";
-import { MemoryCanvasRenderer } from "./memory-canvas-renderer";
 import type { IByteSelection } from "./memory-byte-selection";
 import { normalizeByteSelection } from "./memory-byte-selection";
+import { MemoryCanvasRenderer } from "./memory-canvas-renderer";
 import { MEM_ROW_BYTES, MEM_ROW_HEIGHT_PX } from "./use-memory-invalidation";
 
 type IMemoryCanvasViewProps = {
@@ -15,15 +15,75 @@ type IMemoryCanvasViewProps = {
   pcHighlight: IByteSelection | null;
 };
 
-function clientToAddr(
-  renderer: MemoryCanvasRenderer,
-  scrollEl: HTMLDivElement,
-  clientX: number,
-  clientY: number
-) {
+function clientToAddr(renderer: MemoryCanvasRenderer, scrollEl: HTMLDivElement, clientX: number, clientY: number) {
   const rect = scrollEl.getBoundingClientRect();
   return renderer.hitTest(clientX - rect.left, clientY - rect.top);
 }
+
+const MemoryRegionButtonGroup = memo(
+  function MemoMemoryRegionButtonGroup({
+    processor,
+    scrollToAddress,
+  }: {
+    processor: RVProcessor;
+    scrollToAddress: (address: number) => void;
+  }) {
+    const regions = useMemo(
+      () => [
+        {
+          label: ".text",
+          address: Number(processor.PC_START),
+          tooltip: "Executable section of the program.",
+        },
+        { label: ".rodata", address: Number(processor.RODATA_START), tooltip: "Store constant data" },
+        { label: ".data", address: Number(processor.DATA_START), tooltip: "Global and static variables" },
+        {
+          label: ".bss",
+          address: Number(processor.BSS_START),
+          tooltip: "Uninitialized global and static variables",
+        },
+        {
+          label: "System",
+          address: Number(processor.KBD_STAT),
+          tooltip: "Keyboard, terminal and other simulator I/O",
+        },
+        { label: "Video Memory", address: Number(processor.FB_START), tooltip: "Framebuffer" },
+        {
+          label: "Stack",
+          address: Number(processor.STACK_START),
+          tooltip: "Used for temporary storage; grows downward",
+        },
+      ],
+      [processor]
+    );
+
+    return (
+      <div className="mb-2 flex flex-wrap gap-1">
+        <ButtonGroup>
+          {regions.map(({ label, address, tooltip }) => {
+            if (!tooltip) {
+              return (
+                <Button key={label} variant="outline" onClick={() => scrollToAddress(address)}>
+                  {label}
+                </Button>
+              );
+            }
+
+            return (
+              <Tooltip key={label}>
+                <TooltipTrigger render={<Button variant="outline" onClick={() => scrollToAddress(address)} />}>
+                  {label}
+                </TooltipTrigger>
+                <TooltipContent>{tooltip}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </ButtonGroup>
+      </div>
+    );
+  },
+  (prev, next) => prev.processor === next.processor
+);
 
 export function MemoryCanvasView({ invalidation, pcHighlight }: IMemoryCanvasViewProps) {
   const { simulator } = useSimulator();
@@ -47,36 +107,6 @@ export function MemoryCanvasView({ invalidation, pcHighlight }: IMemoryCanvasVie
 
   const totalRows = Math.ceil(memorySize / MEM_ROW_BYTES);
   const totalHeightPx = totalRows * MEM_ROW_HEIGHT_PX;
-
-  const processor = simulator.processor as RVProcessor;
-  const regions = useMemo(
-    () => [
-      {
-        label: ".text",
-        address: Number(processor.PC_START),
-        tooltip: "Executable section of the program.",
-      },
-      { label: ".rodata", address: Number(processor.RODATA_START), tooltip: "Store constant data" },
-      { label: ".data", address: Number(processor.DATA_START), tooltip: "Global and static variables" },
-      {
-        label: ".bss",
-        address: Number(processor.BSS_START),
-        tooltip: "Uninitialized global and static variables",
-      },
-      {
-        label: "System",
-        address: Number(processor.KBD_STAT),
-        tooltip: "Keyboard, terminal and other simulator I/O",
-      },
-      { label: "Video Memory", address: Number(processor.FB_START), tooltip: "Framebuffer" },
-      {
-        label: "Stack",
-        address: Number(processor.STACK_START),
-        tooltip: "Used for temporary storage; grows downward",
-      },
-    ],
-    [processor]
-  );
 
   const applySelection = useCallback((sel: IByteSelection | null) => {
     selectionRef.current = sel;
@@ -279,28 +309,7 @@ export function MemoryCanvasView({ invalidation, pcHighlight }: IMemoryCanvasVie
 
   return (
     <div className="memory-hex-block flex h-full min-h-0 w-full flex-col">
-      <div className="mb-2 flex flex-wrap gap-1">
-        <ButtonGroup>
-          {regions.map(({ label, address, tooltip }) => {
-            if (!tooltip) {
-              return (
-                <Button key={label} variant="outline" onClick={() => scrollToAddress(address)}>
-                  {label}
-                </Button>
-              );
-            }
-
-            return (
-              <Tooltip key={label}>
-                <TooltipTrigger render={<Button variant="outline" onClick={() => scrollToAddress(address)} />}>
-                  {label}
-                </TooltipTrigger>
-                <TooltipContent>{tooltip}</TooltipContent>
-              </Tooltip>
-            );
-          })}
-        </ButtonGroup>
-      </div>
+      <MemoryRegionButtonGroup processor={simulator.processor as RVProcessor} scrollToAddress={scrollToAddress} />
 
       <div className="flex min-h-0 flex-1 flex-col border px-2 py-1.5 font-mono tracking-tight tabular-nums">
         <div ref={headerRef} className="mem-hex-row shrink-0 border-b">

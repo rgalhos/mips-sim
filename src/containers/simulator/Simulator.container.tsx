@@ -11,7 +11,7 @@ import type { IAssemblerResult } from "@/hardware/common/simulator";
 import { useEditor } from "@/lib/contexts/editor.context";
 import { useSimulator } from "@/lib/contexts/simulator.context";
 import { cn } from "@/lib/utils";
-import { Fragment, useCallback, useLayoutEffect, useState } from "react";
+import { Fragment, startTransition, useCallback, useLayoutEffect, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 
@@ -56,11 +56,12 @@ export function SimulatorContainer() {
       const assembled = simulator.assembleCode(code);
       const t1 = performance.now();
 
-      setProgram(assembled);
-
       console.log(`perf: Code assemble took ${t1 - t0}ms`);
 
       setPendingChanges(false);
+      startTransition(() => {
+        setProgram(assembled);
+      });
 
       if (assembled.errors.length > 0) {
         console.log(`assembler: program contains ${assembled.errors.length} errors. not syncing with worker.`);

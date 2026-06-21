@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { biguint32_to_f, biguint64_to_d } from "@/hardware/rv32/rv32.utils";
 import { useSimulator } from "@/lib/contexts/simulator.context";
 import { X } from "lucide-react";
-import { Fragment, useMemo } from "react";
+import { Fragment, memo, useMemo } from "react";
 import type { IByteSelection } from "./memory-byte-selection";
 import { readUintLE, readUintLEBigInt } from "./memory-byte-selection";
 
@@ -17,7 +17,7 @@ function fmtHex(bytes: number[]) {
   return bytes.map((b) => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
 }
 
-export function MemoryByteInspector({ selection, memory, anchor, onClose }: IMemoryByteInspectorProps) {
+function MemoMemoryByteInspector({ selection, memory, anchor, onClose }: IMemoryByteInspectorProps) {
   const { simulator } = useSimulator();
 
   const byteCount = selection.end - selection.start;
@@ -62,7 +62,7 @@ export function MemoryByteInspector({ selection, memory, anchor, onClose }: IMem
     }
 
     return views;
-  }, [memory, selection, byteCount]);
+  }, [memory, simulator, selection, byteCount]);
 
   // return (
   //   <div
@@ -125,3 +125,8 @@ export function MemoryByteInspector({ selection, memory, anchor, onClose }: IMem
     </div>
   );
 }
+
+export const MemoryByteInspector = memo(
+  MemoMemoryByteInspector,
+  (prev, next) => prev.selection.start === next.selection.start && prev.selection.end === next.selection.end
+);
