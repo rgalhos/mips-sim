@@ -162,6 +162,8 @@
 }
 
 .hex-instruction-row {
+  transition: none;
+
   & .bit-idx-4,
   & .bit-idx-8,
   & .bit-idx-12,
@@ -248,6 +250,10 @@
   & .rm:hover span,
   & .rm:hover ~ .rm span {
     background: #666;
+  }
+
+  &.hex-instruction-row--current {
+    background: rgba(243, 139, 168, 0.25);
   }
 }
 

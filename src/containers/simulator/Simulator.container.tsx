@@ -10,6 +10,7 @@ import { RegisterViewContainer } from "@/containers/register-view/RegisterView.c
 import type { IAssemblerResult } from "@/hardware/common/simulator";
 import { useEditor } from "@/lib/contexts/editor.context";
 import { useSimulator } from "@/lib/contexts/simulator.context";
+import { $settings } from "@/lib/stores/settings.store";
 import { cn } from "@/lib/utils";
 import { Fragment, startTransition, useCallback, useLayoutEffect, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
@@ -25,7 +26,7 @@ const enum ETabs {
 
 export function SimulatorContainer() {
   const { simulator, createSimulatorWorker } = useSimulator();
-  const { editor } = useEditor();
+  const { editor, focusLine } = useEditor();
 
   const [program, setProgram] = useState<IAssemblerResult>({ instructions: [], labels: {}, errors: [] });
   const [pendingChanges, setPendingChanges] = useState(false);
@@ -114,7 +115,16 @@ export function SimulatorContainer() {
     }
 
     simulator.workerService.stepCode();
-  }, [simulator, program]);
+
+    if ($settings.get().focusOnStep) {
+      const t = setTimeout(() => {
+        clearTimeout(t);
+
+        const line = program.instructions.find(({ address }) => address === simulator.processor.cpu.pc)?.lineNumber;
+        if (line) focusLine(line);
+      }, 15);
+    }
+  }, [simulator, program, focusLine]);
 
   const onToggleConsole = useCallback(() => {
     const panel = consolePanelRef.current;
@@ -163,7 +173,7 @@ export function SimulatorContainer() {
                 </TabsContent>
 
                 <TabsContent value={ETabs.HEX_VIEW} keepMounted className="flex min-h-0 flex-1 flex-col">
-                  <HexViewContainer program={program} />
+                  <HexViewContainer program={program} visible={activeTab === ETabs.HEX_VIEW} />
                 </TabsContent>
 
                 <TabsContent value={ETabs.MEMORY} keepMounted className="flex min-h-0 flex-1 flex-col">

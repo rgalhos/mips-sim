@@ -1,13 +1,13 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { IAssembledInstruction, IAssemblerResult } from "@/hardware/common/simulator";
+import { EWorkerCommand, type WorkerMessageResponse } from "@/hardware/common/worker-service";
 import { rv_codec } from "@/hardware/rv32/rv32.const";
 import type { IDecodedRVInstruction } from "@/hardware/rv32/rv32.types";
 import * as rvUtils from "@/hardware/rv32/rv32.utils";
 import { useSimulator } from "@/lib/contexts/simulator.context";
-import { fmtWordHex } from "@/lib/utils";
+import { cn, fmtWordHex } from "@/lib/utils";
 import { BookText } from "lucide-react";
-import { Fragment, memo, useMemo, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type IInstructionParsed = {
   instruction: IAssembledInstruction;
@@ -23,9 +23,9 @@ function cleanLine(line: string) {
 
 const pad = (v: number | bigint, len: number) => v.toString(2).padStart(len, "0");
 
-const Bits = (props: { label: string; value: string; start: number; class?: string }) => (
-  <Tooltip>
-    <TooltipTrigger render={<span className={props.class || ""} />}>
+const Bits = memo(function MemoBits(props: { label: string; value: string; start: number; class?: string }) {
+  return (
+    <span className={props.class || ""} title={props.label}>
       {props.value.split("").map((bit, bitIdx) => (
         <span
           className={`bit-idx-${props.start + bitIdx} ${props.class || ""}`}
@@ -34,10 +34,9 @@ const Bits = (props: { label: string; value: string; start: number; class?: stri
           {bit}
         </span>
       ))}
-    </TooltipTrigger>
-    <TooltipContent>{props.label}</TooltipContent>
-  </Tooltip>
-);
+    </span>
+  );
+});
 
 const InstructionDecRV32 = memo(({ inst }: { inst: IDecodedRVInstruction }) => {
   const el: ReactNode[] = [];
@@ -52,7 +51,12 @@ const InstructionDecRV32 = memo(({ inst }: { inst: IDecodedRVInstruction }) => {
     );
   } else if (inst.codec === rv_codec.i) {
     el.push(
-      <Bits label="imm[11:0]" value={pad(rvUtils.operand_iimm12(inst.bytecode), 12)} start={0} class="imm" />,
+      <Bits
+        label="imm[11:0]"
+        value={pad(BigInt.asUintN(12, rvUtils.operand_iimm12(inst.bytecode)), 12)}
+        start={0}
+        class="imm"
+      />,
       <Bits label="rs1" value={pad(inst.rs1, 5)} start={12} class="rs1" />,
       <Bits label="funct3" value={pad(rvUtils.operand_funct3(inst.bytecode), 3)} start={17} class="funct3" />,
       <Bits label="rd" value={pad(inst.rd, 5)} start={20} class="rd" />
@@ -113,7 +117,7 @@ const InstructionDecRV32 = memo(({ inst }: { inst: IDecodedRVInstruction }) => {
 
 const InstructionRow = memo(function MemoInstructionRow(props: { inst: IInstructionParsed; isCurrent: boolean }) {
   return (
-    <TableRow className="hex-instruction-row">
+    <TableRow className={cn("hex-instruction-row transition-none", props.isCurrent && "hex-instruction-row--current")}>
       <TableCell>{fmtWordHex(props.inst.instruction.address)}</TableCell>
       <TableCell>
         {fmtWordHex(props.inst.instruction.decoded.bytecode)}
@@ -146,8 +150,29 @@ const LabelRow = memo(function MemoLabelRow(props: { label: string }) {
   );
 });
 
-function MemoHexViewContainer(props: { program: IAssemblerResult }) {
+function MemoHexViewContainer(props: { program: IAssemblerResult; visible: boolean }) {
   const { simulator } = useSimulator();
+  const [pc, setPc] = useState(() => simulator.processor.cpu.pc);
+
+  const onDump = useCallback(
+    (response: Extract<WorkerMessageResponse, { command: EWorkerCommand.CPU_DUMP }>) => {
+      if (props.visible) {
+        setPc(response.data.cpu.pc);
+      }
+    },
+    [props.visible]
+  );
+
+  useEffect(() => {
+    const ws = simulator.workerService;
+
+    ws.on(EWorkerCommand.CPU_DUMP, onDump);
+    ws.requestCpuDump();
+
+    return () => {
+      ws.off(EWorkerCommand.CPU_DUMP, onDump);
+    };
+  }, [simulator.workerService, onDump]);
 
   const labelsByAddr = useMemo(() => {
     const kv: Record<string, string[]> = {};
@@ -198,7 +223,7 @@ function MemoHexViewContainer(props: { program: IAssemblerResult }) {
           return (
             <Fragment key={"hex-view-row-" + idx}>
               {labels?.length && labels.map((label) => <LabelRow key={`label-${label}-${idx}`} label={label} />)}
-              <InstructionRow inst={inst} isCurrent={false} />
+              <InstructionRow inst={inst} isCurrent={inst.instruction.address === pc} />
             </Fragment>
           );
         })}

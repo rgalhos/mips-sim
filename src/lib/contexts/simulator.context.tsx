@@ -1,27 +1,25 @@
 import type { ISimulator } from "@/hardware/common/simulator";
 import { RVSimulator } from "@/hardware/rv32/rv32.simulator";
-import { createContext, useCallback, useContext, useRef } from "react";
+import { $settings } from "@/lib/stores/settings.store";
+import { createContext, useCallback, useContext, useState } from "react";
 
 const SimulatorContext = createContext(
   {} as {
     simulator: ISimulator;
+    setSimulator: (simulator: ISimulator) => void;
     createSimulatorWorker: () => void;
   }
 );
 
 export const SimulatorProvider = ({ children }: { children: React.ReactNode }) => {
-  const simulatorRef = useRef<ISimulator | null>(null);
-
-  if (!simulatorRef.current) {
-    simulatorRef.current = new RVSimulator();
-  }
-
-  const simulator = simulatorRef.current;
+  const [simulator, setSimulator] = useState<ISimulator>(new RVSimulator());
 
   const createSimulatorWorker = useCallback(() => {
     if (!simulator.workerService.worker) {
       simulator.createCpuWorker();
       simulator.workerService.requestCpuDump();
+
+      simulator.workerService.setFrequency($settings.get().stepSpeed);
     }
   }, [simulator]);
 
@@ -29,6 +27,7 @@ export const SimulatorProvider = ({ children }: { children: React.ReactNode }) =
     <SimulatorContext.Provider
       value={{
         simulator,
+        setSimulator,
         createSimulatorWorker,
       }}
     >

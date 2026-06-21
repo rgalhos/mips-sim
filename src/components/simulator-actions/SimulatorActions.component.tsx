@@ -1,3 +1,4 @@
+import { SimulatorSettingsDialog } from "@/components/simulator-settings/SimulatorSettingsDialog.component";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EWorkerCommand, type WorkerMessageResponse } from "@/hardware/common/worker-service";
@@ -14,6 +15,7 @@ export function MemoSimulatorActions(props: {
 }) {
   const { simulator } = useSimulator();
   const [cpuHalted, setCpuHalted] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const ws = simulator.workerService;
@@ -22,6 +24,8 @@ export function MemoSimulatorActions(props: {
       // @todo BAD PRACTICE: It also syncs the state of the CPU outside the worker
       simulator.processor.cpu = response.data.cpu;
       simulator.processor.setHalted(response.data.halted);
+      simulator.processor.lastExecutedInstruction = response.data.lastExecutedInstruction;
+      simulator.processor.cycle = response.data.cycle;
 
       setCpuHalted((prev) => (prev === response.data.halted ? prev : response.data.halted));
     };
@@ -46,7 +50,7 @@ export function MemoSimulatorActions(props: {
         label: "Step one instruction",
         action: props.onStep,
       },
-      { Icon: <Settings />, label: "Simulator settings", action: () => void 0 },
+      { Icon: <Settings />, label: "Simulator settings", action: () => setSettingsOpen(true) },
     ],
     [props, cpuHalted]
   );
@@ -128,6 +132,8 @@ export function MemoSimulatorActions(props: {
           </Tooltip>
         ))}
       </div>
+
+      <SimulatorSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   );
 }
