@@ -56,7 +56,6 @@ ebreak
 #   decoded[0..1] : 2-byte header
 #   decoded[2..]  : pre-order serialized huffman tree (treeSize bytes)
 #   then          : the encoded bitstream (fileSize bytes)
-# (the leading "trash" bits are ignored, as requested)
 huffman_extract:
 push ra
 
