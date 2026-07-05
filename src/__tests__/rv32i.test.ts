@@ -1,6 +1,8 @@
-import { rv_opcode, rv_reg } from '../hardware/riscv/riscv.const';
-import { RVProcessor } from '../hardware/riscv/riscv.processor';
-import { u32 } from '../hardware/riscv/riscv.utils';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { rv_opcode, rv_reg } from "@/hardware/rv32/rv32.const";
+import { RVProcessor } from "@/hardware/rv32/rv32.processor";
+import { u32 } from "@/hardware/rv32/rv32.utils";
+import { beforeEach, describe, expect, test } from "vitest";
 
 const sext8 = (byte: bigint) => {
   const b = byte & 0xffn;
@@ -16,8 +18,8 @@ const zext8 = (byte: bigint) => byte & 0xffn;
 
 const zext16 = (half: bigint) => half & 0xffffn;
 
-describe('RV32I', () => {
-  test('addi', () => {
+describe("RV32I", () => {
+  test("addi", () => {
     const cpu = new RVProcessor();
 
     cpu.cpu.register[rv_reg.t1] = 10n;
@@ -33,7 +35,7 @@ describe('RV32I', () => {
     expect(cpu.cpu.register[rv_reg.t0]).toBe(15n);
   });
 
-  test('lw t0, 4(t1)', () => {
+  test("lw t0, 4(t1)", () => {
     const cpu = new RVProcessor();
     const value = 0x89abcdefn;
 
@@ -51,7 +53,7 @@ describe('RV32I', () => {
     expect(cpu.cpu.register[rv_reg.t0]).toBe(u32(value));
   });
 
-  test('lw t0, -4(t1)', () => {
+  test("lw t0, -4(t1)", () => {
     const cpu = new RVProcessor();
     const value = 0x01020304n;
 
@@ -69,7 +71,7 @@ describe('RV32I', () => {
     expect(cpu.cpu.register[rv_reg.t0]).toBe(u32(value));
   });
 
-  test('sw t0, 4(t1)', () => {
+  test("sw t0, 4(t1)", () => {
     const cpu = new RVProcessor();
     const value = 0x89abcdefn;
 
@@ -87,7 +89,7 @@ describe('RV32I', () => {
     expect(cpu.memoryRead(0x104n, 32)).toBe(u32(value));
   });
 
-  describe('lb sign-extension (spec: x[rd] = sext(M[x[rs1]+offset][7:0]))', () => {
+  describe("lb sign-extension (spec: x[rd] = sext(M[x[rs1]+offset][7:0]))", () => {
     const cpu = new RVProcessor();
 
     beforeEach(() => {
@@ -95,11 +97,11 @@ describe('RV32I', () => {
     });
 
     test.each([
-      ['0x00', 0x00n, sext8(0x00n)],
-      ['0x7f', 0x7fn, sext8(0x7fn)],
-      ['0x80', 0x80n, sext8(0x80n)],
-      ['0xff', 0xffn, sext8(0xffn)],
-    ] as const)('byte %s', (_name, memByte, expected) => {
+      ["0x00", 0x00n, sext8(0x00n)],
+      ["0x7f", 0x7fn, sext8(0x7fn)],
+      ["0x80", 0x80n, sext8(0x80n)],
+      ["0xff", 0xffn, sext8(0xffn)],
+    ] as const)("byte %s", (_name, memByte, expected) => {
       cpu.memoryWrite(0x200n, memByte, 8);
       cpu.execute({
         _op: rv_opcode.lb,
@@ -113,7 +115,7 @@ describe('RV32I', () => {
     });
   });
 
-  describe('lh sign-extension (spec: x[rd] = sext(M[x[rs1]+offset][15:0]))', () => {
+  describe("lh sign-extension (spec: x[rd] = sext(M[x[rs1]+offset][15:0]))", () => {
     const cpu = new RVProcessor();
 
     beforeEach(() => {
@@ -121,11 +123,11 @@ describe('RV32I', () => {
     });
 
     test.each([
-      ['0x0000', 0x0000n, sext16(0x0000n)],
-      ['0x7fff', 0x7fffn, sext16(0x7fffn)],
-      ['0x8000', 0x8000n, sext16(0x8000n)],
-      ['0xffff', 0xffffn, sext16(0xffffn)],
-    ] as const)('halfword %s', (_name, memHalf, expected) => {
+      ["0x0000", 0x0000n, sext16(0x0000n)],
+      ["0x7fff", 0x7fffn, sext16(0x7fffn)],
+      ["0x8000", 0x8000n, sext16(0x8000n)],
+      ["0xffff", 0xffffn, sext16(0xffffn)],
+    ] as const)("halfword %s", (_name, memHalf, expected) => {
       cpu.memoryWrite(0x200n, memHalf, 16);
       cpu.execute({
         _op: rv_opcode.lh,
@@ -139,7 +141,7 @@ describe('RV32I', () => {
     });
   });
 
-  describe('lbu zero-extension (spec: x[rd] = zext(M[x[rs1]+offset][7:0]))', () => {
+  describe("lbu zero-extension (spec: x[rd] = zext(M[x[rs1]+offset][7:0]))", () => {
     const cpu = new RVProcessor();
 
     beforeEach(() => {
@@ -147,11 +149,11 @@ describe('RV32I', () => {
     });
 
     test.each([
-      ['0x00', 0x00n, zext8(0x00n)],
-      ['0x7f', 0x7fn, zext8(0x7fn)],
-      ['0x80', 0x80n, zext8(0x80n)],
-      ['0xff', 0xffn, zext8(0xffn)],
-    ] as const)('byte %s', (_name, memByte, expected) => {
+      ["0x00", 0x00n, zext8(0x00n)],
+      ["0x7f", 0x7fn, zext8(0x7fn)],
+      ["0x80", 0x80n, zext8(0x80n)],
+      ["0xff", 0xffn, zext8(0xffn)],
+    ] as const)("byte %s", (_name, memByte, expected) => {
       cpu.memoryWrite(0x200n, memByte, 8);
       cpu.execute({
         _op: rv_opcode.lbu,
@@ -165,7 +167,7 @@ describe('RV32I', () => {
     });
   });
 
-  describe('lhu zero-extension (spec: x[rd] = zext(M[x[rs1]+offset][15:0]))', () => {
+  describe("lhu zero-extension (spec: x[rd] = zext(M[x[rs1]+offset][15:0]))", () => {
     const cpu = new RVProcessor();
 
     beforeEach(() => {
@@ -173,11 +175,11 @@ describe('RV32I', () => {
     });
 
     test.each([
-      ['0x0000', 0x0000n, zext16(0x0000n)],
-      ['0x7fff', 0x7fffn, zext16(0x7fffn)],
-      ['0x8000', 0x8000n, zext16(0x8000n)],
-      ['0xffff', 0xffffn, zext16(0xffffn)],
-    ] as const)('halfword %s', (_name, memHalf, expected) => {
+      ["0x0000", 0x0000n, zext16(0x0000n)],
+      ["0x7fff", 0x7fffn, zext16(0x7fffn)],
+      ["0x8000", 0x8000n, zext16(0x8000n)],
+      ["0xffff", 0xffffn, zext16(0xffffn)],
+    ] as const)("halfword %s", (_name, memHalf, expected) => {
       cpu.memoryWrite(0x200n, memHalf, 16);
       cpu.execute({
         _op: rv_opcode.lhu,
@@ -191,7 +193,7 @@ describe('RV32I', () => {
     });
   });
 
-  test('sb t0, 1(t1) stores rs2[7:0] only', () => {
+  test("sb t0, 1(t1) stores rs2[7:0] only", () => {
     const cpu = new RVProcessor();
 
     cpu.cpu.register[rv_reg.t1] = 0x100n;
@@ -215,7 +217,7 @@ describe('RV32I', () => {
     expect(cpu.memoryRead(0x103n, 8)).toBe(0xaan);
   });
 
-  test('sh t0, 2(t1) stores rs2[15:0] only', () => {
+  test("sh t0, 2(t1) stores rs2[15:0] only", () => {
     const cpu = new RVProcessor();
 
     cpu.cpu.register[rv_reg.t1] = 0x100n;
@@ -239,7 +241,7 @@ describe('RV32I', () => {
     expect(cpu.memoryRead(0x103n, 8)).toBe(0x56n);
   });
 
-  test('sw t0, 0(t1) stores rs2[31:0]', () => {
+  test("sw t0, 0(t1) stores rs2[31:0]", () => {
     const cpu = new RVProcessor();
 
     cpu.cpu.register[rv_reg.t1] = 0x100n;

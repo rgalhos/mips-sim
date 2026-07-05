@@ -72,7 +72,7 @@ const handleCpuStep = () => {
   }
 
   if (ret & rv_worker_commands.PRINT_STRING) {
-    postMessage({ command: EWorkerCommand.TERMINAL_PRINT, data: cpu._workerBuffer });
+    postMessage({ command: EWorkerCommand.TERMINAL_PRINT, data: String(cpu._workerBuffer) });
   }
 
   if (ret & rv_worker_commands.UPDATE_FRAMEBUFFER) {
