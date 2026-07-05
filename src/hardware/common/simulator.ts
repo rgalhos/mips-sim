@@ -1,5 +1,5 @@
 import { EHardwareType } from "../hardware";
-import type { IToken } from "../rv32/analyzer/rv32-tokenizer";
+import type { IToken } from "../rv32/analyzer/rv32-lexer.assembler";
 import type { IManualExample } from "./examples";
 import type { IUserManual } from "./manual";
 import type { IDecodedInstruction, IProcessor } from "./processor";

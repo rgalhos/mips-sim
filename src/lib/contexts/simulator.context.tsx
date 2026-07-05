@@ -19,7 +19,7 @@ export const SimulatorProvider = ({ children }: { children: React.ReactNode }) =
       simulator.createCpuWorker();
       simulator.workerService.requestCpuDump();
 
-      simulator.workerService.setFrequency($settings.get().stepSpeed);
+      queueMicrotask(() => simulator.workerService.setFrequency($settings.get().stepSpeed));
     }
   }, [simulator]);
 

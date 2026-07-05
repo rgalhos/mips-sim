@@ -1,14 +1,10 @@
-import {
-  ETokenType,
-  type IToken,
-  throwMacroBadArity,
-  throwMacroBadDefinition,
-  throwMacroRecursion,
-  throwMacroRedefined,
-  throwMacroUnclosed,
-} from './rv32-tokenizer';
+export interface ISourceLine {
+  line: string;
+  number: number;
+  origin: number;
+}
 
-type SourceLine = { line: string; lineNumber: number };
+type ExpandedLine = { line: string; origin: number };
 
 type Macro = {
   name: string;
@@ -20,25 +16,35 @@ type Macro = {
 
 const MAX_EXPANSION_DEPTH = 32;
 
+type IMacroErrorToken = { lineNumber: number; value: null };
+
+const invalidToken = (lineNumber: number): IMacroErrorToken => ({ lineNumber, value: null });
+
+const throwMacroError = (message: string, lineNumber: number): never => {
+  throw new Error(message, { cause: [invalidToken(lineNumber)] });
+};
+
+const throwMacroRedefined = (lineNumber: number) => throwMacroError("ASSEMBLER_MACRO_REDEFINED", lineNumber);
+const throwMacroUnclosed = (lineNumber: number) => throwMacroError("ASSEMBLER_MACRO_UNCLOSED", lineNumber);
+const throwMacroBadArity = (lineNumber: number) => throwMacroError("ASSEMBLER_MACRO_BAD_ARITY", lineNumber);
+const throwMacroRecursion = (lineNumber: number) => throwMacroError("ASSEMBLER_MACRO_RECURSION", lineNumber);
+const throwMacroBadDefinition = (lineNumber: number) => throwMacroError("ASSEMBLER_MACRO_BAD_DEFINITION", lineNumber);
+
 const stripComment = (s: string): string => {
   let readingStr = false;
 
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
     if (c === '"' || c === "'") readingStr = !readingStr;
-    else if (c === '#' && !readingStr) return s.slice(0, i);
+    else if (c === "#" && !readingStr) return s.slice(0, i);
   }
 
   return s;
 };
 
-const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const invalidToken = (lineNumber: number): IToken => ({
-  type: ETokenType.INVALID,
-  value: null,
-  lineNumber,
-});
+const isEndMacro = (line: string) => /^\.endmacro\b/i.test(line) || /^\.endm\b/i.test(line);
 
 const parseMacroHeader = (rest: string, lineNumber: number): { name: string; params: string[] } => {
   const parts = rest
@@ -47,18 +53,18 @@ const parseMacroHeader = (rest: string, lineNumber: number): { name: string; par
     .filter((s) => s.length > 0);
 
   if (parts.length === 0) {
-    throw throwMacroBadDefinition([invalidToken(lineNumber)]);
+    throwMacroBadDefinition(lineNumber);
   }
 
   const [name, ...params] = parts;
 
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-    throw throwMacroBadDefinition([invalidToken(lineNumber)]);
+    throwMacroBadDefinition(lineNumber);
   }
 
   for (const p of params) {
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(p)) {
-      throw throwMacroBadDefinition([invalidToken(lineNumber)]);
+      throwMacroBadDefinition(lineNumber);
     }
   }
 
@@ -68,19 +74,22 @@ const parseMacroHeader = (rest: string, lineNumber: number): { name: string; par
 const collectLocalLabels = (body: string[]): string[] => {
   const labels = new Set<string>();
   const re = /(?:^|\s)([a-zA-Z_.][a-zA-Z0-9_.]*)\s*:/g;
+
   for (const line of body) {
     const noComment = stripComment(line);
     let m: RegExpExecArray | null;
+
     while ((m = re.exec(noComment)) !== null) {
       labels.add(m[1]);
     }
   }
+
   return [...labels];
 };
 
-const parseDefinitions = (lines: SourceLine[]): { macros: Record<string, Macro>; rest: SourceLine[] } => {
+const parseDefinitions = (lines: ISourceLine[]): { macros: Record<string, Macro>; rest: ISourceLine[] } => {
   const macros: Record<string, Macro> = {};
-  const rest: SourceLine[] = [];
+  const rest: ISourceLine[] = [];
 
   let cur: { name: string; params: string[]; body: string[]; definedAt: number } | null = null;
 
@@ -88,9 +97,9 @@ const parseDefinitions = (lines: SourceLine[]): { macros: Record<string, Macro>;
     const line = stripComment(sl.line).trim();
 
     if (cur) {
-      if (/^\.endmacro\b/i.test(line)) {
+      if (isEndMacro(line)) {
         if (macros[cur.name]) {
-          throw throwMacroRedefined([invalidToken(cur.definedAt)]);
+          throwMacroRedefined(cur.definedAt);
         }
 
         macros[cur.name] = {
@@ -101,27 +110,24 @@ const parseDefinitions = (lines: SourceLine[]): { macros: Record<string, Macro>;
           definedAt: cur.definedAt,
         };
         cur = null;
-        rest.push({ line: '', lineNumber: sl.lineNumber });
-
+        rest.push({ line: "", number: sl.number, origin: sl.number });
         continue;
       }
 
       if (/^\.macro\b/i.test(line)) {
-        throw throwMacroBadDefinition([invalidToken(sl.lineNumber)]);
+        throwMacroBadDefinition(sl.number);
       }
 
       cur.body.push(sl.line);
-      rest.push({ line: '', lineNumber: sl.lineNumber });
-
+      rest.push({ line: "", number: sl.number, origin: sl.number });
       continue;
     }
 
     if (/^\.macro\b/i.test(line)) {
-      const headerRest = line.replace(/^\.macro\b/i, '').trim();
-      const { name, params } = parseMacroHeader(headerRest, sl.lineNumber);
-      cur = { name, params, body: [], definedAt: sl.lineNumber };
-      rest.push({ line: '', lineNumber: sl.lineNumber });
-
+      const headerRest = line.replace(/^\.macro\b/i, "").trim();
+      const { name, params } = parseMacroHeader(headerRest, sl.number);
+      cur = { name, params, body: [], definedAt: sl.number };
+      rest.push({ line: "", number: sl.number, origin: sl.number });
       continue;
     }
 
@@ -129,7 +135,7 @@ const parseDefinitions = (lines: SourceLine[]): { macros: Record<string, Macro>;
   }
 
   if (cur) {
-    throw throwMacroUnclosed([invalidToken(cur.definedAt)]);
+    throwMacroUnclosed(cur.definedAt);
   }
 
   return { macros, rest };
@@ -138,15 +144,15 @@ const parseDefinitions = (lines: SourceLine[]): { macros: Record<string, Macro>;
 const splitArgs = (s: string): string[] => {
   const args: string[] = [];
   let depth = 0;
-  let inString = null;
-  let buf = '';
+  let inString: string | null = null;
+  let buf = "";
 
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
     if (inString) {
       buf += c;
       if (c === inString) inString = null;
-      else if (c === '\\' && i + 1 < s.length) buf += s[++i];
+      else if (c === "\\" && i + 1 < s.length) buf += s[++i];
       continue;
     }
     if (c === '"' || c === "'") {
@@ -154,12 +160,12 @@ const splitArgs = (s: string): string[] => {
       buf += c;
       continue;
     }
-    if (c === '(') depth++;
-    else if (c === ')') depth = Math.max(0, depth - 1);
+    if (c === "(") depth++;
+    else if (c === ")") depth = Math.max(0, depth - 1);
 
-    if (c === ',' && depth === 0) {
+    if (c === "," && depth === 0) {
       args.push(buf.trim());
-      buf = '';
+      buf = "";
       continue;
     }
     buf += c;
@@ -171,63 +177,69 @@ const splitArgs = (s: string): string[] => {
 };
 
 const replaceWord = (line: string, word: string, replacement: string): string => {
-  const re = new RegExp(`\\b${escapeRegex(word)}\\b`, 'g');
+  const re = word.startsWith(".")
+    ? new RegExp(`${escapeRegex(word)}(?![a-zA-Z0-9_.])`, "g")
+    : new RegExp(`\\b${escapeRegex(word)}\\b`, "g");
   return line.replace(re, replacement);
 };
 
 const replaceMacroParam = (line: string, param: string, replacement: string): string => {
-  const re = new RegExp(`\\\\${escapeRegex(param)}(?![a-zA-Z0-9_])`, 'g');
+  const re = new RegExp(`\\\\+${escapeRegex(param)}(?![a-zA-Z0-9_])`, "g");
   return line.replace(re, replacement);
 };
 
 const expandLine = (
   rawLine: string,
-  lineNumber: number,
+  origin: number,
   macros: Record<string, Macro>,
   depth: number,
-  counter: { n: number },
-): SourceLine[] => {
+  counter: { n: number }
+): ExpandedLine[] => {
   if (depth > MAX_EXPANSION_DEPTH) {
-    throw throwMacroRecursion([invalidToken(lineNumber)]);
+    throwMacroRecursion(origin);
   }
 
   const trimmed = rawLine.trim();
-  if (!trimmed || trimmed.startsWith('#')) {
-    return [{ line: rawLine, lineNumber }];
+  if (!trimmed || trimmed.startsWith("#")) {
+    return [{ line: rawLine, origin }];
   }
 
   const labelMatch = trimmed.match(/^([a-zA-Z_.][a-zA-Z0-9_.]*\s*:)\s*(.*)$/);
   if (labelMatch) {
-    const labelPart = labelMatch[1].replace(/\s+/g, '');
+    const labelPart = labelMatch[1].replace(/\s+/g, "");
     const rest = labelMatch[2];
-    const out: SourceLine[] = [{ line: labelPart, lineNumber }];
-    if (!rest.trim()) return out;
+    if (!rest.trim()) return [{ line: labelPart, origin }];
 
-    return out.concat(expandLine(rest, lineNumber, macros, depth, counter));
+    const expandedRest = expandLine(rest, origin, macros, depth, counter);
+    if (expandedRest.length === 1 && expandedRest[0].line.trim() === rest.trim()) {
+      return [{ line: `${labelPart} ${rest.trim()}`, origin }];
+    }
+
+    return [{ line: labelPart, origin }, ...expandedRest];
   }
 
   const invMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*(.*)$/);
   if (!invMatch) {
-    return [{ line: rawLine, lineNumber }];
+    return [{ line: rawLine, origin }];
   }
 
   const name = invMatch[1];
   const macro = macros[name];
   if (!macro) {
-    return [{ line: rawLine, lineNumber }];
+    return [{ line: rawLine, origin }];
   }
 
   const argsRaw = stripComment(invMatch[2]).trim();
   const args = !argsRaw ? [] : splitArgs(argsRaw);
 
   if (args.length !== macro.params.length) {
-    throw throwMacroBadArity([invalidToken(lineNumber)]);
+    throwMacroBadArity(origin);
   }
 
   const uniqueSuffix = `__macro_${macro.name}_${counter.n}__`;
   counter.n++;
 
-  const result: SourceLine[] = [];
+  const result: ExpandedLine[] = [];
   for (const bodyLine of macro.body) {
     let expanded = bodyLine;
     for (const label of macro.localLabels) {
@@ -238,25 +250,25 @@ const expandLine = (
       expanded = replaceMacroParam(expanded, macro.params[i], args[i]);
     }
 
-    result.push(...expandLine(expanded, lineNumber, macros, depth + 1, counter));
+    result.push(...expandLine(expanded, origin, macros, depth + 1, counter));
   }
 
   return result;
 };
 
-export const expandMacros = (code: string): SourceLine[] => {
+export function expandMacros(code: string): ISourceLine[] {
   const counter = { n: 0 };
-  const out: SourceLine[] = [];
-  const lines: SourceLine[] = code.split(/\n/g).map((line, i) => ({ line, lineNumber: i + 1 }));
+  const out: ExpandedLine[] = [];
+  const lines: ISourceLine[] = code.split(/\n/g).map((line, i) => ({ line, number: i + 1, origin: i + 1 }));
   const { macros, rest } = parseDefinitions(lines);
 
   for (const sl of rest) {
-    out.push(...expandLine(sl.line, sl.lineNumber, macros, 0, counter));
+    out.push(...expandLine(sl.line, sl.number, macros, 0, counter));
   }
 
-  return out;
-};
+  return out.map((sl, idx) => ({ line: sl.line, number: idx + 1, origin: sl.origin }));
+}
 
-export const preprocessor = (code: string) => {
+export function preprocessor(code: string): ISourceLine[] {
   return expandMacros(code);
-};
+}

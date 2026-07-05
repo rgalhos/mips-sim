@@ -1,9 +1,9 @@
-import { IManualExample } from '../../common/examples';
+import type { IManualExample } from "../../common/examples";
 
 const _rvExamples: IManualExample[] = [];
 
 _rvExamples.push({
-  name: 'Print Fibonacci sequence',
+  name: "Print Fibonacci sequence",
   code: `# Print fibonacci sequence in the terminal, stopping right before overflow (2971215073)
 # Author: rgmg [at] ic.ufal.br
 
@@ -45,7 +45,7 @@ end:
 });
 
 _rvExamples.push({
-  name: 'Calculate the approximation of PI and golden ratio using floating-point instructions',
+  name: "Calculate the approximation of PI and golden ratio using floating-point instructions",
   code: `# Example:
 # Calculate PI and golden ratio using floating-point registers and instructions
 
@@ -99,7 +99,7 @@ ebreak # pause simulation
 });
 
 _rvExamples.push({
-  name: 'Extract a base64-encoded huffman-compressed image and draw it on the framebuffer',
+  name: "Extract a base64-encoded huffman-compressed image and draw it on the framebuffer",
   code: `# Extract a base64-encoded huffman-compressed image and draw it on the framebuffer
 # Author: rgmg [at] ic.ufal.br
 #
@@ -158,7 +158,6 @@ ebreak
 #   decoded[0..1] : 2-byte header
 #   decoded[2..]  : pre-order serialized huffman tree (treeSize bytes)
 #   then          : the encoded bitstream (fileSize bytes)
-# (the leading "trash" bits are ignored, as requested)
 huffman_extract:
 push ra
 
@@ -394,7 +393,7 @@ decoded:
 });
 
 _rvExamples.push({
-  name: 'Logo IC-UFAL',
+  name: "Logo IC-UFAL",
   code: `# Imagem hardcoded do logo do IC-UFAL
 # Autor: rgmg [arroba] ic.ufal.br
 #

@@ -361,7 +361,7 @@ export const enum rv_ext {
 export const RV_CODEC_FORMAT = {
   [rv_codec.r]: 'O d, 1, 2',
   [rv_codec.i]: 'O d, 1, i',
-  [rv_codec.s]: 'O 1, i(2)',
+  [rv_codec.s]: 'O 2, i(1)',
   'load_store': 'O d, i(1)',
   [rv_codec.b]: 'O 1, 2, X',
   [rv_codec.j]: 'O d, x',

@@ -1437,7 +1437,14 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
           str += rv_reg_f[rs3];
         }
       } else if (c === "i") {
-        str += imm;
+        const bc = instruction.bytecode ?? 0n;
+        if (op_info.codec === rv_codec.i) {
+          str += operand_iimm12(bc);
+        } else if (op_info.codec === rv_codec.s) {
+          str += operand_simm12(bc);
+        } else {
+          str += imm;
+        }
       } else if (c === "x") {
         str += "0x" + BigInt.asUintN(this.XLEN, imm).toString(16).toUpperCase();
       } else if (c === "X") {

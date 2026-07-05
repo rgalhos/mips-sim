@@ -1,8 +1,25 @@
-import { stringifyTokenizerError, type IToken } from "@/hardware/rv32/analyzer/rv32-tokenizer";
+import { stringifySemanticError } from "@/hardware/rv32/analyzer/rv32-analyzer.assembler";
+import { stringifyTokenizerError, type IToken } from "@/hardware/rv32/analyzer/rv32-lexer.assembler";
+import { stringifyParseError } from "@/hardware/rv32/analyzer/rv32-parser.assembler";
 import { useEditor } from "@/lib/contexts/editor.context";
 import { cn } from "@/lib/utils";
 import { TriangleAlertIcon } from "lucide-react";
 import { useMemo } from "react";
+
+function stringifyAssemblerError(e: Error) {
+  if (e.message === "ASSEMBLER_PARSE_ERROR") return stringifyParseError(e);
+  if (e.message === "ASSEMBLER_SEMANTIC_ERROR") return stringifySemanticError(e);
+  return stringifyTokenizerError(e);
+}
+
+function errorLine(e: Error): number {
+  const cause = e.cause;
+  if (cause && typeof cause === "object" && "line" in cause && typeof cause.line === "number") {
+    return cause.line;
+  }
+  const tokens = (cause as IToken[] | undefined) ?? [];
+  return tokens.find((v) => v.origin !== 0)?.origin ?? 0;
+}
 
 export function AssemblerErrors({ errors }: { errors: Error[] }) {
   const { focusLine } = useEditor();
@@ -10,8 +27,8 @@ export function AssemblerErrors({ errors }: { errors: Error[] }) {
   const digestedErrors = useMemo(() => {
     return errors.map((e) => ({
       error: e,
-      line: ((e.cause as IToken[]) || []).find((v) => v.lineNumber !== 0)?.lineNumber || 0,
-      str: stringifyTokenizerError(e),
+      line: errorLine(e),
+      str: stringifyAssemblerError(e),
     }));
   }, [errors]);
 
