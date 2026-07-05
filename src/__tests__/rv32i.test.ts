@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { rv_opcode, rv_reg } from "@/hardware/rv32/rv32.const";
-import { RVProcessor } from "@/hardware/rv32/rv32.processor";
-import { u32 } from "@/hardware/rv32/rv32.utils";
+import { rv_opcode, rv_reg } from "../hardware/rv32/rv32.const";
+import { RVProcessor } from "../hardware/rv32/rv32.processor";
+import { u32 } from "../hardware/rv32/rv32.utils";
 import { beforeEach, describe, expect, test } from "vitest";
 
 const sext8 = (byte: bigint) => {
@@ -86,7 +86,7 @@ describe("RV32I", () => {
       imm: 4n,
     } as any);
 
-    expect(cpu.memoryRead(0x104n, 32)).toBe(u32(value));
+    expect(u32(cpu.memoryRead(0x104n, 32))).toBe(u32(value));
   });
 
   describe("lb sign-extension (spec: x[rd] = sext(M[x[rs1]+offset][7:0]))", () => {
@@ -256,6 +256,6 @@ describe("RV32I", () => {
       imm: 0n,
     } as any);
 
-    expect(cpu.memoryRead(0x100n, 32)).toBe(0xdeadbeefn);
+    expect(u32(cpu.memoryRead(0x100n, 32))).toBe(0xdeadbeefn);
   });
 });

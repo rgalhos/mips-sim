@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { RVSimulator } from "../hardware/rv32/rv32.simulator";
+import { RVSimulator } from "../../hardware/rv32/rv32.simulator";
 
 describe("RV32 assembler - load/store", () => {
   const sim = new RVSimulator();

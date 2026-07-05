@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { rv_opcode, rv_reg, rv_reg_f } from "@/hardware/rv32/rv32.const";
-import { RVProcessor } from "@/hardware/rv32/rv32.processor";
-import { f_to_biguint, SP_CANONICAL_NAN, SP_NEG_INF, SP_POS_INF } from "@/hardware/rv32/rv32.utils";
 import { describe, expect, test } from "vitest";
+import { rv_opcode, rv_reg, rv_reg_f } from "../hardware/rv32/rv32.const";
+import { RVProcessor } from "../hardware/rv32/rv32.processor";
+import { f_to_biguint, SP_CANONICAL_NAN, SP_NEG_INF, SP_POS_INF, u32 } from "../hardware/rv32/rv32.utils";
 
 describe("RV32F", () => {
   test("flw fs10, 4(t1)", () => {
@@ -36,7 +36,7 @@ describe("RV32F", () => {
       imm: 4n,
     } as any);
 
-    expect(cpu.memoryRead(0x104n, 32)).toBe(value);
+    expect(u32(cpu.memoryRead(0x104n, 32))).toBe(value);
   });
 
   test("fmadd.s fa0, ft0, ft1, ft2", () => {
