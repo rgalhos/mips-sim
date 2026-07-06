@@ -19,7 +19,6 @@ pop ra
 `;
 
     const lines = expandMacros(source);
-    console.log(lines);
 
     // it should also preserve line numbers
     // push ra
