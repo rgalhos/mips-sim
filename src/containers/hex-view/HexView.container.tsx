@@ -4,7 +4,9 @@ import { EWorkerCommand, type WorkerMessageResponse } from "@/hardware/common/wo
 import { rv_codec } from "@/hardware/rv32/rv32.const";
 import type { IDecodedRVInstruction } from "@/hardware/rv32/rv32.types";
 import * as rvUtils from "@/hardware/rv32/rv32.utils";
+import { useEditor } from "@/lib/contexts/editor.context";
 import { useSimulator } from "@/lib/contexts/simulator.context";
+import { $simulatorTab, ETabs } from "@/lib/stores/simulator-tab.store";
 import { cn, fmtWordHex } from "@/lib/utils";
 import { BookText } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -27,10 +29,7 @@ const Bits = memo(function MemoBits(props: { label: string; value: string; start
   return (
     <span className={props.class || ""} title={props.label}>
       {props.value.split("").map((bit, bitIdx) => (
-        <span
-          className={`bit-idx-${props.start + bitIdx} ${props.class || ""}`}
-          key={`bits-${props.label}-${bitIdx}-${bit}-${props.start}-${props.class}`}
-        >
+        <span className={`bit-idx-${props.start + bitIdx} ${props.class || ""}`} key={bitIdx}>
           {bit}
         </span>
       ))}
@@ -116,6 +115,8 @@ const InstructionDecRV32 = memo(({ inst }: { inst: IDecodedRVInstruction }) => {
 });
 
 const InstructionRow = memo(function MemoInstructionRow(props: { inst: IInstructionParsed; isCurrent: boolean }) {
+  const { focusLine } = useEditor();
+
   return (
     <TableRow className={cn("hex-instruction-row transition-none", props.isCurrent && "hex-instruction-row--current")}>
       <TableCell>{fmtWordHex(props.inst.instruction.address)}</TableCell>
@@ -129,9 +130,16 @@ const InstructionRow = memo(function MemoInstructionRow(props: { inst: IInstruct
       <TableCell>
         {props.inst.stringified}
         <br />
-        <span className="text-xs">
+        <a
+          className="text-xs"
+          href="#"
+          onClick={() => {
+            focusLine(props.inst.lineNumber);
+            $simulatorTab.set(ETabs.EDITOR);
+          }}
+        >
           {props.inst.lineNumber}: {props.inst.code}
-        </span>
+        </a>
       </TableCell>
       <TableCell>
         <a href={props.inst.manual}>

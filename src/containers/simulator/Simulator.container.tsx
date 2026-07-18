@@ -11,18 +11,14 @@ import type { IAssemblerResult } from "@/hardware/common/simulator";
 import { useEditor } from "@/lib/contexts/editor.context";
 import { useSimulator } from "@/lib/contexts/simulator.context";
 import { $settings } from "@/lib/stores/settings.store";
+import { $simulatorTab, ETabs, setSimulatorTab } from "@/lib/stores/simulator-tab.store";
 import { cn } from "@/lib/utils";
+import { useStore } from "@nanostores/react";
 import { Fragment, startTransition, useCallback, useLayoutEffect, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 
 const CONSOLE_DEFAULT_SIZE = "340px";
-
-const enum ETabs {
-  EDITOR,
-  HEX_VIEW,
-  MEMORY,
-}
 
 export function SimulatorContainer() {
   const { simulator, createSimulatorWorker } = useSimulator();
@@ -31,7 +27,7 @@ export function SimulatorContainer() {
   const [program, setProgram] = useState<IAssemblerResult>({ instructions: [], labels: {}, errors: [] });
   const [pendingChanges, setPendingChanges] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<ETabs>(ETabs.EDITOR);
+  const activeTab = useStore($simulatorTab);
   const consolePanelRef = usePanelRef();
 
   useLayoutEffect(() => {
@@ -87,7 +83,7 @@ export function SimulatorContainer() {
 
     if (program.errors.length > 0) {
       toast.warning("Fix all compilation errors and recompile before running", {
-        action: { label: "Show errors", onClick: () => setActiveTab(ETabs.EDITOR) },
+        action: { label: "Show errors", onClick: () => setSimulatorTab(ETabs.EDITOR) },
       });
 
       return;
@@ -108,7 +104,7 @@ export function SimulatorContainer() {
 
     if (program.errors.length > 0) {
       toast.warning("Fix all compilation errors and recompile before running", {
-        action: { label: "Show errors", onClick: () => setActiveTab(ETabs.EDITOR) },
+        action: { label: "Show errors", onClick: () => setSimulatorTab(ETabs.EDITOR) },
       });
 
       return;
@@ -145,7 +141,7 @@ export function SimulatorContainer() {
         <ResizablePanel className="flex min-h-0 flex-col overflow-hidden">
           <Tabs
             value={activeTab}
-            onValueChange={(tab) => setActiveTab(tab as ETabs)}
+            onValueChange={(tab) => setSimulatorTab(tab as ETabs)}
             className="flex min-h-0 w-full flex-1 flex-col"
           >
             <div className="sticky top-0 z-10 shrink-0 bg-background">

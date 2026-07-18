@@ -21,8 +21,8 @@ export const EditorProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    editor.revealLine(line);
     editor.setPosition({ lineNumber: line, column: 999 });
+    editor.revealLineInCenter(line);
     editor.focus();
   };
 
