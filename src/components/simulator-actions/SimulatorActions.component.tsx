@@ -1,3 +1,4 @@
+import { ScreenWindow } from "@/components/screen/ScreenWindow.component";
 import { SimulatorSettingsDialog } from "@/components/simulator-settings/SimulatorSettingsDialog.component";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -16,6 +17,7 @@ export function MemoSimulatorActions(props: {
   const { simulator } = useSimulator();
   const [cpuHalted, setCpuHalted] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [screenOpen, setScreenOpen] = useState(false);
 
   useEffect(() => {
     const ws = simulator.workerService;
@@ -58,7 +60,7 @@ export function MemoSimulatorActions(props: {
   const simulatorTools = useMemo(
     () => [
       { Icon: <Terminal />, label: "Open terminal", action: props.onToggleConsole },
-      { Icon: <Monitor />, label: "Open screen", action: () => void 0 },
+      { Icon: <Monitor />, label: "Open screen", action: () => setScreenOpen(true) },
     ],
     [props]
   );
@@ -134,6 +136,7 @@ export function MemoSimulatorActions(props: {
       </div>
 
       <SimulatorSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <ScreenWindow open={screenOpen} onClose={() => setScreenOpen(false)} />
     </>
   );
 }

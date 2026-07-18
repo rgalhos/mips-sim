@@ -111,7 +111,7 @@ export const stringifyTokenizerError = (e: Error) => {
   return msg;
 };
 
-const dataViewHelper = new DataView(new ArrayBuffer(8));
+const dv = new DataView(new ArrayBuffer(8));
 
 function pushToken(tokens: IToken[], state: ILexerState, column: number, type: ETokenType, value: unknown) {
   tokens.push({
@@ -239,8 +239,8 @@ function handleImmediate(tokens: IToken[], state: ILexerState) {
   }
 
   if (isFloat) {
-    dataViewHelper.setFloat32(0, v);
-    pushToken(tokens, state, col, ETokenType.IMMEDIATE, dataViewHelper.getUint32(0));
+    dv.setFloat32(0, v);
+    pushToken(tokens, state, col, ETokenType.IMMEDIATE, dv.getUint32(0));
   } else {
     pushToken(tokens, state, col, ETokenType.IMMEDIATE, v);
   }
