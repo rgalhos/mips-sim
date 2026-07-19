@@ -16,6 +16,7 @@ export interface IManualInstruction {
   operation: string;
   usage: string;
   description: string;
+  section: string;
 }
 
 export interface IManualConst {

@@ -1,11 +1,12 @@
 import {
   NavigationMenu,
   NavigationMenuItem,
-  NavigationMenuLink,
   NavigationMenuList,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
+import { $page, EPage, setPage } from "@/lib/stores/page.store";
 import { cn } from "@/lib/utils";
+import { useStore } from "@nanostores/react";
 
 const GITHUB_REPO_URL = "https://github.com/rgalhos/rv-sim";
 
@@ -18,18 +19,19 @@ function GitHubIcon({ className }: { className?: string }) {
 }
 
 const navItems = [
-  { label: "Simulator", href: "/" },
-  { label: "Documentation", href: "/documentation" },
-  { label: "Example", href: "/example" },
-  { label: "About", href: "/about" },
+  { label: "Simulator", page: EPage.SIMULATOR },
+  { label: "Documentation", page: EPage.DOCUMENTATION },
+  { label: "Examples", page: EPage.EXAMPLE },
+  { label: "About", page: EPage.ABOUT },
 ] as const;
 
 type NavMenuProps = {
-  activeHref?: (typeof navItems)[number]["href"];
   className?: string;
 };
 
-export function NavMenu({ activeHref = "/", className }: NavMenuProps) {
+export function NavMenu({ className }: NavMenuProps) {
+  const activePage = useStore($page);
+
   return (
     <header className={cn("shrink-0 border-b border-border bg-background", className)}>
       <div className="flex h-14 w-full items-center gap-6 px-6">
@@ -49,17 +51,18 @@ export function NavMenu({ activeHref = "/", className }: NavMenuProps) {
         <NavigationMenu className="max-w-none flex-none justify-start">
           <NavigationMenuList className="justify-start gap-1">
             {navItems.map((item) => (
-              <NavigationMenuItem key={item.href}>
-                <NavigationMenuLink
-                  href={item.href}
+              <NavigationMenuItem key={item.page}>
+                <button
+                  type="button"
+                  onClick={() => setPage(item.page)}
                   className={cn(
                     navigationMenuTriggerStyle(),
                     "relative after:absolute after:inset-x-2 after:bottom-1 after:h-0.5 after:rounded-full after:bg-foreground after:opacity-0 after:transition-opacity hover:after:opacity-0",
-                    activeHref === item.href && "text-foreground after:opacity-100"
+                    activePage === item.page && "text-foreground after:opacity-100"
                   )}
                 >
                   {item.label}
-                </NavigationMenuLink>
+                </button>
               </NavigationMenuItem>
             ))}
           </NavigationMenuList>

@@ -60,9 +60,9 @@ export function MemoSimulatorActions(props: {
   const simulatorTools = useMemo(
     () => [
       { Icon: <Terminal />, label: "Open terminal", action: props.onToggleConsole },
-      { Icon: <Monitor />, label: "Open screen", action: () => setScreenOpen(true) },
+      { Icon: <Monitor />, label: "Open screen", action: () => setScreenOpen(!screenOpen) },
     ],
-    [props]
+    [props, screenOpen]
   );
 
   return (
