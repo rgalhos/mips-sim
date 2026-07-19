@@ -130,16 +130,15 @@ const InstructionRow = memo(function MemoInstructionRow(props: { inst: IInstruct
       <TableCell>
         {props.inst.stringified}
         <br />
-        <a
-          className="text-xs"
-          href="#"
+        <span
+          className="cursor-pointer text-xs"
           onClick={() => {
             focusLine(props.inst.lineNumber);
             $simulatorTab.set(ETabs.EDITOR);
           }}
         >
           {props.inst.lineNumber}: {props.inst.code}
-        </a>
+        </span>
       </TableCell>
       <TableCell>
         <a href={props.inst.manual}>

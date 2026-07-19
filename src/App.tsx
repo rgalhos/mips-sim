@@ -1,4 +1,5 @@
 import { NavMenu } from "@/components/navigation-menu/NavigationMenu.component";
+import { AboutPage } from "@/components/pages/About.page";
 import { DocumentationPage } from "@/components/pages/Documentation.page";
 import { Toaster } from "@/components/ui/sonner";
 import { SimulatorContainer } from "@/containers/simulator/Simulator.container";
@@ -20,7 +21,7 @@ export function App() {
 
         {page === EPage.DOCUMENTATION && <DocumentationPage />}
         {page === EPage.EXAMPLE && <></>}
-        {page === EPage.ABOUT && <></>}
+        {page === EPage.ABOUT && <AboutPage />}
       </main>
 
       <Toaster duration={5000} position="bottom-center" richColors />

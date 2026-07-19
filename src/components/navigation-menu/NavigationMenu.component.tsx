@@ -8,7 +8,7 @@ import { $page, EPage, setPage } from "@/lib/stores/page.store";
 import { cn } from "@/lib/utils";
 import { useStore } from "@nanostores/react";
 
-const GITHUB_REPO_URL = "https://github.com/rgalhos/rv-sim";
+const GITHUB_REPO_URL = "https://github.com/rgalhos/riscv-sim";
 
 function GitHubIcon({ className }: { className?: string }) {
   return (

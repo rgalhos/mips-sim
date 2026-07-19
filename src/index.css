@@ -161,6 +161,10 @@
   html {
     @apply font-sans text-base;
   }
+  a {
+    color: var(--catppuccin-blue);
+    text-decoration: underline;
+  }
 }
 
 .hex-instruction-row {
