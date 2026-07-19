@@ -6,6 +6,46 @@ import { memo } from "react";
 
 const EDITOR_DRAFT_STORAGE_KEY = "editor_contents";
 
+// @todo
+const DEFAULT_PROGRAM = `# Print fibonacci sequence in the terminal, stopping right before overflow (2971215073)
+# Author: rgmg [at] ic.ufal.br
+
+.text
+
+.equ val a0
+.equ t1 s0
+.equ t2 s1
+.equ max_val s2
+
+addi a7, zero, SYSCALL_PRINT_UINT # load print syscall
+
+lui max_val, %hi(2971215073) # load top bits of const in s2
+addi max_val, max_val, %lo(2971215073) # load bottom bits of const in s2
+
+# print 0
+addi val, zero, 0 # val = 0
+ecall # print
+
+# print 1
+addi val, zero, 1 # val = 1
+ecall # print
+
+addi t1, zero, 0 # t1 = 0
+addi t2, zero, 1 # t2 = 1
+
+fib:
+    add val, t1, t2 # val = t1 + t2
+    ecall # print
+
+    beq max_val, val, end #  if (max_val == val) goto end
+
+    add t1, zero, t2 # t1 = t2
+    add t2, zero, val # t2 = val
+    jal zero, fib # goto fib
+
+end:
+`;
+
 function MemoEditorContainer(props: { handleEditorChange?: () => void }) {
   const { setEditor, setMonaco } = useEditor();
 
@@ -20,9 +60,7 @@ function MemoEditorContainer(props: { handleEditorChange?: () => void }) {
     setMonaco(monaco);
 
     const draft = localStorage.getItem(EDITOR_DRAFT_STORAGE_KEY);
-    if (!!draft) {
-      editor.setValue(draft);
-    }
+    editor.setValue(draft || DEFAULT_PROGRAM);
   };
 
   const handleEditorChange: EditorProps["onChange"] = (value, editor) => {

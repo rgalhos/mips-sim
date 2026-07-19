@@ -1,6 +1,7 @@
 import { NavMenu } from "@/components/navigation-menu/NavigationMenu.component";
 import { AboutPage } from "@/components/pages/About.page";
 import { DocumentationPage } from "@/components/pages/Documentation.page";
+import { ExamplesPage } from "@/components/pages/Examples.page";
 import { Toaster } from "@/components/ui/sonner";
 import { SimulatorContainer } from "@/containers/simulator/Simulator.container";
 import { $page, EPage } from "@/lib/stores/page.store";
@@ -20,7 +21,7 @@ export function App() {
         </div>
 
         {page === EPage.DOCUMENTATION && <DocumentationPage />}
-        {page === EPage.EXAMPLE && <></>}
+        {page === EPage.EXAMPLE && <ExamplesPage />}
         {page === EPage.ABOUT && <AboutPage />}
       </main>
 
