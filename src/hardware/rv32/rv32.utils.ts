@@ -12,7 +12,7 @@ export function u32(n: bigint): bigint {
 }
 
 export function s32(n: bigint): bigint {
-  return (n << 32n) >> 32n;
+  return BigInt.asIntN(32, n);
 }
 
 export function operand_opcode(inst: bigint): number {

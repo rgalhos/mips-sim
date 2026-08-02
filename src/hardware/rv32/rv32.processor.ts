@@ -921,10 +921,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         let xd;
         if (v2 === 0n) {
           xd = BigInt.asUintN(32, -1n);
-        } else if (v1 === 0x80000000n && v2 === 0xffffffffn) {
-          xd = -2147483648n;
         } else {
-          xd = (v1 / v2) & 0xffffffffn;
+          xd = s32(v1) / s32(v2);
         }
         this.registerWrite(d.rd, xd);
         return;
@@ -943,10 +941,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         let xd;
         if (v2 === 0n) {
           xd = v1;
-        } else if (v1 === 0x80000000n && v2 === 0xffffffffn) {
-          xd = 0n;
         } else {
-          xd = v1 % v2;
+          xd = s32(v1) % s32(v2);
         }
         this.registerWrite(d.rd, xd);
         return;
