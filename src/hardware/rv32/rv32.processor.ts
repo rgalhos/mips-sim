@@ -1,4 +1,4 @@
-import { IProcessor, type IRegisterReadable } from "../common/processor";
+import { IProcessor, type IRegisterReadable, type IStepUndoFrame } from "../common/processor";
 import type { IAssembledInstruction } from "../common/simulator";
 import {
   rv_codec,
@@ -11,7 +11,7 @@ import {
   rv_syscalls,
   rv_worker_commands,
 } from "./rv32.const";
-import type { IDecodedRVInstruction, IRVCPU } from "./rv32.types";
+import type { IDecodedRVInstruction, IRVCPU, IRVStepUndoFrame } from "./rv32.types";
 import {
   biguint32_to_f,
   encodeBType,
@@ -1356,6 +1356,8 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   }
 
   public step() {
+    this.beginUndoFrame();
+
     const inst = this.fetch();
     const dec = this.decode(inst);
 
@@ -1366,7 +1368,10 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
         dec,
         pc: this.cpu.pc,
       });
+
       this.setHalted(true);
+      this.commitUndoFrame();
+
       return;
     }
 
@@ -1377,7 +1382,26 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
       this.cpu.pc += 4n;
     }
 
+    this.commitUndoFrame();
+
     return ret;
+  }
+
+  protected beginUndoFrame() {
+    super.beginUndoFrame();
+
+    if (this._undoFrame) {
+      (this._undoFrame as IRVStepUndoFrame).registersF = {};
+    }
+  }
+
+  protected applyUndoFrame(frame: IStepUndoFrame<IDecodedRVInstruction>) {
+    super.applyUndoFrame(frame);
+
+    const registersF = (frame as IRVStepUndoFrame).registersF;
+    for (const reg of Object.keys(registersF)) {
+      this.cpu.registerF[Number(reg)] = registersF[Number(reg)];
+    }
   }
 
   public stringifyInstruction(instruction: Partial<IDecodedRVInstruction>): string {
@@ -1488,6 +1512,11 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
   protected registerWriteF(reg: number, value: bigint) {
     if (reg > rv_reg_f.f31) {
       throw new Error("RVSIM: inexistent RV32F register: " + reg);
+    }
+
+    const undoFrame = this._undoFrame as IRVStepUndoFrame | null;
+    if (undoFrame && !(reg in undoFrame.registersF)) {
+      undoFrame.registersF[reg] = this.cpu.registerF[reg];
     }
 
     this._dbgRegChanges.push({

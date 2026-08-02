@@ -28,6 +28,7 @@ const postCpuDump = () => {
       halted: cpu.halted,
       cycle: cpu.cycle,
       lastExecutedInstruction: cpu.lastExecutedInstruction,
+      canStepBack: cpu.canStepBack,
     },
   });
 
@@ -136,6 +137,12 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     cpu.setHalted(true);
 
     handleCpuStep();
+  } else if (command === EWorkerCommand.CPU_STEP_BACK) {
+    cancelRunLoop();
+    cpu.setHalted(true);
+
+    cpu.stepBack();
+    postCpuDump();
   } else if (command === EWorkerCommand.SET_CPU_HALT) {
     if (data) {
       cancelRunLoop();

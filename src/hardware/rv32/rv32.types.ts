@@ -1,4 +1,4 @@
-import type { ICPU, IDecodedInstruction } from "../common/processor";
+import type { ICPU, IDecodedInstruction, IStepUndoFrame } from "../common/processor";
 import type { rv_codec, rv_opcode } from "./rv32.const";
 
 export interface IDecodedRVInstruction extends IDecodedInstruction {
@@ -34,4 +34,8 @@ export interface IDecodedRVInstruction extends IDecodedInstruction {
 
 export interface IRVCPU extends ICPU {
   registerF: Record<number, bigint>;
+}
+
+export interface IRVStepUndoFrame extends IStepUndoFrame<IDecodedRVInstruction> {
+  registersF: Record<number, bigint>;
 }

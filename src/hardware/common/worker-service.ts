@@ -8,6 +8,7 @@ export const enum EWorkerCommand {
   CPU_SETUP = "CPU_SETUP",
   CPU_RUN = "CPU_RUN",
   CPU_STEP = "CPU_STEP",
+  CPU_STEP_BACK = "CPU_STEP_BACK",
   CPU_RESET = "CPU_RESET",
   SET_FREQUENCY = "SET_FREQUENCY",
   GET_FREQUENCY = "GET_FREQUENCY",
@@ -31,6 +32,7 @@ export interface IWorkerCPUDump {
   cycle: number;
   halted: boolean;
   lastExecutedInstruction: unknown;
+  canStepBack: boolean;
 }
 
 export interface IWorkerSetupPayload {
@@ -84,6 +86,7 @@ export type WorkerMessage =
         | EWorkerCommand.GET_FREQUENCY
         | EWorkerCommand.CPU_RUN
         | EWorkerCommand.CPU_STEP
+        | EWorkerCommand.CPU_STEP_BACK
         | EWorkerCommand.CPU_RESET
         | EWorkerCommand.MEMORY_RETRIEVE
         | EWorkerCommand.CPU_DUMP;
@@ -120,6 +123,7 @@ export type WorkerMessageResponse =
         | EWorkerCommand.CPU_SETUP
         | EWorkerCommand.CPU_RUN
         | EWorkerCommand.CPU_STEP
+        | EWorkerCommand.CPU_STEP_BACK
         | EWorkerCommand.CPU_RESET
         | EWorkerCommand.UPDATE_SCREEN;
       data: never;
@@ -184,6 +188,10 @@ export class WorkerService extends EventEmitter {
 
   stepCode() {
     this._postMessage({ command: EWorkerCommand.CPU_STEP } as WorkerMessage);
+  }
+
+  stepBack() {
+    this._postMessage({ command: EWorkerCommand.CPU_STEP_BACK } as WorkerMessage);
   }
 
   resetCpu() {

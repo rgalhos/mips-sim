@@ -29,6 +29,15 @@ export type IRegisterReadable = {
   };
 };
 
+export interface IStepUndoFrame<TDecodedInstruction> {
+  pc: bigint;
+  cycle: number;
+  halted: boolean;
+  lastExecutedInstruction: TDecodedInstruction | null;
+  registers: Record<number, bigint>;
+  memory: Record<number, number>;
+}
+
 export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction> {
   /**
    * List of registes used by
@@ -106,6 +115,14 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
   // @ts-expect-error ts(1268) - bigint as literal
   protected instructionCache: { [bytecode: bigint]: TDecodedInstruction } = {};
 
+  protected readonly undoHistoryLimit = 50;
+  protected _undoStack: IStepUndoFrame<TDecodedInstruction>[] = [];
+  protected _undoFrame: IStepUndoFrame<TDecodedInstruction> | null = null;
+
+  public get canStepBack() {
+    return this._undoStack.length > 0;
+  }
+
   private _halted = true;
 
   /**
@@ -143,6 +160,8 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
 
     this.cycle = 0;
     this.lastExecutedInstruction = null;
+    this._undoStack = [];
+    this._undoFrame = null;
 
     this.setHalted(true);
   }
@@ -181,10 +200,71 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
     return this.cpu.register[reg];
   }
 
+  protected beginUndoFrame() {
+    this._undoFrame = {
+      pc: this.cpu.pc,
+      cycle: this.cycle,
+      halted: this.halted,
+      lastExecutedInstruction: this.lastExecutedInstruction,
+      registers: {},
+      memory: {},
+    };
+  }
+
+  protected commitUndoFrame() {
+    if (!this._undoFrame) return;
+
+    this._undoStack.push(this._undoFrame);
+    if (this._undoStack.length > this.undoHistoryLimit) {
+      this._undoStack.shift();
+    }
+
+    this._undoFrame = null;
+  }
+
+  public stepBack(): boolean {
+    const frame = this._undoStack.pop();
+    if (!frame) return false;
+
+    this.applyUndoFrame(frame);
+    return true;
+  }
+
+  protected applyUndoFrame(frame: IStepUndoFrame<TDecodedInstruction>) {
+    for (const reg of Object.keys(frame.registers)) {
+      this.cpu.register[Number(reg)] = frame.registers[Number(reg)];
+    }
+
+    for (const addr of Object.keys(frame.memory)) {
+      const value = frame.memory[Number(addr)];
+      this.memory[Number(addr)] = value;
+      this._memoryOperationDiff[Number(addr)] = value;
+    }
+
+    this.cpu.pc = frame.pc;
+    this.cycle = frame.cycle;
+    this.setHalted(frame.halted);
+    this.lastExecutedInstruction = frame.lastExecutedInstruction;
+  }
+
+  protected recordRegisterUndo(reg: number, oldValue: bigint) {
+    if (this._undoFrame && !(reg in this._undoFrame.registers)) {
+      this._undoFrame.registers[reg] = oldValue;
+    }
+  }
+
+  protected recordMemoryUndo(address: number, oldValue: number) {
+    if (this._undoFrame && !(address in this._undoFrame.memory)) {
+      this._undoFrame.memory[address] = oldValue;
+    }
+  }
+
   protected registerWrite(reg: number, value: bigint) {
     if (!this.registers[reg]) {
       console.error("WIMS: Writing to inexistent register: ", reg);
     }
+
+    this.recordRegisterUndo(reg, this.cpu.register[reg]);
 
     this._dbgRegChanges.push({
       reg: this.registers[reg] as string,
@@ -200,6 +280,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
     switch (bits) {
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 32:
+        this.recordMemoryUndo(addr + 3, this.memory[addr + 3]);
         this._dbgMemChanges.push({
           address: addr + 3,
           value: (this._memoryOperationDiff[addr + 3] = this.memory[addr + 3] = (v >>> 24) & 0xff),
@@ -207,6 +288,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
           pc: this.cpu.pc,
         });
 
+        this.recordMemoryUndo(addr + 2, this.memory[addr + 2]);
         this._dbgMemChanges.push({
           address: addr + 2,
           value: (this._memoryOperationDiff[addr + 2] = this.memory[addr + 2] = (v >>> 16) & 0xff),
@@ -215,6 +297,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
         });
       // @ts-expect-error // eslint-disable-next-line no-fallthrough
       case 16:
+        this.recordMemoryUndo(addr + 1, this.memory[addr + 1]);
         this._dbgMemChanges.push({
           address: addr + 2,
           value: (this._memoryOperationDiff[addr + 1] = this.memory[addr + 1] = (v >>> 8) & 0xff),
@@ -223,6 +306,7 @@ export abstract class IProcessor<TDecodedInstruction extends IDecodedInstruction
         });
       // eslint-disable-next-line no-fallthrough
       default:
+        this.recordMemoryUndo(addr, this.memory[addr]);
         this._dbgMemChanges.push({
           address: addr + 2,
           value: (this._memoryOperationDiff[addr] = this.memory[addr] = v & 0xff),

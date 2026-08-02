@@ -12,10 +12,12 @@ export function MemoSimulatorActions(props: {
   onAssemble: () => void;
   onToggleExecution: () => void;
   onStep: () => void;
+  onStepBack: () => void;
   onToggleConsole: () => void;
 }) {
   const { simulator } = useSimulator();
   const [cpuHalted, setCpuHalted] = useState(true);
+  const [canStepBack, setCanStepBack] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [screenOpen, setScreenOpen] = useState(false);
 
@@ -30,6 +32,7 @@ export function MemoSimulatorActions(props: {
       simulator.processor.cycle = response.data.cycle;
 
       setCpuHalted((prev) => (prev === response.data.halted ? prev : response.data.halted));
+      setCanStepBack((prev) => (prev === response.data.canStepBack ? prev : response.data.canStepBack));
     };
 
     ws.on(EWorkerCommand.CPU_DUMP, onCpuDump);
@@ -39,14 +42,21 @@ export function MemoSimulatorActions(props: {
     };
   }, [simulator]);
 
-  const simulatorActions = useMemo(
+  const simulatorActions = useMemo<
+    Array<{ Icon: React.ReactElement; label: string; action: () => void; disabled?: boolean }>
+  >(
     () => [
       {
         Icon: cpuHalted ? <Play color="var(--catppuccin-green)" /> : <Pause color="var(--catppuccin-red)" />,
         label: "Run program",
         action: props.onToggleExecution,
       },
-      { Icon: <UndoDot color="var(--catppuccin-blue)" />, label: "Step back", disabled: true, action: () => void 0 },
+      {
+        Icon: <UndoDot color="var(--catppuccin-blue)" />,
+        label: "Step back",
+        disabled: !canStepBack,
+        action: props.onStepBack,
+      },
       {
         Icon: <StepForward color="var(--catppuccin-blue)" />,
         label: "Step one instruction",
@@ -54,7 +64,7 @@ export function MemoSimulatorActions(props: {
       },
       { Icon: <Settings />, label: "Simulator settings", action: () => setSettingsOpen(true) },
     ],
-    [props, cpuHalted]
+    [props, cpuHalted, canStepBack]
   );
 
   const simulatorTools = useMemo(

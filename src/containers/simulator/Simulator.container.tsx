@@ -96,6 +96,24 @@ export function SimulatorContainer() {
     }
   }, [simulator, onAssemble, program]);
 
+  const onStepBack = useCallback(() => {
+    if (!simulator || !simulator.workerService.worker) {
+      console.log("No simulator or worker");
+      return;
+    }
+
+    simulator.workerService.stepBack();
+
+    if ($settings.get().focusOnStep) {
+      const t = setTimeout(() => {
+        clearTimeout(t);
+
+        const line = program.instructions.find(({ address }) => address === simulator.processor.cpu.pc)?.lineNumber;
+        if (line) focusLine(line);
+      }, 15);
+    }
+  }, [simulator, program, focusLine]);
+
   const onStep = useCallback(() => {
     if (!simulator || !simulator.workerService.worker) {
       console.log("No simulator or worker");
@@ -155,6 +173,7 @@ export function SimulatorContainer() {
                   onAssemble={onAssemble}
                   onToggleExecution={onToggleExecution}
                   onStep={onStep}
+                  onStepBack={onStepBack}
                   onToggleConsole={onToggleConsole}
                 />
               </TabsList>
