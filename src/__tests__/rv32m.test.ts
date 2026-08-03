@@ -20,7 +20,7 @@ function run(op: rv_opcode, a: bigint, b: bigint) {
 }
 
 describe("RV32M", () => {
-  describe("mul (spec: x[rd] = x[rs1] * x[rs2], lower XLEN bits of the full product)", () => {
+  describe("mul", () => {
     test.each([
       ["positive * positive: 6 * 7 = 42", 6n, 7n, 42n],
       ["positive * negative: 6 * -7 = -42, stored as 0xffffffd6", 6n, 0xfffffff9n, 0xffffffd6n],
@@ -35,7 +35,7 @@ describe("RV32M", () => {
     });
   });
 
-  describe("mulh (spec: x[rd] = (x[rs1] *s x[rs2])[63:32], both operands signed)", () => {
+  describe("mulh", () => {
     test.each([
       ["2 * 3 = 6 fits in the lower half, upper half is 0", 2n, 3n, 0n],
       ["INT32_MAX * INT32_MAX = 0x3fffffff_00000001, upper half 0x3fffffff", 0x7fffffffn, 0x7fffffffn, 0x3fffffffn],
@@ -48,7 +48,7 @@ describe("RV32M", () => {
     });
   });
 
-  describe("mulhu (spec: x[rd] = (x[rs1] *u x[rs2])[63:32], both operands unsigned)", () => {
+  describe("mulhu", () => {
     test.each([
       ["2 * 3 = 6 fits in the lower half, upper half is 0", 2n, 3n, 0n],
       ["UINT32_MAX * UINT32_MAX = 0xfffffffe_00000001, upper half 0xfffffffe", 0xffffffffn, 0xffffffffn, 0xfffffffen],
@@ -64,7 +64,7 @@ describe("RV32M", () => {
     });
   });
 
-  describe("mulhsu (spec: x[rd] = (x[rs1] *s x[rs2]_zext)[63:32], rs1 signed, rs2 unsigned)", () => {
+  describe("mulhsu", () => {
     test.each([
       ["5 * UINT32_MAX (0xffffffff, unsigned) = 0x4_fffffffb, upper half 4", 5n, 0xffffffffn, 4n],
       [
@@ -90,7 +90,7 @@ describe("RV32M", () => {
     });
   });
 
-  describe("div (spec: signed division, rounding towards zero)", () => {
+  describe("div", () => {
     test.each([
       ["10 / 2 = 5", 10n, 2n, 5n],
       ["-10 / 3 truncates towards zero to -3, not floors to -4", 0xfffffff6n, 3n, 0xfffffffdn],
@@ -111,7 +111,7 @@ describe("RV32M", () => {
     });
   });
 
-  describe("divu (spec: unsigned division, rounding towards zero)", () => {
+  describe("divu", () => {
     test.each([
       ["10 / 2 = 5", 10n, 2n, 5n],
       ["0x80000000 read as a large unsigned value: 0x80000000 / 2 = 0x40000000", 0x80000000n, 2n, 0x40000000n],
@@ -125,7 +125,7 @@ describe("RV32M", () => {
     });
   });
 
-  describe("rem (spec: x[rd] = x[rs1] -s x[rs2] *s (x[rs1] /s x[rs2]); remainder keeps the dividend's sign)", () => {
+  describe("rem", () => {
     test.each([
       ["10 % 3 = 1", 10n, 3n, 1n],
       ["-10 % 3 = -1, keeps the dividend's sign", 0xfffffff6n, 3n, 0xffffffffn],
@@ -146,7 +146,7 @@ describe("RV32M", () => {
     });
   });
 
-  describe("remu (spec: unsigned remainder)", () => {
+  describe("remu", () => {
     test.each([
       ["10 % 3 = 1", 10n, 3n, 1n],
       ["0x80000001 read as a large unsigned value: 0x80000001 % 2 = 1", 0x80000001n, 2n, 1n],
