@@ -199,8 +199,8 @@ export function SimulatorContainer() {
               <ResizableHandle withHandle className="mx-4" />
 
               <ResizablePanel
-                defaultSize="20%"
-                maxSize="350px"
+                defaultSize="400px"
+                maxSize="500px"
                 minSize="50px"
                 className="flex min-h-0 flex-col overflow-auto"
               >

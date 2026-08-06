@@ -16,7 +16,7 @@ const RegisterRow = memo(
   }) {
     return (
       <div className={`reg px-1 reg-${reg} ${blink ? "blink-register" : ""}`}>
-        {reg.padEnd(5, " ")} {fmtWordHex(values.value)} ({values.str}) {"\n"}
+        {values.regStr.padEnd(9, " ")} {fmtWordHex(values.value)} ({values.str}) {"\n"}
       </div>
     );
   },

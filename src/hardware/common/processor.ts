@@ -24,6 +24,7 @@ export type ICPU = Record<string, unknown> & {
 
 export type IRegisterReadable = {
   [reg: string]: {
+    regStr: string;
     value: bigint;
     str: string;
   };

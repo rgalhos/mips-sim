@@ -122,6 +122,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   } else if (command === EWorkerCommand.CPU_RESET) {
     cancelRunLoop();
     cpu.resetState();
+    nextDump = 0;
   } else if (command === EWorkerCommand.CPU_RUN) {
     cpu.setHalted(!cpu.halted);
 
@@ -161,6 +162,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     console.log("cpu worker: debug: program loaded", { program: data, cpu });
 
     cpu.loadProgram(data as Parameters<RVProcessor["loadProgram"]>[0]);
+    nextDump = 0;
 
     postCpuDump();
   } else if (command === EWorkerCommand.MEMORY_RETRIEVE) {
@@ -175,6 +177,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   } else if (command === EWorkerCommand.SYNC_WORKER) {
     cancelRunLoop();
     cpu.resetState({ clearMemory: !usingSharedMemory && !data.memory });
+    nextDump = 0;
 
     cpu.cpu = data.cpu as IRVCPU;
 

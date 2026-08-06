@@ -7,6 +7,7 @@ import {
   rv_opcode,
   RV_OPCODE_DATA,
   rv_reg,
+  rv_reg_alias,
   rv_reg_f,
   rv_syscalls,
   rv_worker_commands,
@@ -1538,16 +1539,22 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
     }
   }
 
+  // @todo rewrite; this function sucks
   public getRegistersReadable(cpu: IRVCPU) {
     const reg: IRegisterReadable = {
       pc: {
+        regStr: "pc",
         value: cpu.pc,
         str: cpu.pc.toString(10),
       },
     };
 
     for (const [r, v] of Object.entries(cpu.register)) {
+      // @ts-expect-error @todo bleeeeeeeeeeeeeeh
+      const regStr = `${rv_reg_alias[rv_reg[r]].padEnd(3, " ")} (${rv_reg[r]})`;
+
       reg[rv_reg[r as unknown as number]] = {
+        regStr,
         value: v,
         str: v.toString(10),
       };
@@ -1555,7 +1562,11 @@ export class RVProcessor extends IProcessor<IDecodedRVInstruction> {
 
     if (this.extensions & rv_ext.RV32F) {
       for (const [r, v] of Object.entries(cpu.registerF)) {
+        // @ts-expect-error @todo bleeeeeeeeeeeeeeh
+        const regStr = rv_reg_alias[rv_reg_f[r]].padEnd(3, " ") + ` (${rv_reg_f[r]})`.padEnd(7, " ");
+
         reg[rv_reg_f[r as unknown as number]] = {
+          regStr,
           value: v,
           str: biguint32_to_f(v).toString(10),
         };
